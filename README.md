@@ -1,35 +1,28 @@
 # Stundenplan Card (Home Assistant)
 
-Eine einfache Lovelace Custom Card zur Darstellung eines Stundenplans (mit optionalem Heute-Highlight).
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
+![Version](https://img.shields.io/github/v/release/fabel-smith/stundenplan-card)
+![Maintenance](https://img.shields.io/maintenance/yes/2026)
+![License](https://img.shields.io/github/license/fabel-smith/stundenplan-card)
 
-## Installation (HACS)
-1. HACS → Frontend → Custom repositories
-2. Repo-URL hinzufügen, Kategorie: Lovelace
-3. Installieren
-4. Home Assistant neu laden (oder Browser Cache leeren)
-5. Resource wird i.d.R. automatisch hinzugefügt (sonst manuell unter Einstellungen → Dashboards → Ressourcen)
+Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle – inklusive **visuellem Editor (GUI)**, **Heute-Highlight** und **Hervorhebung des aktuellen Fachs**.
 
-## Beispiel
-```yaml
-type: custom:stundenplan-card
-title: "Vivvi / Klasse 2c"
-days: [Mo, Di, Mi, Do, Fr]
-rows:
-  - time: "1. 07:45–08:30"
-    cells: ["D","Sp","M","D","Reli"]
-  - time: "2. 08:35–09:20"
-    cells: ["D","Sp","D","D","Reli"]
-  - break: true
-    time: "09:20–09:40"
-    label: "gr. P"
-  - time: "3. 09:40–10:25"
-    cells: ["M","D","Mu","M","D"]
-  - time: "4. 10:30–11:15"
-    cells: ["SU","D","Sp","M","M"]
-  - break: true
-    time: "11:15–11:40"
-    label: "gr. P"
-  - time: "5. 11:40–12:25"
-    cells: ["BK","M","SU","TW","SU"]
+---
 
-highlight_today: true
+## ✨ Features
+
+- 📅 Tabellenansicht (Tage × Stunden)
+- 🛠️ Vollständiger visueller Editor (kein YAML-Zwang)
+- 🔵 Hervorhebung der heutigen Spalte (`highlight_today`)
+- 🟡 Hervorhebung des **aktuellen Fachs** (heutiger Tag + aktuelle Stunde) (`highlight_current`)
+- ☕ Pausen-Zeilen (`break: true` + Label)
+- ➕ Zeilen hinzufügen / löschen
+- ⚡ HACS-kompatibel
+
+---
+
+## 📸 Screenshot
+
+```md
+![Screenshot](screenshot.png)
+
