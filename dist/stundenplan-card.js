@@ -997,10 +997,10 @@ customElements.get("stundenplan-card-editor") || customElements.define("stundenp
 const q = window;
 q.customCards = q.customCards || [];
 q.customCards.push({
-  type: "custom:stundenplan-card",
+  type: "stundenplan-card",
+  // WICHTIG: ohne "custom:"
   name: "Stundenplan Card",
   description: "Stundenplan mit visuellem Editor",
   preview: !0
-  // wieder aktiv, setConfig ist jetzt defensiv
 });
 //# sourceMappingURL=stundenplan-card.js.map
