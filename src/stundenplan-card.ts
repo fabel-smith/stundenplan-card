@@ -15,13 +15,14 @@ interface StundenplanConfig {
   highlight_today?: boolean;
 }
 
+/* =========================
+   CARD
+========================= */
 class StundenplanCard extends LitElement {
-  static get properties() {
-    return {
-      hass: {},
-      config: {},
-    };
-  }
+  static properties = {
+    hass: {},
+    config: {},
+  };
 
   hass: any;
   config!: StundenplanConfig;
@@ -41,15 +42,13 @@ class StundenplanCard extends LitElement {
   }
 
   setConfig(config: StundenplanConfig) {
-    if (!config.rows) {
-      throw new Error("rows required");
-    }
+    if (!config.rows) throw new Error("rows required");
     this.config = config;
   }
 
   render() {
     const { title, days = [], rows = [], highlight_today = true } = this.config;
-    const today = new Date().getDay(); // 1 = Mo
+    const today = new Date().getDay();
 
     return html`
       <ha-card>
@@ -131,9 +130,92 @@ class StundenplanCard extends LitElement {
 
 customElements.define("stundenplan-card", StundenplanCard);
 
+/* =========================
+   VISUAL EDITOR
+========================= */
+class StundenplanCardEditor extends LitElement {
+  static properties = {
+    hass: {},
+    _config: {},
+  };
+
+  hass: any;
+  _config!: StundenplanConfig;
+
+  setConfig(config: StundenplanConfig) {
+    this._config = { ...config };
+  }
+
+  private _valueChanged(ev: any) {
+    if (!this._config) return;
+    const target = ev.target;
+    const key = target.configValue;
+
+    const value = target.type === "checkbox" ? target.checked : target.value;
+    this._config = { ...this._config, [key]: value };
+
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: this._config },
+      })
+    );
+  }
+
+  render() {
+    if (!this.hass) return html``;
+
+    return html`
+      <div style="padding:16px;">
+        <ha-textfield
+          label="Titel"
+          .value=${this._config.title || ""}
+          .configValue=${"title"}
+          @input=${this._valueChanged}
+        ></ha-textfield>
+
+        <ha-textfield
+          label="Tage (kommagetrennt, z.B. Mo,Di,Mi,Do,Fr)"
+          .value=${(this._config.days || []).join(",")}
+          .configValue=${"days"}
+          @input=${(e: any) => {
+            const val = e.target.value.split(",").map((v: string) => v.trim());
+            this._config = { ...this._config, days: val };
+            this.dispatchEvent(
+              new CustomEvent("config-changed", {
+                detail: { config: this._config },
+              })
+            );
+          }}
+        ></ha-textfield>
+
+        <ha-formfield label="Heute hervorheben">
+          <ha-switch
+            .checked=${this._config.highlight_today ?? true}
+            .configValue=${"highlight_today"}
+            @change=${this._valueChanged}
+          ></ha-switch>
+        </ha-formfield>
+
+        <p style="margin-top:16px; opacity:0.7;">
+          Zeilen (rows) bearbeitest du aktuell noch im YAML – UI-Editor für
+          Zeilen kommt in v0.2.0 😉
+        </p>
+      </div>
+    `;
+  }
+}
+
+customElements.define("stundenplan-card-editor", StundenplanCardEditor);
+
 (window as any).customCards = (window as any).customCards || [];
 (window as any).customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
   description: "Stundenplan mit visuellem Editor",
+  preview: true,
+});
+
+/* Verbindung Card ↔ Editor */
+(window as any).customElements.whenDefined("stundenplan-card").then(() => {
+  (window as any).customCards = (window as any).customCards || [];
 });
