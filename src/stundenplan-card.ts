@@ -1,7 +1,8 @@
 import { LitElement, html, css } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 
 interface StundenplanRow {
-  time?: string;
+  time: string;
   cells?: string[];
   break?: boolean;
   label?: string;
@@ -10,22 +11,47 @@ interface StundenplanRow {
 interface StundenplanConfig {
   type: string;
   title?: string;
-  days?: string[];
-  rows: StundenplanRow[];
+  days: string[];
   highlight_today?: boolean;
+  rows: StundenplanRow[];
 }
 
 /* =========================
    CARD
 ========================= */
+@customElement("stundenplan-card")
 class StundenplanCard extends LitElement {
-  static properties = {
-    hass: {},
-    config: {},
-  };
+  @property({ attribute: false }) hass: any;
+  @state() private config!: StundenplanConfig;
 
-  hass: any;
-  config!: StundenplanConfig;
+  static styles = css`
+    .card {
+      padding: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      padding: 6px;
+      text-align: center;
+      border: 1px solid var(--divider-color);
+    }
+    th {
+      background: var(--secondary-background-color);
+    }
+    .time {
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    .today {
+      background: rgba(0, 150, 255, 0.2);
+    }
+    .break {
+      font-style: italic;
+      opacity: 0.7;
+    }
+  `;
 
   static getStubConfig() {
     return {
@@ -41,181 +67,142 @@ class StundenplanCard extends LitElement {
     };
   }
 
+  static getConfigElement() {
+    return document.createElement("stundenplan-card-editor");
+  }
+
   setConfig(config: StundenplanConfig) {
-    if (!config.rows) throw new Error("rows required");
+    if (!config || !config.rows || !config.days) {
+      throw new Error("Invalid configuration");
+    }
     this.config = config;
   }
 
+  private getTodayIndex() {
+    const map: Record<number, number> = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4 };
+    const day = new Date().getDay(); // 0=So
+    return map[day] ?? -1;
+  }
+
   render() {
-    const { title, days = [], rows = [], highlight_today = true } = this.config;
-    const today = new Date().getDay();
+    if (!this.config) return html``;
+
+    const todayIndex = this.getTodayIndex();
 
     return html`
-      <ha-card>
-        ${title ? html`<div class="header">${title}</div>` : ""}
-        <div class="table">
-          <div class="row header-row">
-            <div class="cell time">Stunde</div>
-            ${days.map((d) => html`<div class="cell">${d}</div>`)}
-          </div>
+      <ha-card header="${this.config.title ?? ""}">
+        <div class="card">
+          <table>
+            <thead>
+              <tr>
+                <th class="time">Stunde</th>
+                ${this.config.days.map((d, i) => html`
+                  <th class="${this.config.highlight_today && i === todayIndex ? "today" : ""}">${d}</th>
+                `)}
+              </tr>
+            </thead>
+            <tbody>
+              ${this.config.rows.map(row => {
+                if (row.break) {
+                  return html`
+                    <tr class="break">
+                      <td class="time">${row.time}</td>
+                      <td colspan="${this.config.days.length}">
+                        ${row.label ?? ""}
+                      </td>
+                    </tr>
+                  `;
+                }
 
-          ${rows.map((row) =>
-            row.break
-              ? html`
-                  <div class="row break-row">
-                    <div class="cell time">${row.time ?? ""}</div>
-                    <div class="cell break" colspan="${days.length}">
-                      ${row.label ?? ""}
-                    </div>
-                  </div>
-                `
-              : html`
-                  <div class="row">
-                    <div class="cell time">${row.time}</div>
-                    ${row.cells?.map(
-                      (c, i) => html`
-                        <div
-                          class="cell ${highlight_today && today === i + 1
-                            ? "today"
-                            : ""}"
-                        >
-                          ${c}
-                        </div>
-                      `
-                    )}
-                  </div>
-                `
-          )}
+                return html`
+                  <tr>
+                    <td class="time">${row.time}</td>
+                    ${row.cells?.map((cell, i) => html`
+                      <td class="${this.config.highlight_today && i === todayIndex ? "today" : ""}">
+                        ${cell}
+                      </td>
+                    `)}
+                  </tr>
+                `;
+              })}
+            </tbody>
+          </table>
         </div>
       </ha-card>
     `;
   }
-
-  static styles = css`
-    .header {
-      font-weight: 700;
-      padding: 12px;
-      font-size: 16px;
-    }
-    .table {
-      display: flex;
-      flex-direction: column;
-    }
-    .row {
-      display: grid;
-      grid-template-columns: 140px repeat(auto-fit, minmax(60px, 1fr));
-    }
-    .cell {
-      padding: 10px;
-      text-align: center;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    .time {
-      font-weight: 600;
-      background: rgba(255, 255, 255, 0.05);
-    }
-    .header-row .cell {
-      font-weight: 700;
-      background: rgba(255, 255, 255, 0.08);
-    }
-    .break-row .cell {
-      background: rgba(255, 255, 255, 0.03);
-      font-style: italic;
-    }
-    .today {
-      background: rgba(56, 189, 248, 0.25);
-    }
-  `;
 }
-
-customElements.define("stundenplan-card", StundenplanCard);
 
 /* =========================
    VISUAL EDITOR
 ========================= */
+@customElement("stundenplan-card-editor")
 class StundenplanCardEditor extends LitElement {
-  static properties = {
-    hass: {},
-    _config: {},
-  };
-
-  hass: any;
-  _config!: StundenplanConfig;
+  @state() private _config!: StundenplanConfig;
 
   setConfig(config: StundenplanConfig) {
-    this._config = { ...config };
+    this._config = JSON.parse(JSON.stringify(config));
   }
 
-  private _valueChanged(ev: any) {
-    if (!this._config) return;
-    const target = ev.target;
-    const key = target.configValue;
-
-    const value = target.type === "checkbox" ? target.checked : target.value;
-    this._config = { ...this._config, [key]: value };
-
-    this.dispatchEvent(
-      new CustomEvent("config-changed", {
-        detail: { config: this._config },
-      })
-    );
+  private _valueChanged() {
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: this._config },
+      bubbles: true,
+      composed: true,
+    }));
   }
+
+  static styles = css`
+    .row {
+      margin-bottom: 12px;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+  `;
 
   render() {
-    if (!this.hass) return html``;
+    if (!this._config) return html``;
 
     return html`
-      <div style="padding:16px;">
-        <ha-textfield
-          label="Titel"
-          .value=${this._config.title || ""}
-          .configValue=${"title"}
-          @input=${this._valueChanged}
-        ></ha-textfield>
+      <div class="row">
+        <label>Titel</label>
+        <input
+          type="text"
+          .value="${this._config.title ?? ""}"
+          @input="${(e: any) => {
+            this._config.title = e.target.value;
+            this._valueChanged();
+          }}"
+        />
+      </div>
 
-        <ha-textfield
-          label="Tage (kommagetrennt, z.B. Mo,Di,Mi,Do,Fr)"
-          .value=${(this._config.days || []).join(",")}
-          .configValue=${"days"}
-          @input=${(e: any) => {
-            const val = e.target.value.split(",").map((v: string) => v.trim());
-            this._config = { ...this._config, days: val };
-            this.dispatchEvent(
-              new CustomEvent("config-changed", {
-                detail: { config: this._config },
-              })
-            );
-          }}
-        ></ha-textfield>
+      <div class="row">
+        <label>Tage (Komma getrennt)</label>
+        <input
+          type="text"
+          .value="${this._config.days.join(", ")}"
+          @input="${(e: any) => {
+            this._config.days = e.target.value.split(",").map((d: string) => d.trim());
+            this._valueChanged();
+          }}"
+        />
+      </div>
 
-        <ha-formfield label="Heute hervorheben">
-          <ha-switch
-            .checked=${this._config.highlight_today ?? true}
-            .configValue=${"highlight_today"}
-            @change=${this._valueChanged}
-          ></ha-switch>
-        </ha-formfield>
-
-        <p style="margin-top:16px; opacity:0.7;">
-          Zeilen (rows) bearbeitest du aktuell noch im YAML – UI-Editor für
-          Zeilen kommt in v0.2.0 😉
-        </p>
+      <div class="row">
+        <label>
+          <input
+            type="checkbox"
+            .checked="${this._config.highlight_today ?? false}"
+            @change="${(e: any) => {
+              this._config.highlight_today = e.target.checked;
+              this._valueChanged();
+            }}"
+          />
+          Heute hervorheben
+        </label>
       </div>
     `;
   }
 }
-
-customElements.define("stundenplan-card-editor", StundenplanCardEditor);
-
-(window as any).customCards = (window as any).customCards || [];
-(window as any).customCards.push({
-  type: "stundenplan-card",
-  name: "Stundenplan Card",
-  description: "Stundenplan mit visuellem Editor",
-  preview: true,
-});
-
-/* Verbindung Card ↔ Editor */
-(window as any).customElements.whenDefined("stundenplan-card").then(() => {
-  (window as any).customCards = (window as any).customCards || [];
-});
