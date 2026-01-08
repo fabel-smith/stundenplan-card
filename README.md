@@ -23,4 +23,4 @@ Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle – ink
 
 ## 📸 Screenshot
 
-![Screenshot](screenshot.png)
+![Screenshot](https://raw.githubusercontent.com/fabel-smith/stundenplan-card/main/screenshot.png)
