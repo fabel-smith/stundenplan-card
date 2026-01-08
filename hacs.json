@@ -1,0 +1,8 @@
+{
+  "name": "Stundenplan Card",
+  "content_in_root": false,
+  "render_readme": true,
+  "domains": [],
+  "country": "DE",
+  "homeassistant": "2023.6.0"
+}
