@@ -1,5 +1,4 @@
 import { LitElement, html, css } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
 
 interface StundenplanRow {
   time: string;
@@ -19,39 +18,9 @@ interface StundenplanConfig {
 /* =========================
    CARD
 ========================= */
-@customElement("stundenplan-card")
 class StundenplanCard extends LitElement {
-  @property({ attribute: false }) hass: any;
-  @state() private config!: StundenplanConfig;
-
-  static styles = css`
-    .card {
-      padding: 12px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    th, td {
-      padding: 6px;
-      text-align: center;
-      border: 1px solid var(--divider-color);
-    }
-    th {
-      background: var(--secondary-background-color);
-    }
-    .time {
-      font-weight: bold;
-      white-space: nowrap;
-    }
-    .today {
-      background: rgba(0, 150, 255, 0.2);
-    }
-    .break {
-      font-style: italic;
-      opacity: 0.7;
-    }
-  `;
+  hass: any;
+  config!: StundenplanConfig;
 
   static getStubConfig() {
     return {
@@ -84,6 +53,16 @@ class StundenplanCard extends LitElement {
     return map[day] ?? -1;
   }
 
+  static styles = css`
+    .card { padding: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 6px; text-align: center; border: 1px solid var(--divider-color); }
+    th { background: var(--secondary-background-color); }
+    .time { font-weight: bold; white-space: nowrap; }
+    .today { background: rgba(0, 150, 255, 0.2); }
+    .break { font-style: italic; opacity: 0.7; }
+  `;
+
   render() {
     if (!this.config) return html``;
 
@@ -96,32 +75,35 @@ class StundenplanCard extends LitElement {
             <thead>
               <tr>
                 <th class="time">Stunde</th>
-                ${this.config.days.map((d, i) => html`
-                  <th class="${this.config.highlight_today && i === todayIndex ? "today" : ""}">${d}</th>
-                `)}
+                ${this.config.days.map(
+                  (d, i) => html`
+                    <th class="${this.config.highlight_today && i === todayIndex ? "today" : ""}">
+                      ${d}
+                    </th>
+                  `
+                )}
               </tr>
             </thead>
             <tbody>
-              ${this.config.rows.map(row => {
+              ${this.config.rows.map((row) => {
                 if (row.break) {
                   return html`
                     <tr class="break">
                       <td class="time">${row.time}</td>
-                      <td colspan="${this.config.days.length}">
-                        ${row.label ?? ""}
-                      </td>
+                      <td colspan="${this.config.days.length}">${row.label ?? ""}</td>
                     </tr>
                   `;
                 }
-
                 return html`
                   <tr>
                     <td class="time">${row.time}</td>
-                    ${row.cells?.map((cell, i) => html`
-                      <td class="${this.config.highlight_today && i === todayIndex ? "today" : ""}">
-                        ${cell}
-                      </td>
-                    `)}
+                    ${(row.cells ?? []).map(
+                      (cell, i) => html`
+                        <td class="${this.config.highlight_today && i === todayIndex ? "today" : ""}">
+                          ${cell}
+                        </td>
+                      `
+                    )}
                   </tr>
                 `;
               })}
@@ -136,30 +118,28 @@ class StundenplanCard extends LitElement {
 /* =========================
    VISUAL EDITOR
 ========================= */
-@customElement("stundenplan-card-editor")
 class StundenplanCardEditor extends LitElement {
-  @state() private _config!: StundenplanConfig;
+  hass: any;
+  _config!: StundenplanConfig;
 
   setConfig(config: StundenplanConfig) {
     this._config = JSON.parse(JSON.stringify(config));
   }
 
-  private _valueChanged() {
-    this.dispatchEvent(new CustomEvent("config-changed", {
-      detail: { config: this._config },
-      bubbles: true,
-      composed: true,
-    }));
+  private _emit() {
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   static styles = css`
-    .row {
-      margin-bottom: 12px;
-    }
-    input {
-      width: 100%;
-      box-sizing: border-box;
-    }
+    .row { margin-bottom: 12px; }
+    input { width: 100%; box-sizing: border-box; padding: 8px; }
+    label { display: block; margin-bottom: 6px; opacity: 0.8; }
   `;
 
   render() {
@@ -173,7 +153,7 @@ class StundenplanCardEditor extends LitElement {
           .value="${this._config.title ?? ""}"
           @input="${(e: any) => {
             this._config.title = e.target.value;
-            this._valueChanged();
+            this._emit();
           }}"
         />
       </div>
@@ -182,10 +162,13 @@ class StundenplanCardEditor extends LitElement {
         <label>Tage (Komma getrennt)</label>
         <input
           type="text"
-          .value="${this._config.days.join(", ")}"
+          .value="${(this._config.days ?? []).join(", ")}"
           @input="${(e: any) => {
-            this._config.days = e.target.value.split(",").map((d: string) => d.trim());
-            this._valueChanged();
+            this._config.days = e.target.value
+              .split(",")
+              .map((d: string) => d.trim())
+              .filter((d: string) => d.length);
+            this._emit();
           }}"
         />
       </div>
@@ -194,10 +177,10 @@ class StundenplanCardEditor extends LitElement {
         <label>
           <input
             type="checkbox"
-            .checked="${this._config.highlight_today ?? false}"
+            .checked="${this._config.highlight_today ?? true}"
             @change="${(e: any) => {
               this._config.highlight_today = e.target.checked;
-              this._valueChanged();
+              this._emit();
             }}"
           />
           Heute hervorheben
@@ -206,3 +189,16 @@ class StundenplanCardEditor extends LitElement {
     `;
   }
 }
+
+// Register custom elements
+customElements.define("stundenplan-card", StundenplanCard);
+customElements.define("stundenplan-card-editor", StundenplanCardEditor);
+
+// Show in card picker
+(window as any).customCards = (window as any).customCards || [];
+(window as any).customCards.push({
+  type: "stundenplan-card",
+  name: "Stundenplan Card",
+  description: "Stundenplan mit visuellem Editor",
+  preview: true,
+});
