@@ -1,4 +1,4 @@
-import { LitElement, html, css, nothing, TemplateResult } from "lit";
+import { LitElement, html, css, TemplateResult } from "lit";
 
 type LessonRow = {
   time: string;
@@ -19,6 +19,11 @@ type StundenplanConfig = {
   days?: string[];
   highlight_today?: boolean;
   rows?: Row[];
+
+  // IMPORTANT:
+  // Home Assistant kann zusätzliche Keys in die Card-Config schreiben (z.B. Layout-Metadaten).
+  // Die dürfen NICHT weg-normalisiert werden, sonst springt z.B. "Karte in voller Breite" wieder raus.
+  [key: string]: any;
 };
 
 function isBreakRow(r: any): r is BreakRow {
@@ -46,7 +51,21 @@ export class StundenplanCard extends LitElement {
     return document.createElement("stundenplan-card-editor");
   }
 
-  // IMPORTANT: defensiv, damit Picker/Preview stabil bleibt
+  // Sections view sizing (Home Assistant)
+  // sorgt dafür, dass die Card im Sections-Layout als "volle Breite" behandelt wird
+  public getGridOptions() {
+    return {
+      columns: "full",
+    };
+  }
+
+  // optional: hilft HA beim Platzieren
+  public getCardSize(): number {
+    const rows = this.config?.rows?.length ?? 3;
+    return Math.max(3, rows);
+  }
+
+  // defensiv, damit Picker/Preview stabil bleibt
   public setConfig(cfg: StundenplanConfig): void {
     const stub = StundenplanCard.getStubConfig();
     const type = ((cfg?.type ?? stub.type) + "").toString();
@@ -61,17 +80,6 @@ export class StundenplanCard extends LitElement {
       ...cfg,
       type,
     });
-  }
-
-  // optional: hilft HA beim Platzieren
-  public getCardSize(): number {
-    const rows = this.config?.rows?.length ?? 3;
-    return Math.max(3, rows);
-  }
-
-  // FIX B: Sections/Grid → default full width
-  public getLayoutOptions(): { grid_columns: number; grid_rows: string } {
-    return { grid_columns: 12, grid_rows: "auto" };
   }
 
   private normalizeConfig(cfg: StundenplanConfig) {
@@ -160,11 +168,11 @@ export class StundenplanCard extends LitElement {
   }
 
   static styles = css`
-    /* FIX A: immer volle Breite – unabhängig vom UI-Toggle */
     :host {
       display: block;
       width: 100%;
       max-width: 100%;
+      box-sizing: border-box;
     }
 
     ha-card {
@@ -172,15 +180,18 @@ export class StundenplanCard extends LitElement {
       width: 100%;
       max-width: 100%;
       box-sizing: border-box;
+      overflow: hidden;
     }
 
     .card {
       padding: 12px;
+      box-sizing: border-box;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
+      box-sizing: border-box;
     }
 
     th,
@@ -188,6 +199,7 @@ export class StundenplanCard extends LitElement {
       padding: 6px;
       text-align: center;
       border: 1px solid var(--divider-color);
+      box-sizing: border-box;
     }
 
     th {
@@ -218,7 +230,7 @@ export class StundenplanCardEditor extends LitElement {
   };
 
   public hass: any;
-  private _config?: Required<Pick<StundenplanConfig, "type" | "title" | "days" | "highlight_today" | "rows">>;
+  private _config?: Required<Pick<StundenplanConfig, "type" | "title" | "days" | "highlight_today" | "rows">> & Record<string, any>;
 
   public setConfig(cfg: StundenplanConfig): void {
     const type = ((cfg?.type ?? "") + "").toString();
@@ -237,7 +249,15 @@ export class StundenplanCardEditor extends LitElement {
     }
   }
 
+  // IMPORTANT: Layout-/Sections-Keys durchreichen, damit "Karte in voller Breite" nicht zurückspringt.
   private normalizeConfig(cfg: StundenplanConfig) {
+    const extras = { ...(cfg ?? {}) };
+    delete extras.title;
+    delete extras.days;
+    delete extras.highlight_today;
+    delete extras.rows;
+    delete extras.type;
+
     const days = Array.isArray(cfg.days) ? cfg.days.map((d) => (d ?? "").toString()) : [];
     const rowsIn = Array.isArray(cfg.rows) ? cfg.rows : [];
 
@@ -251,6 +271,7 @@ export class StundenplanCardEditor extends LitElement {
     });
 
     return {
+      ...extras,
       type: (cfg.type ?? "custom:stundenplan-card").toString(),
       title: (cfg.title ?? "Mein Stundenplan").toString(),
       days,
@@ -282,13 +303,13 @@ export class StundenplanCardEditor extends LitElement {
 
   private updateRowTime(idx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => (i === idx ? { ...r, time: value } : r));
+    const rows = this._config.rows.map((r: any, i: number) => (i === idx ? { ...r, time: value } : r));
     this.emit({ ...this._config, rows });
   }
 
   private updateRowCell(rowIdx: number, cellIdx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => {
+    const rows = this._config.rows.map((r: any, i: number) => {
       if (i !== rowIdx || isBreakRow(r)) return r;
       const cells = Array.isArray((r as LessonRow).cells) ? [...(r as LessonRow).cells] : [];
       cells[cellIdx] = value;
@@ -299,7 +320,7 @@ export class StundenplanCardEditor extends LitElement {
 
   private toggleBreak(idx: number, isBreak: boolean) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => {
+    const rows = this._config.rows.map((r: any, i: number) => {
       if (i !== idx) return r;
       if (isBreak) return { break: true, time: (r as any).time ?? "", label: (r as any).label ?? "Pause" };
       return { time: (r as any).time ?? "", cells: Array.from({ length: this._config!.days.length }, () => "") };
@@ -309,7 +330,7 @@ export class StundenplanCardEditor extends LitElement {
 
   private updateBreakLabel(idx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => (i === idx ? { ...r, label: value } : r));
+    const rows = this._config.rows.map((r: any, i: number) => (i === idx ? { ...r, label: value } : r));
     this.emit({ ...this._config, rows });
   }
 
@@ -330,7 +351,7 @@ export class StundenplanCardEditor extends LitElement {
 
   private removeRow(idx: number) {
     if (!this._config) return;
-    const rows = this._config.rows.filter((_, i) => i !== idx);
+    const rows = this._config.rows.filter((_: any, i: number) => i !== idx);
     this.emit({ ...this._config, rows });
   }
 
@@ -341,19 +362,31 @@ export class StundenplanCardEditor extends LitElement {
       <div class="section">
         <div class="row">
           <label>Titel</label>
-          <input type="text" .value=${this._config.title ?? ""} @input=${(e: any) => this.emit({ ...this._config!, title: e.target.value })} />
+          <input
+            type="text"
+            .value=${this._config.title ?? ""}
+            @input=${(e: any) => this.emit({ ...this._config!, title: e.target.value })}
+          />
         </div>
 
         <div class="row">
           <label>Tage (Komma getrennt)</label>
-          <input type="text" .value=${(this._config.days ?? []).join(", ")} @input=${(e: any) => this.setDaysFromString(e.target.value)} />
+          <input
+            type="text"
+            .value=${(this._config.days ?? []).join(", ")}
+            @input=${(e: any) => this.setDaysFromString(e.target.value)}
+          />
           <div class="hint">Beispiel: Mo, Di, Mi, Do, Fr</div>
         </div>
 
         <div class="row">
           <label>Optionen</label>
           <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_today ?? true} @change=${(e: any) => this.emit({ ...this._config!, highlight_today: e.target.checked })} />
+            <input
+              type="checkbox"
+              .checked=${this._config.highlight_today ?? true}
+              @change=${(e: any) => this.emit({ ...this._config!, highlight_today: e.target.checked })}
+            />
             <span>Heute hervorheben</span>
           </div>
         </div>
@@ -367,48 +400,62 @@ export class StundenplanCardEditor extends LitElement {
         </div>
       </div>
 
-      ${this._config.rows.map((r, idx) => html`
-        <div class="rowCard">
-          <div class="rowTop">
-            <div>
-              <label>Zeit / Stunde</label>
-              <input
-                type="text"
-                .value=${(r as any).time ?? ""}
-                placeholder="z. B. 1. 08:00–08:45"
-                @input=${(e: any) => this.updateRowTime(idx, e.target.value)}
-              />
+      ${this._config.rows.map(
+        (r: any, idx: number) => html`
+          <div class="rowCard">
+            <div class="rowTop">
+              <div>
+                <label>Zeit / Stunde</label>
+                <input
+                  type="text"
+                  .value=${(r as any).time ?? ""}
+                  placeholder="z. B. 1. 08:00–08:45"
+                  @input=${(e: any) => this.updateRowTime(idx, e.target.value)}
+                />
+              </div>
+
+              <div class="checkboxLine" style="margin-top: 20px;">
+                <input type="checkbox" .checked=${isBreakRow(r)} @change=${(e: any) => this.toggleBreak(idx, e.target.checked)} />
+                <span>Pause</span>
+              </div>
+
+              <div style="margin-top: 20px; text-align:right;">
+                <button class="danger" @click=${() => this.removeRow(idx)}>Löschen</button>
+              </div>
             </div>
 
-            <div class="checkboxLine" style="margin-top: 20px;">
-              <input type="checkbox" .checked=${isBreakRow(r)} @change=${(e: any) => this.toggleBreak(idx, e.target.checked)} />
-              <span>Pause</span>
-            </div>
-
-            <div style="margin-top: 20px; text-align:right;">
-              <button class="danger" @click=${() => this.removeRow(idx)}>Löschen</button>
-            </div>
+            ${isBreakRow(r)
+              ? html`
+                  <div class="row">
+                    <label>Pausentext</label>
+                    <input
+                      type="text"
+                      .value=${r.label ?? "Pause"}
+                      placeholder="z. B. Pause"
+                      @input=${(e: any) => this.updateBreakLabel(idx, e.target.value)}
+                    />
+                  </div>
+                `
+              : html`
+                  <div class="cellsGrid">
+                    ${(this._config!.days ?? []).map(
+                      (d: string, i: number) => html`
+                        <div>
+                          <div class="cellLabel">${d}</div>
+                          <input
+                            type="text"
+                            .value=${((r as LessonRow).cells?.[i] ?? "").toString()}
+                            placeholder="Fach"
+                            @input=${(e: any) => this.updateRowCell(idx, i, e.target.value)}
+                          />
+                        </div>
+                      `
+                    )}
+                  </div>
+                `}
           </div>
-
-          ${isBreakRow(r)
-            ? html`
-                <div class="row">
-                  <label>Pausentext</label>
-                  <input type="text" .value=${r.label ?? "Pause"} placeholder="z. B. Pause" @input=${(e: any) => this.updateBreakLabel(idx, e.target.value)} />
-                </div>
-              `
-            : html`
-                <div class="cellsGrid">
-                  ${(this._config!.days ?? []).map((d, i) => html`
-                    <div>
-                      <div class="cellLabel">${d}</div>
-                      <input type="text" .value=${((r as LessonRow).cells?.[i] ?? "").toString()} placeholder="Fach" @input=${(e: any) => this.updateRowCell(idx, i, e.target.value)} />
-                    </div>
-                  `)}
-                </div>
-              `}
-        </div>
-      `)}
+        `
+      )}
     `;
   }
 
