@@ -1,31 +1,18 @@
 import { LitElement, html, css, TemplateResult } from "lit";
 
 /**
- * Variante C: Individuelle Farbe pro Zelle
- *
- * Neu:
- * - Jede Zeile kann optional "cell_styles" haben (Array je Tag/Zelle)
- * - Jede Zelle kann bg/color/border bekommen
- *
- * YAML-Beispiel:
- * type: custom:stundenplan-card
- * title: Stundenplan - Klasse 2c
- * days: [Mo, Di, Mi, Do, Fr]
- * rows:
- *   - time: "1. 07:45–08:30"
- *     cells: ["D","Sp","M","D","Reli"]
- *     cell_styles:
- *       - { bg: "rgba(33,150,243,0.25)" }         # Mo Zelle
- *       - { bg: "rgba(76,175,80,0.25)" }          # Di Zelle
- *       - { bg: "rgba(255,193,7,0.25)", color: "#111" }
- *       - null
- *       - { bg: "rgba(156,39,176,0.25)" }
+ * Stundenplan Card
+ * - Visueller Editor
+ * - Highlight Today (Spalte)
+ * - Individuelle Farben pro Zelle via Editor
+ *   (bg HEX + bg_alpha 0..1 + Textfarbe)
  */
 
 type CellStyle = {
-  bg?: string;     // background
-  color?: string;  // text color
-  border?: string; // optional border override
+  bg?: string;        // HEX (#RRGGBB) oder CSS (rgba/var/rgb)
+  bg_alpha?: number;  // 0..1 (nur wenn bg HEX ist)
+  color?: string;     // HEX oder CSS
+  border?: string;
 };
 
 type LessonRow = {
@@ -54,28 +41,65 @@ function isBreakRow(r: any): r is BreakRow {
   return !!r && r.break === true;
 }
 
+function clamp01(n: number): number {
+  return Math.min(1, Math.max(0, n));
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  if (!hex) return null;
+  const h = hex.replace("#", "").trim();
+  if (h.length !== 6) return null;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  if ([r, g, b].some((x) => Number.isNaN(x))) return null;
+  return { r, g, b };
+}
+
 function normalizeCellStyle(s: any): CellStyle | null {
   if (!s || typeof s !== "object") return null;
   const out: CellStyle = {};
+
   if (typeof s.bg === "string" && s.bg.trim()) out.bg = s.bg.trim();
   if (typeof s.color === "string" && s.color.trim()) out.color = s.color.trim();
   if (typeof s.border === "string" && s.border.trim()) out.border = s.border.trim();
+
+  if (typeof s.bg_alpha === "number" && !Number.isNaN(s.bg_alpha)) {
+    out.bg_alpha = clamp01(s.bg_alpha);
+  }
+
   return Object.keys(out).length ? out : null;
 }
 
+function backgroundCssFromStyle(st: CellStyle | null): string | null {
+  if (!st?.bg) return null;
+  const bg = st.bg.trim();
+
+  // abwärtskompatibel: Nutzer hat direkt rgba()/rgb()/var() eingetragen
+  if (bg.startsWith("rgba(") || bg.startsWith("rgb(") || bg.startsWith("var(")) return bg;
+
+  // HEX + alpha -> rgba
+  const rgb = hexToRgb(bg);
+  if (!rgb) return bg; // notfalls roh übernehmen
+  const a = typeof st.bg_alpha === "number" ? clamp01(st.bg_alpha) : 0.18;
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`;
+}
+
 function styleToString(style: CellStyle | null, fallbackBorder: string): string {
-  if (!style) return `border:${fallbackBorder};`;
   const parts: string[] = [];
-  if (style.bg) parts.push(`background:${style.bg}`);
-  if (style.color) parts.push(`color:${style.color}`);
-  parts.push(`border:${style.border ?? fallbackBorder}`);
+  const bgCss = backgroundCssFromStyle(style);
+  if (bgCss) parts.push(`background:${bgCss}`);
+  if (style?.color) parts.push(`color:${style.color}`);
+  parts.push(`border:${style?.border ?? fallbackBorder}`);
   return parts.join(";") + ";";
 }
 
 export class StundenplanCard extends LitElement {
   // Sections view sizing (Home Assistant)
   public getGridOptions() {
-    return { columns: "full" };
+    return {
+      columns: "full",
+    };
   }
 
   private config?: Required<Pick<StundenplanConfig, "type" | "title" | "days" | "highlight_today" | "rows">>;
@@ -91,11 +115,11 @@ export class StundenplanCard extends LitElement {
           time: "1. 08:00–08:45",
           cells: ["D", "M", "E", "D", "S"],
           cell_styles: [
-            { bg: "rgba(33,150,243,0.18)" },
-            { bg: "rgba(255,193,7,0.18)", color: "#111" },
+            { bg: "#3b82f6", bg_alpha: 0.18, color: "#ffffff" },
+            { bg: "#22c55e", bg_alpha: 0.18, color: "#ffffff" },
             null,
             null,
-            { bg: "rgba(156,39,176,0.18)" },
+            { bg: "#a855f7", bg_alpha: 0.18, color: "#ffffff" },
           ],
         },
         { time: "2. 08:50–09:35", cells: ["M", "M", "D", "E", "S"] },
@@ -147,21 +171,14 @@ export class StundenplanCard extends LitElement {
       }
 
       const cellsIn = Array.isArray(r?.cells) ? r.cells : [];
-      const cells = Array.from({ length: days.length }, (_, i) =>
-        (cellsIn[i] ?? "").toString()
-      );
+      const cells = Array.from({ length: days.length }, (_, i) => (cellsIn[i] ?? "").toString());
 
       const stylesIn = Array.isArray(r?.cell_styles) ? r.cell_styles : [];
-      const cell_styles = Array.from({ length: days.length }, (_, i) =>
-        normalizeCellStyle(stylesIn[i])
-      );
+      const cell_styles = Array.from({ length: days.length }, (_, i) => normalizeCellStyle(stylesIn[i]));
 
-      const out: LessonRow = {
-        time: (r?.time ?? "").toString(),
-        cells,
-      };
-      // nur setzen, wenn mindestens eine Style-Zelle existiert
+      const out: LessonRow = { time: (r?.time ?? "").toString(), cells };
       if (cell_styles.some((x) => !!x)) out.cell_styles = cell_styles;
+
       return out;
     });
 
@@ -221,15 +238,12 @@ export class StundenplanCard extends LitElement {
                     <td class="time">${row.time}</td>
                     ${this.config!.days.map((_, i) => {
                       const val = cells[i] ?? "";
-
-                      // Variante C: individueller Stil pro Zelle
                       const cellStyle = styles[i] ?? null;
-                      const inlineStyle = styleToString(cellStyle, borderDefault);
 
-                      // optional zusätzlich "Heute"-Spalte leicht markieren (ohne deine Farben zu überschreiben)
+                      // Wichtig: today-markierung soll Farben NICHT überschreiben
                       const cls = this.config!.highlight_today && i === todayIdx ? "today" : "";
 
-                      return html`<td class=${cls} style=${inlineStyle}>${val}</td>`;
+                      return html`<td class=${cls} style=${styleToString(cellStyle, borderDefault)}>${val}</td>`;
                     })}
                   </tr>
                 `;
@@ -242,6 +256,7 @@ export class StundenplanCard extends LitElement {
   }
 
   static styles = css`
+    /* volle Breite – unabhängig vom UI-Toggle */
     :host {
       display: block;
       width: 100%;
@@ -281,7 +296,7 @@ export class StundenplanCard extends LitElement {
       white-space: nowrap;
     }
 
-    /* "Heute" – bewusst nur leicht, damit Zellfarben (Variante C) nicht kaputt gehen */
+    /* Heute – nur als Overlay, damit Zellfarben bleiben */
     td.today,
     th.today {
       box-shadow: inset 0 0 0 9999px rgba(0, 150, 255, 0.12);
@@ -294,7 +309,7 @@ export class StundenplanCard extends LitElement {
   `;
 }
 
-/* ----------------- Editor (Variante C) ----------------- */
+/* ----------------- Editor ----------------- */
 
 export class StundenplanCardEditor extends LitElement {
   static properties = {
@@ -341,7 +356,9 @@ export class StundenplanCardEditor extends LitElement {
       const cell_styles = Array.from({ length: days.length }, (_, i) => normalizeCellStyle(stylesIn[i]));
 
       const out: LessonRow = { time: (r?.time ?? "").toString(), cells };
-      if (cell_styles.some((x) => !!x)) out.cell_styles = cell_styles;
+      // im Editor setzen wir cell_styles immer, damit man sofort konfigurieren kann
+      out.cell_styles = cell_styles;
+
       return out;
     });
 
@@ -371,7 +388,17 @@ export class StundenplanCardEditor extends LitElement {
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length);
-    this.emit(this.normalizeConfig({ ...this._config, days }));
+
+    // Bei Änderung der Tage: Zellen & Styles auf neue Länge normalisieren
+    const rows = (this._config.rows ?? []).map((r) => {
+      if (isBreakRow(r)) return r;
+      const lr = r as LessonRow;
+      const cells = Array.from({ length: days.length }, (_, i) => (lr.cells?.[i] ?? "").toString());
+      const styles = Array.from({ length: days.length }, (_, i) => normalizeCellStyle(lr.cell_styles?.[i]));
+      return { ...lr, cells, cell_styles: styles };
+    });
+
+    this.emit({ ...this._config, days, rows });
   }
 
   private updateRowTime(idx: number, value: string) {
@@ -384,9 +411,10 @@ export class StundenplanCardEditor extends LitElement {
     if (!this._config) return;
     const rows = this._config.rows.map((r, i) => {
       if (i !== rowIdx || isBreakRow(r)) return r;
-      const cells = Array.isArray((r as LessonRow).cells) ? [...(r as LessonRow).cells] : [];
+      const row = r as LessonRow;
+      const cells = Array.isArray(row.cells) ? [...row.cells] : [];
       cells[cellIdx] = value;
-      return { ...(r as LessonRow), cells };
+      return { ...row, cells };
     });
     this.emit({ ...this._config, rows });
   }
@@ -402,16 +430,12 @@ export class StundenplanCardEditor extends LitElement {
         ? [...row.cell_styles]
         : Array.from({ length: this._config!.days.length }, () => null as CellStyle | null);
 
-      const current = styles[cellIdx] ?? {};
-      const next: CellStyle = {
-        ...current,
-        ...patch,
-      };
+      const current = styles[cellIdx] ? { ...(styles[cellIdx] as CellStyle) } : ({} as CellStyle);
 
-      // leere styles -> null
-      const normalized = normalizeCellStyle(next);
+      const next: CellStyle = { ...current, ...patch };
+      if (typeof next.bg_alpha === "number") next.bg_alpha = clamp01(next.bg_alpha);
 
-      styles[cellIdx] = normalized;
+      styles[cellIdx] = normalizeCellStyle(next);
       return { ...row, cell_styles: styles };
     });
 
@@ -420,15 +444,21 @@ export class StundenplanCardEditor extends LitElement {
 
   private toggleBreak(idx: number, isBreak: boolean) {
     if (!this._config) return;
+
     const rows = this._config.rows.map((r, i) => {
       if (i !== idx) return r;
-      if (isBreak) return { break: true, time: (r as any).time ?? "", label: (r as any).label ?? "Pause" };
+
+      if (isBreak) {
+        return { break: true, time: (r as any).time ?? "", label: (r as any).label ?? "Pause" };
+      }
+
       return {
         time: (r as any).time ?? "",
         cells: Array.from({ length: this._config!.days.length }, () => ""),
         cell_styles: Array.from({ length: this._config!.days.length }, () => null),
-      };
+      } as LessonRow;
     });
+
     this.emit({ ...this._config, rows });
   }
 
@@ -440,20 +470,22 @@ export class StundenplanCardEditor extends LitElement {
 
   private addLessonRow() {
     if (!this._config) return;
+
     const rows = [
       ...this._config.rows,
       {
         time: "",
         cells: Array.from({ length: this._config.days.length }, () => ""),
         cell_styles: Array.from({ length: this._config.days.length }, () => null),
-      },
+      } as LessonRow,
     ];
+
     this.emit({ ...this._config, rows });
   }
 
   private addBreakRow() {
     if (!this._config) return;
-    const rows = [...this._config.rows, { break: true, time: "", label: "Pause" }];
+    const rows = [...this._config.rows, { break: true, time: "", label: "Pause" } as BreakRow];
     this.emit({ ...this._config, rows });
   }
 
@@ -523,11 +555,7 @@ export class StundenplanCardEditor extends LitElement {
               </div>
 
               <div class="checkboxLine" style="margin-top: 20px;">
-                <input
-                  type="checkbox"
-                  .checked=${isBreakRow(r)}
-                  @change=${(e: any) => this.toggleBreak(idx, e.target.checked)}
-                />
+                <input type="checkbox" .checked=${isBreakRow(r)} @change=${(e: any) => this.toggleBreak(idx, e.target.checked)} />
                 <span>Pause</span>
               </div>
 
@@ -542,7 +570,7 @@ export class StundenplanCardEditor extends LitElement {
                     <label>Pausentext</label>
                     <input
                       type="text"
-                      .value=${r.label ?? "Pause"}
+                      .value=${(r as BreakRow).label ?? "Pause"}
                       placeholder="z. B. Pause"
                       @input=${(e: any) => this.updateBreakLabel(idx, e.target.value)}
                     />
@@ -554,6 +582,11 @@ export class StundenplanCardEditor extends LitElement {
                       const row = r as LessonRow;
                       const val = (row.cells?.[i] ?? "").toString();
                       const st = (row.cell_styles?.[i] ?? null) as CellStyle | null;
+
+                      const bgHex = st?.bg && st.bg.startsWith("#") ? st.bg : "#3b82f6";
+                      const alpha = typeof st?.bg_alpha === "number" ? clamp01(st.bg_alpha) : 0.18;
+                      const alphaPct = Math.round(alpha * 100);
+                      const textHex = st?.color && st.color.startsWith("#") ? st.color : "#ffffff";
 
                       return html`
                         <div class="cellBox">
@@ -568,20 +601,37 @@ export class StundenplanCardEditor extends LitElement {
                           />
 
                           <div class="styleGrid">
-                            <input
-                              type="text"
-                              class="styleInput"
-                              .value=${st?.bg ?? ""}
-                              placeholder='bg (z.B. rgba(...))'
-                              @input=${(e: any) => this.updateCellStyle(idx, i, { bg: e.target.value })}
-                            />
-                            <input
-                              type="text"
-                              class="styleInput"
-                              .value=${st?.color ?? ""}
-                              placeholder='text (z.B. #fff)'
-                              @input=${(e: any) => this.updateCellStyle(idx, i, { color: e.target.value })}
-                            />
+                            <div class="styleLine">
+                              <div class="styleLabel">Hintergrund</div>
+                              <input
+                                type="color"
+                                .value=${bgHex}
+                                @input=${(e: any) => this.updateCellStyle(idx, i, { bg: e.target.value })}
+                              />
+                            </div>
+
+                            <div class="styleLine">
+                              <div class="styleLabel">Transparenz</div>
+                              <div class="rangeWrap">
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="100"
+                                  .value=${String(alphaPct)}
+                                  @input=${(e: any) => this.updateCellStyle(idx, i, { bg_alpha: Number(e.target.value) / 100 })}
+                                />
+                                <div class="styleHint">${alphaPct}%</div>
+                              </div>
+                            </div>
+
+                            <div class="styleLine">
+                              <div class="styleLabel">Text</div>
+                              <input
+                                type="color"
+                                .value=${textHex}
+                                @input=${(e: any) => this.updateCellStyle(idx, i, { color: e.target.value })}
+                              />
+                            </div>
                           </div>
 
                           <div class="preview" style=${styleToString(st, "1px solid var(--divider-color)")}>
@@ -691,7 +741,7 @@ export class StundenplanCardEditor extends LitElement {
     .cellsGrid {
       display: grid;
       gap: 10px;
-      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     }
 
     .cellBox {
@@ -713,14 +763,51 @@ export class StundenplanCardEditor extends LitElement {
 
     .styleGrid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 8px;
       margin-bottom: 8px;
     }
 
-    .styleInput {
-      padding: 8px !important;
-      border-radius: 10px !important;
+    .styleLine {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .styleLabel {
+      opacity: 0.75;
+      font-size: 12px;
+    }
+
+    .rangeWrap {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .styleHint {
+      opacity: 0.7;
+      font-size: 12px;
+      min-width: 44px;
+      text-align: right;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 34px;
+      padding: 0;
+      border: 1px solid var(--divider-color);
+      border-radius: 8px;
+      background: var(--card-background-color);
+      box-sizing: border-box;
+      cursor: pointer;
     }
 
     .preview {
@@ -733,11 +820,11 @@ export class StundenplanCardEditor extends LitElement {
   `;
 }
 
-// Register (wichtig für HA)
+/* Register (wichtig für HA) */
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", StundenplanCard);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", StundenplanCardEditor);
 
-// Picker-Metadaten
+/* Picker-Metadaten */
 (window as any).customCards = (window as any).customCards || [];
 (window as any).customCards.push({
   type: "stundenplan-card", // ohne "custom:"
