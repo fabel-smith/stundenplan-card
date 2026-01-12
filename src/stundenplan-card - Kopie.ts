@@ -1,6 +1,5 @@
 import { LitElement, html, css, TemplateResult } from "lit";
 
-/** ---------- Types ---------- */
 type LessonRow = {
   time: string;
   cells: string[];
@@ -19,60 +18,20 @@ type StundenplanConfig = {
   title?: string;
   days?: string[];
   highlight_today?: boolean;
-  highlight_current?: boolean;
   rows?: Row[];
+
+  // IMPORTANT:
+  // Home Assistant kann zusätzliche Keys in die Card-Config schreiben (z.B. Layout-Metadaten).
+  // Die dürfen NICHT weg-normalisiert werden, sonst springt z.B. "Karte in voller Breite" wieder raus.
+  [key: string]: any;
 };
 
 function isBreakRow(r: any): r is BreakRow {
   return !!r && r.break === true;
 }
 
-/** ---------- Helper: time parsing ---------- */
-function toMinutes(hhmm: string): number | null {
-  const m = /^(\d{1,2}):(\d{2})$/.exec((hhmm ?? "").trim());
-  if (!m) return null;
-  const h = Number(m[1]);
-  const mi = Number(m[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(mi)) return null;
-  return h * 60 + mi;
-}
-
-/**
- * Extract start/end from a time label like:
- * - "1. 07:45–08:30"
- * - "07:45-08:30"
- * - "09:20–09:40"
- */
-function extractStartEnd(label: string): { start: number | null; end: number | null } {
-  const s = (label ?? "").toString();
-  // find first two HH:MM occurrences
-  const matches = s.match(/\b\d{1,2}:\d{2}\b/g) ?? [];
-  if (matches.length < 2) return { start: null, end: null };
-  const start = toMinutes(matches[0]);
-  const end = toMinutes(matches[1]);
-  return { start, end };
-}
-
-function nowMinutes(): number {
-  const d = new Date();
-  return d.getHours() * 60 + d.getMinutes();
-}
-
-/** ---------- Card ---------- */
 export class StundenplanCard extends LitElement {
-  private config?: {
-    type: string;
-    title: string;
-    days: string[];
-    highlight_today: boolean;
-    highlight_current: boolean;
-    rows: Row[];
-  };
-
-  // Sections view sizing (Home Assistant)
-  public getGridOptions() {
-    return { columns: "full" };
-  }
+  private config?: Required<Pick<StundenplanConfig, "type" | "title" | "days" | "highlight_today" | "rows">>;
 
   static getStubConfig(): Required<StundenplanConfig> {
     return {
@@ -80,7 +39,6 @@ export class StundenplanCard extends LitElement {
       title: "Mein Stundenplan",
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       highlight_today: true,
-      highlight_current: false,
       rows: [
         { time: "1. 08:00–08:45", cells: ["D", "M", "E", "D", "S"] },
         { time: "2. 08:50–09:35", cells: ["M", "M", "D", "E", "S"] },
@@ -93,11 +51,25 @@ export class StundenplanCard extends LitElement {
     return document.createElement("stundenplan-card-editor");
   }
 
+  // Sections view sizing (Home Assistant)
+  // sorgt dafür, dass die Card im Sections-Layout als "volle Breite" behandelt wird
+  public getGridOptions() {
+    return {
+      columns: "full",
+    };
+  }
+
+  // optional: hilft HA beim Platzieren
+  public getCardSize(): number {
+    const rows = this.config?.rows?.length ?? 3;
+    return Math.max(3, rows);
+  }
+
+  // defensiv, damit Picker/Preview stabil bleibt
   public setConfig(cfg: StundenplanConfig): void {
     const stub = StundenplanCard.getStubConfig();
     const type = ((cfg?.type ?? stub.type) + "").toString();
 
-    // defensiv für Picker/Preview
     if (!(type === "custom:stundenplan-card" || type === "stundenplan-card")) {
       this.config = this.normalizeConfig(stub);
       return;
@@ -108,11 +80,6 @@ export class StundenplanCard extends LitElement {
       ...cfg,
       type,
     });
-  }
-
-  public getCardSize(): number {
-    const rows = this.config?.rows?.length ?? 3;
-    return Math.max(3, rows);
   }
 
   private normalizeConfig(cfg: StundenplanConfig) {
@@ -143,7 +110,6 @@ export class StundenplanCard extends LitElement {
       title: (cfg.title ?? "Mein Stundenplan").toString(),
       days,
       highlight_today: cfg.highlight_today ?? true,
-      highlight_current: cfg.highlight_current ?? false,
       rows,
     };
   }
@@ -159,7 +125,6 @@ export class StundenplanCard extends LitElement {
     if (!this.config) return html``;
 
     const todayIdx = this.getTodayIndex();
-    const now = nowMinutes();
 
     return html`
       <ha-card header=${this.config.title ?? ""}>
@@ -169,12 +134,10 @@ export class StundenplanCard extends LitElement {
               <tr>
                 <th class="time">Stunde</th>
                 ${this.config.days.map(
-                  (d, i) =>
-                    html`<th class=${this.config!.highlight_today && i === todayIdx ? "today" : ""}>${d}</th>`
+                  (d, i) => html`<th class=${this.config.highlight_today && i === todayIdx ? "today" : ""}>${d}</th>`
                 )}
               </tr>
             </thead>
-
             <tbody>
               ${this.config.rows.map((r) => {
                 if (isBreakRow(r)) {
@@ -186,22 +149,13 @@ export class StundenplanCard extends LitElement {
                   `;
                 }
 
-                const lesson = r as LessonRow;
-                const { start, end } = extractStartEnd(lesson.time);
-                const isCurrent =
-                  this.config!.highlight_current &&
-                  start != null &&
-                  end != null &&
-                  now >= start &&
-                  now < end;
-
+                const cells = (r as LessonRow).cells ?? [];
                 return html`
-                  <tr class=${isCurrent ? "current" : ""}>
-                    <td class="time ${isCurrent ? "currentTime" : ""}">${lesson.time}</td>
+                  <tr>
+                    <td class="time">${(r as LessonRow).time}</td>
                     ${this.config!.days.map((_, i) => {
-                      const val = lesson.cells?.[i] ?? "";
-                      const isToday = this.config!.highlight_today && i === todayIdx;
-                      return html`<td class=${isToday ? "today" : ""}>${val}</td>`;
+                      const val = cells[i] ?? "";
+                      return html`<td class=${this.config!.highlight_today && i === todayIdx ? "today" : ""}>${val}</td>`;
                     })}
                   </tr>
                 `;
@@ -214,7 +168,6 @@ export class StundenplanCard extends LitElement {
   }
 
   static styles = css`
-    /* immer volle Breite */
     :host {
       display: block;
       width: 100%;
@@ -227,16 +180,18 @@ export class StundenplanCard extends LitElement {
       width: 100%;
       max-width: 100%;
       box-sizing: border-box;
+      overflow: hidden;
     }
 
     .card {
       padding: 12px;
+      box-sizing: border-box;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      table-layout: fixed;
+      box-sizing: border-box;
     }
 
     th,
@@ -244,9 +199,7 @@ export class StundenplanCard extends LitElement {
       padding: 6px;
       text-align: center;
       border: 1px solid var(--divider-color);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      box-sizing: border-box;
     }
 
     th {
@@ -263,25 +216,13 @@ export class StundenplanCard extends LitElement {
       background: rgba(0, 150, 255, 0.2);
     }
 
-    /* highlight_current */
-    tr.current td {
-      background: rgba(76, 175, 80, 0.10);
-    }
-    /* Zeitfeld etwas stärker */
-    td.currentTime {
-      background: rgba(76, 175, 80, 0.18) !important;
-    }
-
-    /* Pausen */
-    .break td {
+    .break {
       font-style: italic;
       opacity: 0.75;
-      background: rgba(255, 255, 255, 0.02);
     }
   `;
 }
 
-/** ---------- Editor ---------- */
 export class StundenplanCardEditor extends LitElement {
   static properties = {
     hass: {},
@@ -289,14 +230,7 @@ export class StundenplanCardEditor extends LitElement {
   };
 
   public hass: any;
-  private _config?: {
-    type: string;
-    title: string;
-    days: string[];
-    highlight_today: boolean;
-    highlight_current: boolean;
-    rows: Row[];
-  };
+  private _config?: Required<Pick<StundenplanConfig, "type" | "title" | "days" | "highlight_today" | "rows">> & Record<string, any>;
 
   public setConfig(cfg: StundenplanConfig): void {
     const type = ((cfg?.type ?? "") + "").toString();
@@ -315,10 +249,17 @@ export class StundenplanCardEditor extends LitElement {
     }
   }
 
+  // IMPORTANT: Layout-/Sections-Keys durchreichen, damit "Karte in voller Breite" nicht zurückspringt.
   private normalizeConfig(cfg: StundenplanConfig) {
-    const stub = StundenplanCard.getStubConfig();
-    const days = Array.isArray(cfg.days) && cfg.days.length ? cfg.days.map((d) => (d ?? "").toString()) : stub.days;
-    const rowsIn = Array.isArray(cfg.rows) ? cfg.rows : stub.rows;
+    const extras = { ...(cfg ?? {}) };
+    delete extras.title;
+    delete extras.days;
+    delete extras.highlight_today;
+    delete extras.rows;
+    delete extras.type;
+
+    const days = Array.isArray(cfg.days) ? cfg.days.map((d) => (d ?? "").toString()) : [];
+    const rowsIn = Array.isArray(cfg.rows) ? cfg.rows : [];
 
     const rows: Row[] = rowsIn.map((r: any) => {
       if (isBreakRow(r)) {
@@ -330,11 +271,11 @@ export class StundenplanCardEditor extends LitElement {
     });
 
     return {
-      type: (cfg.type ?? stub.type).toString(),
-      title: (cfg.title ?? stub.title).toString(),
+      ...extras,
+      type: (cfg.type ?? "custom:stundenplan-card").toString(),
+      title: (cfg.title ?? "Mein Stundenplan").toString(),
       days,
-      highlight_today: cfg.highlight_today ?? stub.highlight_today,
-      highlight_current: cfg.highlight_current ?? stub.highlight_current,
+      highlight_today: cfg.highlight_today ?? true,
       rows,
     };
   }
@@ -362,13 +303,13 @@ export class StundenplanCardEditor extends LitElement {
 
   private updateRowTime(idx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => (i === idx ? { ...r, time: value } : r));
+    const rows = this._config.rows.map((r: any, i: number) => (i === idx ? { ...r, time: value } : r));
     this.emit({ ...this._config, rows });
   }
 
   private updateRowCell(rowIdx: number, cellIdx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => {
+    const rows = this._config.rows.map((r: any, i: number) => {
       if (i !== rowIdx || isBreakRow(r)) return r;
       const cells = Array.isArray((r as LessonRow).cells) ? [...(r as LessonRow).cells] : [];
       cells[cellIdx] = value;
@@ -379,7 +320,7 @@ export class StundenplanCardEditor extends LitElement {
 
   private toggleBreak(idx: number, isBreak: boolean) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => {
+    const rows = this._config.rows.map((r: any, i: number) => {
       if (i !== idx) return r;
       if (isBreak) return { break: true, time: (r as any).time ?? "", label: (r as any).label ?? "Pause" };
       return { time: (r as any).time ?? "", cells: Array.from({ length: this._config!.days.length }, () => "") };
@@ -389,7 +330,7 @@ export class StundenplanCardEditor extends LitElement {
 
   private updateBreakLabel(idx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => (i === idx ? { ...r, label: value } : r));
+    const rows = this._config.rows.map((r: any, i: number) => (i === idx ? { ...r, label: value } : r));
     this.emit({ ...this._config, rows });
   }
 
@@ -410,7 +351,7 @@ export class StundenplanCardEditor extends LitElement {
 
   private removeRow(idx: number) {
     if (!this._config) return;
-    const rows = this._config.rows.filter((_, i) => i !== idx);
+    const rows = this._config.rows.filter((_: any, i: number) => i !== idx);
     this.emit({ ...this._config, rows });
   }
 
@@ -448,15 +389,6 @@ export class StundenplanCardEditor extends LitElement {
             />
             <span>Heute hervorheben</span>
           </div>
-
-          <div class="checkboxLine">
-            <input
-              type="checkbox"
-              .checked=${this._config.highlight_current ?? false}
-              @change=${(e: any) => this.emit({ ...this._config!, highlight_current: e.target.checked })}
-            />
-            <span>Aktuelle Stunde hervorheben</span>
-          </div>
         </div>
       </div>
 
@@ -469,7 +401,7 @@ export class StundenplanCardEditor extends LitElement {
       </div>
 
       ${this._config.rows.map(
-        (r, idx) => html`
+        (r: any, idx: number) => html`
           <div class="rowCard">
             <div class="rowTop">
               <div>
@@ -483,11 +415,7 @@ export class StundenplanCardEditor extends LitElement {
               </div>
 
               <div class="checkboxLine" style="margin-top: 20px;">
-                <input
-                  type="checkbox"
-                  .checked=${isBreakRow(r)}
-                  @change=${(e: any) => this.toggleBreak(idx, e.target.checked)}
-                />
+                <input type="checkbox" .checked=${isBreakRow(r)} @change=${(e: any) => this.toggleBreak(idx, e.target.checked)} />
                 <span>Pause</span>
               </div>
 
@@ -511,7 +439,7 @@ export class StundenplanCardEditor extends LitElement {
               : html`
                   <div class="cellsGrid">
                     ${(this._config!.days ?? []).map(
-                      (d, i) => html`
+                      (d: string, i: number) => html`
                         <div>
                           <div class="cellLabel">${d}</div>
                           <input
@@ -634,10 +562,11 @@ export class StundenplanCardEditor extends LitElement {
   `;
 }
 
-/** ---------- Register ---------- */
+// Register (wichtig für HA)
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", StundenplanCard);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", StundenplanCardEditor);
 
+// Picker-Metadaten
 (window as any).customCards = (window as any).customCards || [];
 (window as any).customCards.push({
   type: "stundenplan-card", // ohne "custom:"
