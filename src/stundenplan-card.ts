@@ -12,6 +12,9 @@ import { LitElement, html, css, TemplateResult } from "lit";
  * - Editor: Klick auf Vorschau springt/fokussiert die Zelle
  * - Editor: Wenn "time" geändert wird, werden start/end automatisch nachgezogen (wenn auto/leer)
  * - Auto-Refresh (Timer): Highlights springen automatisch um (ohne Dashboard-Reload)
+ *
+ * UPDATE:
+ * - Rechts: echte Vorschau-Tabelle (Klick auf Fach -> springt links zur passenden Eingabezelle)
  */
 
 type CellStyle = {
@@ -805,6 +808,66 @@ export class StundenplanCardEditor extends LitElement {
     (el as HTMLInputElement).focus?.();
   }
 
+  private renderEditorPreview(): TemplateResult {
+    if (!this._config) return html``;
+
+    const borderDefault = "1px solid var(--divider-color)";
+    const days = this._config.days ?? [];
+    const rows = this._config.rows ?? [];
+
+    return html`
+      <div class="editorPreview">
+        <div class="editorPreviewTitle">Vorschau</div>
+
+        <table class="previewTable">
+          <thead>
+            <tr>
+              <th class="p-time">Stunde</th>
+              ${days.map((d) => html`<th>${d}</th>`)}
+            </tr>
+          </thead>
+
+          <tbody>
+            ${rows.map((r, rowIdx) => {
+              if (isBreakRow(r)) {
+                return html`
+                  <tr class="p-break">
+                    <td class="p-time">${r.time}</td>
+                    <td colspan=${days.length}>${r.label ?? ""}</td>
+                  </tr>
+                `;
+              }
+
+              const lr = r as LessonRow;
+              return html`
+                <tr>
+                  <td class="p-time">${lr.time}</td>
+                  ${days.map((_, cellIdx) => {
+                    const val = (lr.cells?.[cellIdx] ?? "").toString();
+                    const st = (lr.cell_styles?.[cellIdx] ?? null) as CellStyle | null;
+
+                    return html`
+                      <td
+                        class="p-cell"
+                        style=${styleToString(st, borderDefault)}
+                        title="Klicken zum Bearbeiten"
+                        @click=${() => this.jumpToCell(rowIdx, cellIdx)}
+                      >
+                        ${val}
+                      </td>
+                    `;
+                  })}
+                </tr>
+              `;
+            })}
+          </tbody>
+        </table>
+
+        <div class="editorPreviewHint">Tipp: Klick auf ein Fach springt links zur passenden Zelle.</div>
+      </div>
+    `;
+  }
+
   protected render(): TemplateResult {
     if (!this._config) return html``;
 
@@ -813,6 +876,8 @@ export class StundenplanCardEditor extends LitElement {
     const currentState = this.parseColorToHexAlpha(this._config.highlight_current_color, "#4caf50", 0.18);
 
     return html`
+      ${this.renderEditorPreview()}
+
       <div class="section">
         <div class="row">
           <label>Titel</label>
@@ -1080,12 +1145,14 @@ export class StundenplanCardEditor extends LitElement {
                             </div>
                           </div>
 
+                          <!-- NUR NOCH VORSCHAUBILD (OHNE KLICK, OHNE "Vorschau (klicken)") -->
                           <div
-                            class="preview clickable"
+                            class="preview"
                             style=${styleToString(st, "1px solid var(--divider-color)")}
-                            @click=${() => this.jumpToCell(idx, i)}
+                            aria-label="Vorschau"
+                            title="Vorschau"
                           >
-                            Vorschau (klicken)
+                            ${val}
                           </div>
                         </div>
                       `;
@@ -1102,6 +1169,69 @@ export class StundenplanCardEditor extends LitElement {
     :host {
       display: block;
       box-sizing: border-box;
+    }
+
+    .editorPreview {
+      border: 1px solid var(--divider-color);
+      border-radius: 14px;
+      padding: 12px;
+      margin-bottom: 16px;
+      background: var(--card-background-color);
+    }
+
+    .editorPreviewTitle {
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0.9;
+      margin-bottom: 10px;
+    }
+
+    .previewTable {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .previewTable th,
+    .previewTable td {
+      border: 1px solid var(--divider-color);
+      padding: 6px;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .previewTable th {
+      background: var(--secondary-background-color);
+      font-weight: 700;
+    }
+
+    .p-time {
+      font-weight: 700;
+      white-space: nowrap;
+      width: 110px;
+    }
+
+    .p-break {
+      font-style: italic;
+      opacity: 0.8;
+    }
+
+    .p-cell {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .p-cell:hover {
+      filter: brightness(1.06);
+    }
+
+    .editorPreviewHint {
+      margin-top: 8px;
+      font-size: 12px;
+      opacity: 0.7;
     }
 
     .section {
@@ -1281,14 +1411,6 @@ export class StundenplanCardEditor extends LitElement {
       text-align: center;
       opacity: 0.85;
       background: rgba(255, 255, 255, 0.04);
-    }
-
-    .preview.clickable {
-      cursor: pointer;
-      user-select: none;
-    }
-    .preview.clickable:hover {
-      filter: brightness(1.06);
     }
   `;
 }
