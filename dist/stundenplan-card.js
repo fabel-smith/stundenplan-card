@@ -745,7 +745,7 @@ const I = class I extends C {
                     ${this.config.days.map((d, u) => {
         const f = a[u] ?? "", p = c[u] ?? null, y = this.config.highlight_today && u === t ? "today" : "";
         let S = `--sp-hl:${i};` + vt(p, e);
-        return h && this.config.highlight_current_text && r && (S += `color:${r};`), _`<td class=${y} style=${S}>${f}</td>`;
+        return h && this.config.highlight_current_text && r && u === t && t >= 0 && (S += `color:${r};`), _`<td class=${y} style=${S}>${f}</td>`;
       })}
                   </tr>
                 `;

@@ -348,8 +348,14 @@ export class StundenplanCard extends LitElement {
                       let style = `--sp-hl:${todayOverlay};` + styleToString(cellStyle, borderDefault);
 
                       // NEU: Aktuelles Fach – Textfarbe überschreiben (nur in aktueller Zeit-Zeile)
-                      if (isCurrent && this.config!.highlight_current_text && currentTextColor) {
-                        style += `color:${currentTextColor};`;
+                      if (
+			isCurrent &&
+  			this.config!.highlight_current_text &&
+  			currentTextColor &&
+  			i === todayIdx &&
+  			todayIdx >= 0
+		      ) {
+  			style += `color:${currentTextColor};`;
                       }
 
                       return html`<td class=${cls} style=${style}>${val}</td>`;
