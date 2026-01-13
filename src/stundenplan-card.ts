@@ -4,10 +4,13 @@ import { LitElement, html, css, TemplateResult } from "lit";
  * Stundenplan Card
  * - Visueller Editor
  * - highlight_today (Spalte)
- * - highlight_current (aktuelle Stunde -> Zeitspalte)
+ * - highlight_current (aktuelle Stunde -> Zeitspalte Hintergrund)
  * - highlight_current_text (aktuelles Fach -> Textfarbe NUR am heutigen Tag)
- * - Highlight-Farben konfigurierbar (today/current/current_text)
- * - Variante C: Individuelle Farben pro Zelle via Editor (bg + alpha + text)
+ * - highlight_current_time_text (aktuelle Stunde -> Textfarbe in der Zeitspalte)
+ * - Highlight-Farben konfigurierbar (today/current/current_text/current_time_text)
+ * - Highlight-Farben im Editor per Picker (HEX + Alpha -> rgba)
+ * - Editor: Klick auf Vorschau springt/fokussiert die Zelle
+ * - Editor: Wenn "time" geändert wird, werden start/end automatisch nachgezogen (wenn auto/leer)
  */
 
 type CellStyle = {
@@ -37,14 +40,20 @@ type StundenplanConfig = {
   type: string; // "custom:stundenplan-card"
   title?: string;
   days?: string[];
+
   highlight_today?: boolean;
   highlight_current?: boolean;
+
   highlight_today_color?: string;   // rgba(...) oder #...
   highlight_current_color?: string; // rgba(...) oder #...
 
   // Textfarbe für aktuelles Fach (nur heutige Spalte + aktuelle Zeit-Zeile)
   highlight_current_text?: boolean;
   highlight_current_text_color?: string; // rgba(...) oder #...
+
+  // Textfarbe in der Zeitspalte für aktuelle Stunde
+  highlight_current_time_text?: boolean;
+  highlight_current_time_text_color?: string; // rgba(...) oder #...
 
   rows?: Row[];
 };
@@ -87,12 +96,10 @@ function backgroundCssFromStyle(st: CellStyle | null): string | null {
   if (!st?.bg) return null;
   const bg = st.bg.trim();
 
-  // abwärtskompatibel: Nutzer hat direkt rgba()/rgb()/var() eingetragen
   if (bg.startsWith("rgba(") || bg.startsWith("rgb(") || bg.startsWith("var(")) return bg;
 
-  // HEX + alpha -> rgba
   const rgb = hexToRgb(bg);
-  if (!rgb) return bg; // notfalls roh übernehmen
+  if (!rgb) return bg;
   const a = typeof st.bg_alpha === "number" ? clamp01(st.bg_alpha) : 0.18;
   return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`;
 }
@@ -127,18 +134,17 @@ function parseStartEndFromTime(time: string | undefined): { start?: string; end?
   return { start: m[1], end: m[2] };
 }
 
-// NEU: robustes Matching von "Heute" anhand der days-Labels (Mo/Di/... oder Mon/Tue/... etc.)
+// robustes Matching von "Heute" anhand der days-Labels (Mo/Di/... oder Mon/Tue/... etc.)
 function normalizeDayLabel(label: string): string {
   return (label ?? "")
     .toString()
     .trim()
     .toLowerCase()
-    .replace(/\./g, "")       // "Mo." -> "mo"
-    .replace(/\s+/g, "");     // "M o" -> "mo"
+    .replace(/\./g, "")
+    .replace(/\s+/g, "");
 }
 
 function todayCandidates(getDay: number): string[] {
-  // JS getDay(): 0=So,1=Mo,2=Di,3=Mi,4=Do,5=Fr,6=Sa
   switch (getDay) {
     case 1:
       return ["mo", "mon", "monday", "montag"];
@@ -160,7 +166,6 @@ function todayCandidates(getDay: number): string[] {
 }
 
 export class StundenplanCard extends LitElement {
-  // Sections view sizing (Home Assistant)
   public getGridOptions() {
     return { columns: "full" };
   }
@@ -172,13 +177,19 @@ export class StundenplanCard extends LitElement {
       type: "custom:stundenplan-card",
       title: "Mein Stundenplan",
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
+
       highlight_today: true,
       highlight_current: true,
+
       highlight_today_color: "rgba(0, 150, 255, 0.12)",
       highlight_current_color: "rgba(76, 175, 80, 0.18)",
 
+      // auffällige Defaults:
       highlight_current_text: false,
-      highlight_current_text_color: "rgba(255, 255, 255, 0.95)",
+      highlight_current_text_color: "#ff1744",
+
+      highlight_current_time_text: false,
+      highlight_current_time_text_color: "#ff9100",
 
       rows: [
         {
@@ -210,7 +221,6 @@ export class StundenplanCard extends LitElement {
     return document.createElement("stundenplan-card-editor");
   }
 
-  // IMPORTANT: defensiv, damit Picker/Preview stabil bleibt
   public setConfig(cfg: StundenplanConfig): void {
     const stub = StundenplanCard.getStubConfig();
     const type = ((cfg?.type ?? stub.type) + "").toString();
@@ -275,12 +285,19 @@ export class StundenplanCard extends LitElement {
       type: (cfg.type ?? "custom:stundenplan-card").toString(),
       title: (cfg.title ?? "Mein Stundenplan").toString(),
       days,
+
       highlight_today: cfg.highlight_today ?? true,
       highlight_current: cfg.highlight_current ?? false,
+
       highlight_today_color: (cfg.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
       highlight_current_color: (cfg.highlight_current_color ?? "rgba(76, 175, 80, 0.18)").toString(),
+
       highlight_current_text: cfg.highlight_current_text ?? false,
-      highlight_current_text_color: (cfg.highlight_current_text_color ?? "rgba(255, 255, 255, 0.95)").toString(),
+      highlight_current_text_color: (cfg.highlight_current_text_color ?? "#ff1744").toString(),
+
+      highlight_current_time_text: cfg.highlight_current_time_text ?? false,
+      highlight_current_time_text_color: (cfg.highlight_current_time_text_color ?? "#ff9100").toString(),
+
       rows,
     };
   }
@@ -323,6 +340,7 @@ export class StundenplanCard extends LitElement {
     const currentOverlay = cssColorFromHexOrCss(this.config.highlight_current_color ?? "", 0.18);
 
     const currentTextColor = (this.config.highlight_current_text_color ?? "").toString().trim();
+    const currentTimeTextColor = (this.config.highlight_current_time_text_color ?? "").toString().trim();
 
     return html`
       <ha-card header=${this.config.title ?? ""}>
@@ -359,15 +377,17 @@ export class StundenplanCard extends LitElement {
                   !!row.end &&
                   this.isNowBetween(row.start, row.end);
 
+                let timeStyle =
+                  `--sp-hl:${currentOverlay};` +
+                  (isCurrent ? "box-shadow: inset 0 0 0 9999px var(--sp-hl);" : "");
+
+                if (isCurrent && this.config!.highlight_current_time_text && currentTimeTextColor) {
+                  timeStyle += `color:${currentTimeTextColor};`;
+                }
+
                 return html`
                   <tr>
-                    <td
-                      class="time"
-                      style=${`--sp-hl:${currentOverlay};` +
-                      (isCurrent ? "box-shadow: inset 0 0 0 9999px var(--sp-hl);" : "")}
-                    >
-                      ${row.time}
-                    </td>
+                    <td class="time" style=${timeStyle}>${row.time}</td>
 
                     ${this.config!.days.map((_, i) => {
                       const val = cells[i] ?? "";
@@ -376,7 +396,6 @@ export class StundenplanCard extends LitElement {
                       const cls = this.config!.highlight_today && i === todayIdx ? "today" : "";
                       let style = `--sp-hl:${todayOverlay};` + styleToString(cellStyle, borderDefault);
 
-                      // FIX: Aktuelles Fach – NUR in der heutigen Spalte + aktueller Zeit-Zeile
                       if (
                         isCurrent &&
                         this.config!.highlight_current_text &&
@@ -479,6 +498,58 @@ export class StundenplanCardEditor extends LitElement {
     }
   }
 
+  // --- Picker Helpers (Editor) ---
+  private rgbaFromHex(hex: string, alpha: number): string {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return `rgba(0,0,0,${clamp01(alpha)})`;
+    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${clamp01(alpha)})`;
+  }
+
+  private parseColorToHexAlpha(value: string, fallbackHex: string, fallbackAlpha: number): { hex: string; alpha: number } {
+    const v = (value ?? "").toString().trim();
+
+    // HEX
+    if (v.startsWith("#")) {
+      const rgb = hexToRgb(v);
+      if (rgb) return { hex: v, alpha: clamp01(fallbackAlpha) };
+      return { hex: fallbackHex, alpha: clamp01(fallbackAlpha) };
+    }
+
+    // rgba(r,g,b,a)
+    const m = v.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)/i);
+    if (m) {
+      const r = Math.max(0, Math.min(255, Number(m[1])));
+      const g = Math.max(0, Math.min(255, Number(m[2])));
+      const b = Math.max(0, Math.min(255, Number(m[3])));
+      const a = clamp01(Number(m[4]));
+      const toHex = (n: number) => n.toString(16).padStart(2, "0");
+      return { hex: `#${toHex(r)}${toHex(g)}${toHex(b)}`, alpha: a };
+    }
+
+    // rgb(r,g,b)
+    const m2 = v.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+    if (m2) {
+      const r = Math.max(0, Math.min(255, Number(m2[1])));
+      const g = Math.max(0, Math.min(255, Number(m2[2])));
+      const b = Math.max(0, Math.min(255, Number(m2[3])));
+      const toHex = (n: number) => n.toString(16).padStart(2, "0");
+      return { hex: `#${toHex(r)}${toHex(g)}${toHex(b)}`, alpha: clamp01(fallbackAlpha) };
+    }
+
+    return { hex: fallbackHex, alpha: clamp01(fallbackAlpha) };
+  }
+
+  private setHighlightRgba(key: keyof StundenplanConfig, hex: string, alpha01: number) {
+    if (!this._config) return;
+    const rgba = this.rgbaFromHex(hex, alpha01);
+    this.emit({ ...this._config, [key]: rgba });
+  }
+
+  private setHighlightHexOnly(key: keyof StundenplanConfig, hex: string) {
+    if (!this._config) return;
+    this.emit({ ...this._config, [key]: hex });
+  }
+
   private normalizeConfig(cfg: StundenplanConfig): Required<StundenplanConfig> {
     const days =
       Array.isArray(cfg.days) && cfg.days.length
@@ -516,12 +587,19 @@ export class StundenplanCardEditor extends LitElement {
       type: (cfg.type ?? "custom:stundenplan-card").toString(),
       title: (cfg.title ?? "Mein Stundenplan").toString(),
       days,
+
       highlight_today: cfg.highlight_today ?? true,
       highlight_current: cfg.highlight_current ?? false,
+
       highlight_today_color: (cfg.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
       highlight_current_color: (cfg.highlight_current_color ?? "rgba(76, 175, 80, 0.18)").toString(),
+
       highlight_current_text: cfg.highlight_current_text ?? false,
-      highlight_current_text_color: (cfg.highlight_current_text_color ?? "rgba(255, 255, 255, 0.95)").toString(),
+      highlight_current_text_color: (cfg.highlight_current_text_color ?? "#ff1744").toString(),
+
+      highlight_current_time_text: cfg.highlight_current_time_text ?? false,
+      highlight_current_time_text_color: (cfg.highlight_current_time_text_color ?? "#ff9100").toString(),
+
       rows,
     };
   }
@@ -555,9 +633,34 @@ export class StundenplanCardEditor extends LitElement {
     this.emit({ ...this._config, days, rows });
   }
 
+  // WICHTIG: Wenn "time" geändert wird, start/end nachziehen, sofern leer oder auto-abgeleitet
   private updateRowTime(idx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => (i === idx ? { ...r, time: value } : r));
+
+    const rows = this._config.rows.map((r, i) => {
+      if (i !== idx) return r;
+
+      if (isBreakRow(r)) return { ...r, time: value };
+
+      const lr = r as LessonRow;
+
+      const oldParsed = parseStartEndFromTime(lr.time);
+      const newParsed = parseStartEndFromTime(value);
+
+      const startNow = (lr.start ?? "").toString().trim();
+      const endNow = (lr.end ?? "").toString().trim();
+
+      const startWasAuto = !startNow || (!!oldParsed.start && startNow === oldParsed.start);
+      const endWasAuto = !endNow || (!!oldParsed.end && endNow === oldParsed.end);
+
+      return {
+        ...lr,
+        time: value,
+        start: startWasAuto ? (newParsed.start ?? lr.start) : lr.start,
+        end: endWasAuto ? (newParsed.end ?? lr.end) : lr.end,
+      };
+    });
+
     this.emit({ ...this._config, rows });
   }
 
@@ -673,8 +776,20 @@ export class StundenplanCardEditor extends LitElement {
     this.emit({ ...this._config, rows });
   }
 
+  private jumpToCell(rowIdx: number, cellIdx: number) {
+    const id = `sp-cell-${rowIdx}-${cellIdx}`;
+    const el = this.renderRoot?.getElementById(id) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    (el as HTMLInputElement).focus?.();
+  }
+
   protected render(): TemplateResult {
     if (!this._config) return html``;
+
+    // Highlight Picker States
+    const todayState = this.parseColorToHexAlpha(this._config.highlight_today_color, "#0096ff", 0.12);
+    const currentState = this.parseColorToHexAlpha(this._config.highlight_current_color, "#4caf50", 0.18);
 
     return html`
       <div class="section">
@@ -726,36 +841,95 @@ export class StundenplanCardEditor extends LitElement {
             />
             <span>Aktuelles Fach (Textfarbe) hervorheben</span>
           </div>
+
+          <div class="checkboxLine">
+            <input
+              type="checkbox"
+              .checked=${this._config.highlight_current_time_text ?? false}
+              @change=${(e: any) => this.emit({ ...this._config!, highlight_current_time_text: e.target.checked })}
+            />
+            <span>Aktuelle Stunde (Textfarbe) hervorheben</span>
+          </div>
         </div>
 
+        <!-- Picker: Heute (Overlay) -->
         <div class="row">
           <label>Highlight-Farbe (Heute)</label>
-          <input
-            type="text"
-            .value=${this._config.highlight_today_color ?? "rgba(0, 150, 255, 0.12)"}
-            placeholder='z.B. rgba(0,150,255,0.12) oder #0096ff'
-            @input=${(e: any) => this.emit({ ...this._config!, highlight_today_color: e.target.value })}
-          />
+          <div class="pickerRow">
+            <input
+              type="color"
+              .value=${todayState.hex}
+              @input=${(e: any) => this.setHighlightRgba("highlight_today_color", e.target.value, todayState.alpha)}
+            />
+            <div class="rangeWrap">
+              <input
+                type="range"
+                min="0"
+                max="100"
+                .value=${String(Math.round(todayState.alpha * 100))}
+                @input=${(e: any) => this.setHighlightRgba("highlight_today_color", todayState.hex, Number(e.target.value) / 100)}
+              />
+              <div class="styleHint">${Math.round(todayState.alpha * 100)}%</div>
+            </div>
+          </div>
+          <div class="hint">${this._config.highlight_today_color}</div>
         </div>
 
+        <!-- Picker: Aktuelle Stunde (Overlay Zeitspalte) -->
         <div class="row">
           <label>Highlight-Farbe (Aktuelle Stunde)</label>
-          <input
-            type="text"
-            .value=${this._config.highlight_current_color ?? "rgba(76, 175, 80, 0.18)"}
-            placeholder='z.B. rgba(76,175,80,0.18) oder #4caf50'
-            @input=${(e: any) => this.emit({ ...this._config!, highlight_current_color: e.target.value })}
-          />
+          <div class="pickerRow">
+            <input
+              type="color"
+              .value=${currentState.hex}
+              @input=${(e: any) => this.setHighlightRgba("highlight_current_color", e.target.value, currentState.alpha)}
+            />
+            <div class="rangeWrap">
+              <input
+                type="range"
+                min="0"
+                max="100"
+                .value=${String(Math.round(currentState.alpha * 100))}
+                @input=${(e: any) => this.setHighlightRgba("highlight_current_color", currentState.hex, Number(e.target.value) / 100)}
+              />
+              <div class="styleHint">${Math.round(currentState.alpha * 100)}%</div>
+            </div>
+          </div>
+          <div class="hint">${this._config.highlight_current_color}</div>
         </div>
 
+        <!-- Picker: Textfarbe aktuelles Fach -->
         <div class="row">
           <label>Textfarbe (Aktuelles Fach)</label>
-          <input
-            type="text"
-            .value=${this._config.highlight_current_text_color ?? "rgba(255, 255, 255, 0.95)"}
-            placeholder='z.B. #ff0000 oder rgba(255,0,0,0.95)'
-            @input=${(e: any) => this.emit({ ...this._config!, highlight_current_text_color: e.target.value })}
-          />
+          <div class="pickerRow">
+            <input
+              type="color"
+              .value=${(this._config.highlight_current_text_color ?? "#ff1744").toString()}
+              @input=${(e: any) => this.setHighlightHexOnly("highlight_current_text_color", e.target.value)}
+            />
+            <input
+              type="text"
+              .value=${this._config.highlight_current_text_color ?? "#ff1744"}
+              @input=${(e: any) => this.emit({ ...this._config!, highlight_current_text_color: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <!-- Picker: Textfarbe aktuelle Stunde (Zeitspalte) -->
+        <div class="row">
+          <label>Textfarbe (Aktuelle Stunde / Zeitspalte)</label>
+          <div class="pickerRow">
+            <input
+              type="color"
+              .value=${(this._config.highlight_current_time_text_color ?? "#ff9100").toString()}
+              @input=${(e: any) => this.setHighlightHexOnly("highlight_current_time_text_color", e.target.value)}
+            />
+            <input
+              type="text"
+              .value=${this._config.highlight_current_time_text_color ?? "#ff9100"}
+              @input=${(e: any) => this.emit({ ...this._config!, highlight_current_time_text_color: e.target.value })}
+            />
+          </div>
         </div>
       </div>
 
@@ -836,11 +1010,14 @@ export class StundenplanCardEditor extends LitElement {
                       const alphaPct = Math.round(alpha * 100);
                       const textHex = st?.color && st.color.startsWith("#") ? st.color : "#ffffff";
 
+                      const inputId = `sp-cell-${idx}-${i}`;
+
                       return html`
                         <div class="cellBox">
                           <div class="cellLabel">${d}</div>
 
                           <input
+                            id=${inputId}
                             type="text"
                             class="cellInput"
                             .value=${val}
@@ -882,8 +1059,12 @@ export class StundenplanCardEditor extends LitElement {
                             </div>
                           </div>
 
-                          <div class="preview" style=${styleToString(st, "1px solid var(--divider-color)")}>
-                            Vorschau
+                          <div
+                            class="preview clickable"
+                            style=${styleToString(st, "1px solid var(--divider-color)")}
+                            @click=${() => this.jumpToCell(idx, i)}
+                          >
+                            Vorschau (klicken)
                           </div>
                         </div>
                       `;
@@ -927,6 +1108,7 @@ export class StundenplanCardEditor extends LitElement {
       opacity: 0.7;
       font-size: 12px;
       margin-top: 4px;
+      word-break: break-word;
     }
     .checkboxLine {
       display: flex;
@@ -934,6 +1116,13 @@ export class StundenplanCardEditor extends LitElement {
       gap: 10px;
       user-select: none;
       margin-top: 6px;
+    }
+
+    .pickerRow {
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      gap: 10px;
+      align-items: center;
     }
 
     .rowsHeader {
@@ -1071,6 +1260,14 @@ export class StundenplanCardEditor extends LitElement {
       text-align: center;
       opacity: 0.85;
       background: rgba(255, 255, 255, 0.04);
+    }
+
+    .preview.clickable {
+      cursor: pointer;
+      user-select: none;
+    }
+    .preview.clickable:hover {
+      filter: brightness(1.06);
     }
   `;
 }
