@@ -5,9 +5,9 @@ import { LitElement, html, css, TemplateResult } from "lit";
  * - Visueller Editor
  * - highlight_today (Spalte)
  * - highlight_current (aktuelle Stunde -> Zeitspalte)
- * - highlight_current_text (aktuelles Fach -> Textfarbe in der Zeile)
+ * - highlight_current_text (aktuelles Fach -> Textfarbe NUR am heutigen Tag)
  * - Highlight-Farben konfigurierbar (today/current/current_text)
- * - Individuelle Farben pro Zelle via Editor (bg + alpha + text)
+ * - Variante C: Individuelle Farben pro Zelle via Editor (bg + alpha + text)
  */
 
 type CellStyle = {
@@ -42,7 +42,7 @@ type StundenplanConfig = {
   highlight_today_color?: string;   // rgba(...) oder #...
   highlight_current_color?: string; // rgba(...) oder #...
 
-  // NEU: Textfarbe für aktuelles Fach (Zeile, in der aktuelle Zeit liegt)
+  // Textfarbe für aktuelles Fach (nur heutige Spalte + aktuelle Zeit-Zeile)
   highlight_current_text?: boolean;
   highlight_current_text_color?: string; // rgba(...) oder #...
 
@@ -119,12 +119,44 @@ function cssColorFromHexOrCss(value: string, defaultAlpha: number): string {
   return v;
 }
 
-// NEU: start/end aus "time" extrahieren (z.B. "1. 07:45–08:30")
+// start/end aus "time" extrahieren (z.B. "1. 07:45–08:30")
 function parseStartEndFromTime(time: string | undefined): { start?: string; end?: string } {
   const t = (time ?? "").toString();
   const m = t.match(/(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})/);
   if (!m) return {};
   return { start: m[1], end: m[2] };
+}
+
+// NEU: robustes Matching von "Heute" anhand der days-Labels (Mo/Di/... oder Mon/Tue/... etc.)
+function normalizeDayLabel(label: string): string {
+  return (label ?? "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, "")       // "Mo." -> "mo"
+    .replace(/\s+/g, "");     // "M o" -> "mo"
+}
+
+function todayCandidates(getDay: number): string[] {
+  // JS getDay(): 0=So,1=Mo,2=Di,3=Mi,4=Do,5=Fr,6=Sa
+  switch (getDay) {
+    case 1:
+      return ["mo", "mon", "monday", "montag"];
+    case 2:
+      return ["di", "die", "tue", "tues", "tuesday", "dienstag"];
+    case 3:
+      return ["mi", "wed", "wednesday", "mittwoch"];
+    case 4:
+      return ["do", "thu", "thur", "thurs", "thursday", "donnerstag"];
+    case 5:
+      return ["fr", "fri", "friday", "freitag"];
+    case 6:
+      return ["sa", "sat", "saturday", "samstag"];
+    case 0:
+      return ["so", "sun", "sunday", "sonntag"];
+    default:
+      return [];
+  }
 }
 
 export class StundenplanCard extends LitElement {
@@ -145,7 +177,6 @@ export class StundenplanCard extends LitElement {
       highlight_today_color: "rgba(0, 150, 255, 0.12)",
       highlight_current_color: "rgba(76, 175, 80, 0.18)",
 
-      // NEU
       highlight_current_text: false,
       highlight_current_text_color: "rgba(255, 255, 255, 0.95)",
 
@@ -235,7 +266,6 @@ export class StundenplanCard extends LitElement {
         end: endRaw || parsed.end || undefined,
         cells,
       };
-      // Keep styles if present
       if (cell_styles.some((x) => !!x)) out.cell_styles = cell_styles;
 
       return out;
@@ -249,20 +279,22 @@ export class StundenplanCard extends LitElement {
       highlight_current: cfg.highlight_current ?? false,
       highlight_today_color: (cfg.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
       highlight_current_color: (cfg.highlight_current_color ?? "rgba(76, 175, 80, 0.18)").toString(),
-
-      // NEU
       highlight_current_text: cfg.highlight_current_text ?? false,
       highlight_current_text_color: (cfg.highlight_current_text_color ?? "rgba(255, 255, 255, 0.95)").toString(),
-
       rows,
     };
   }
 
-  private getTodayIndex(): number {
-    // JS getDay(): 0=So,1=Mo,...,5=Fr,6=Sa
-    const map: Record<number, number> = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4 };
+  private getTodayIndex(days: string[]): number {
     const d = new Date().getDay();
-    return map[d] ?? -1;
+    const candidates = new Set(todayCandidates(d).map(normalizeDayLabel));
+    if (!candidates.size) return -1;
+
+    const normDays = (days ?? []).map((x) => normalizeDayLabel(x));
+    for (let i = 0; i < normDays.length; i++) {
+      if (candidates.has(normDays[i])) return i;
+    }
+    return -1;
   }
 
   private toMinutes(t: string | undefined): number | null {
@@ -284,13 +316,12 @@ export class StundenplanCard extends LitElement {
   protected render(): TemplateResult {
     if (!this.config) return html``;
 
-    const todayIdx = this.getTodayIndex();
+    const todayIdx = this.getTodayIndex(this.config.days ?? []);
     const borderDefault = "1px solid var(--divider-color)";
 
     const todayOverlay = cssColorFromHexOrCss(this.config.highlight_today_color ?? "", 0.12);
     const currentOverlay = cssColorFromHexOrCss(this.config.highlight_current_color ?? "", 0.18);
 
-    // NEU: Textfarbe für aktuelles Fach
     const currentTextColor = (this.config.highlight_current_text_color ?? "").toString().trim();
 
     return html`
@@ -343,19 +374,17 @@ export class StundenplanCard extends LitElement {
                       const cellStyle = styles[i] ?? null;
 
                       const cls = this.config!.highlight_today && i === todayIdx ? "today" : "";
-
-                      // today highlight overlays, but keeps cell background via box-shadow
                       let style = `--sp-hl:${todayOverlay};` + styleToString(cellStyle, borderDefault);
 
-                      // NEU: Aktuelles Fach – Textfarbe überschreiben (nur in aktueller Zeit-Zeile)
+                      // FIX: Aktuelles Fach – NUR in der heutigen Spalte + aktueller Zeit-Zeile
                       if (
-			isCurrent &&
-  			this.config!.highlight_current_text &&
-  			currentTextColor &&
-  			i === todayIdx &&
-  			todayIdx >= 0
-		      ) {
-  			style += `color:${currentTextColor};`;
+                        isCurrent &&
+                        this.config!.highlight_current_text &&
+                        currentTextColor &&
+                        todayIdx >= 0 &&
+                        i === todayIdx
+                      ) {
+                        style += `color:${currentTextColor};`;
                       }
 
                       return html`<td class=${cls} style=${style}>${val}</td>`;
@@ -371,7 +400,6 @@ export class StundenplanCard extends LitElement {
   }
 
   static styles = css`
-    /* volle Breite – unabhängig vom UI-Toggle */
     :host {
       display: block;
       width: 100%;
@@ -411,7 +439,6 @@ export class StundenplanCard extends LitElement {
       white-space: nowrap;
     }
 
-    /* Heute – als Overlay, damit Zellfarben bleiben */
     td.today,
     th.today {
       box-shadow: inset 0 0 0 9999px var(--sp-hl, rgba(0, 150, 255, 0.12));
@@ -481,7 +508,6 @@ export class StundenplanCardEditor extends LitElement {
         start: startRaw || parsed.start || undefined,
         end: endRaw || parsed.end || undefined,
         cells,
-        // im Editor immer vorhanden, damit bequem editierbar
         cell_styles,
       } as LessonRow;
     });
@@ -494,11 +520,8 @@ export class StundenplanCardEditor extends LitElement {
       highlight_current: cfg.highlight_current ?? false,
       highlight_today_color: (cfg.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
       highlight_current_color: (cfg.highlight_current_color ?? "rgba(76, 175, 80, 0.18)").toString(),
-
-      // NEU
       highlight_current_text: cfg.highlight_current_text ?? false,
       highlight_current_text_color: (cfg.highlight_current_text_color ?? "rgba(255, 255, 255, 0.95)").toString(),
-
       rows,
     };
   }
@@ -695,7 +718,6 @@ export class StundenplanCardEditor extends LitElement {
             <span>Aktuelle Stunde hervorheben</span>
           </div>
 
-          <!-- NEU -->
           <div class="checkboxLine">
             <input
               type="checkbox"
@@ -726,7 +748,6 @@ export class StundenplanCardEditor extends LitElement {
           />
         </div>
 
-        <!-- NEU -->
         <div class="row">
           <label>Textfarbe (Aktuelles Fach)</label>
           <input
