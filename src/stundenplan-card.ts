@@ -19,6 +19,9 @@ import { LitElement, html, css, TemplateResult } from "lit";
  * UPDATE 2:
  * - Optional: Daten aus Entity/Attribut laden (source_entity / source_attribute)
  * - Fix: Textfarbe der aktuellen Stunde/Fach bleibt unabhängig von highlight_current (Hintergrund)
+ *
+ * UPDATE 3:
+ * - Fix (Editor): Pausen können nun gezielt "unter" einer Zeile eingefügt werden (nicht nur am Ende).
  */
 
 type CellStyle = {
@@ -486,8 +489,7 @@ export class StundenplanCard extends LitElement {
 
                 // FIX: "isCurrent" darf NICHT von highlight_current abhängen,
                 // sonst verschwinden Text-Highlights wenn nur der Hintergrund deaktiviert ist.
-                const isCurrentTime =
-                  !!row.start && !!row.end && this.isNowBetween(row.start, row.end);
+                const isCurrentTime = !!row.start && !!row.end && this.isNowBetween(row.start, row.end);
 
                 // Zeitspalte: Hintergrund nur wenn highlight_current aktiv
                 let timeStyle = `--sp-hl:${currentOverlay};`;
@@ -512,13 +514,7 @@ export class StundenplanCard extends LitElement {
                       let style = `--sp-hl:${todayOverlay};` + styleToString(cellStyle, borderDefault);
 
                       // Textfarbe aktuelles Fach – unabhängig vom Hintergrund-Highlight (cfg.highlight_current)
-                      if (
-                        isCurrentTime &&
-                        cfg.highlight_current_text &&
-                        currentTextColor &&
-                        todayIdx >= 0 &&
-                        i === todayIdx
-                      ) {
+                      if (isCurrentTime && cfg.highlight_current_text && currentTextColor && todayIdx >= 0 && i === todayIdx) {
                         style += `color:${currentTextColor};`;
                       }
 
@@ -867,26 +863,44 @@ export class StundenplanCardEditor extends LitElement {
     this.emit({ ...this._config, rows });
   }
 
-  private addLessonRow() {
+  // --- INSERT HELPERS (neu) ---
+  private addLessonRow(afterIdx?: number) {
     if (!this._config) return;
 
-    const rows = [
-      ...this._config.rows,
-      {
-        time: "",
-        start: "",
-        end: "",
-        cells: Array.from({ length: this._config.days.length }, () => ""),
-        cell_styles: Array.from({ length: this._config.days.length }, () => null),
-      } as LessonRow,
-    ];
+    const newRow: LessonRow = {
+      time: "",
+      start: "",
+      end: "",
+      cells: Array.from({ length: this._config.days.length }, () => ""),
+      cell_styles: Array.from({ length: this._config.days.length }, () => null),
+    };
+
+    const rows = [...this._config.rows];
+
+    // Wenn afterIdx gesetzt ist, füge direkt darunter ein, sonst ans Ende.
+    if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) {
+      rows.splice(afterIdx + 1, 0, newRow);
+    } else {
+      rows.push(newRow);
+    }
 
     this.emit({ ...this._config, rows });
   }
 
-  private addBreakRow() {
+  private addBreakRow(afterIdx?: number) {
     if (!this._config) return;
-    const rows = [...this._config.rows, { break: true, time: "", label: "Pause" } as BreakRow];
+
+    const newRow: BreakRow = { break: true, time: "", label: "Pause" };
+
+    const rows = [...this._config.rows];
+
+    // Wenn afterIdx gesetzt ist, füge direkt darunter ein, sonst ans Ende.
+    if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) {
+      rows.splice(afterIdx + 1, 0, newRow);
+    } else {
+      rows.push(newRow);
+    }
+
     this.emit({ ...this._config, rows });
   }
 
@@ -1047,7 +1061,8 @@ export class StundenplanCardEditor extends LitElement {
                 min="0"
                 max="100"
                 .value=${String(Math.round(todayState.alpha * 100))}
-                @input=${(e: any) => this.setHighlightRgba("highlight_today_color", todayState.hex, Number(e.target.value) / 100)}
+                @input=${(e: any) =>
+                  this.setHighlightRgba("highlight_today_color", todayState.hex, Number(e.target.value) / 100)}
               />
               <div class="styleHint">${Math.round(todayState.alpha * 100)}%</div>
             </div>
@@ -1069,7 +1084,8 @@ export class StundenplanCardEditor extends LitElement {
                 min="0"
                 max="100"
                 .value=${String(Math.round(currentState.alpha * 100))}
-                @input=${(e: any) => this.setHighlightRgba("highlight_current_color", currentState.hex, Number(e.target.value) / 100)}
+                @input=${(e: any) =>
+                  this.setHighlightRgba("highlight_current_color", currentState.hex, Number(e.target.value) / 100)}
               />
               <div class="styleHint">${Math.round(currentState.alpha * 100)}%</div>
             </div>
@@ -1177,7 +1193,9 @@ export class StundenplanCardEditor extends LitElement {
                 <span>Pause</span>
               </div>
 
-              <div style="margin-top: 20px; text-align:right;">
+              <div class="rowActions">
+                <button class="mini" title="Stunde darunter einfügen" @click=${() => this.addLessonRow(idx)}>+ Stunde</button>
+                <button class="mini" title="Pause darunter einfügen" @click=${() => this.addBreakRow(idx)}>+ Pause</button>
                 <button class="danger" @click=${() => this.removeRow(idx)}>Löschen</button>
               </div>
             </div>
@@ -1454,6 +1472,23 @@ export class StundenplanCardEditor extends LitElement {
       gap: 10px;
       align-items: center;
       margin-bottom: 10px;
+    }
+
+    .rowActions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    button.mini {
+      padding: 7px 9px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1;
+      white-space: nowrap;
     }
 
     .timeGrid {
