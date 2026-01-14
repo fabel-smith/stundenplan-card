@@ -14,7 +14,11 @@ import { LitElement, html, css, TemplateResult } from "lit";
  * - Auto-Refresh (Timer): Highlights springen automatisch um (ohne Dashboard-Reload)
  *
  * UPDATE:
- * - Rechts: echte Vorschau-Tabelle (Klick auf Fach -> springt links zur passenden Eingabezelle)
+ * - Echte Vorschau-Tabelle hinzugefügt (Klick auf Fach -> springt links zur passenden Eingabezelle)
+ *
+ * UPDATE 2:
+ * - Optional: Daten aus Entity/Attribut laden (source_entity / source_attribute)
+ * - Fix: Textfarbe der aktuellen Stunde/Fach bleibt unabhängig von highlight_current (Hintergrund)
  */
 
 type CellStyle = {
@@ -59,6 +63,10 @@ type StundenplanConfig = {
   highlight_current_time_text?: boolean;
   highlight_current_time_text_color?: string; // rgba(...) oder #...
 
+  // OPTIONAL: Datenquelle aus HA Entity/Attribut
+  source_entity?: string;      // z.B. "sensor.stundenplan"
+  source_attribute?: string;   // z.B. "plan" (wenn JSON im Attribut liegt)
+  source_time_key?: string;    // Default: "Stunde"
   rows?: Row[];
 };
 
@@ -174,6 +182,9 @@ export class StundenplanCard extends LitElement {
     return { columns: "full" };
   }
 
+  // HA injects hass into the card instance
+  public hass: any;
+
   private config?: Required<StundenplanConfig>;
 
   // >>> Auto-Update Timer (damit Highlights automatisch umspringen)
@@ -203,13 +214,16 @@ export class StundenplanCard extends LitElement {
       highlight_today_color: "rgba(0, 150, 255, 0.12)",
       highlight_current_color: "rgba(76, 175, 80, 0.18)",
 
-      // auffälligere Defaults:
       highlight_current_text: false,
-      highlight_current_text_color: "#ff1744", // kräftiges Rot/Pink, sofort sichtbar
+      highlight_current_text_color: "#ff1744",
 
-      // Zeitspalte Textfarbe
       highlight_current_time_text: false,
-      highlight_current_time_text_color: "#ff9100", // kräftiges Orange, sofort sichtbar
+      highlight_current_time_text_color: "#ff9100",
+
+      // Defaults für Entity-Mode
+      source_entity: "",
+      source_attribute: "",
+      source_time_key: "Stunde",
 
       rows: [
         {
@@ -241,7 +255,6 @@ export class StundenplanCard extends LitElement {
     return document.createElement("stundenplan-card-editor");
   }
 
-  // defensiv, damit Picker/Preview stabil bleibt
   public setConfig(cfg: StundenplanConfig): void {
     const stub = StundenplanCard.getStubConfig();
     const type = ((cfg?.type ?? stub.type) + "").toString();
@@ -319,6 +332,10 @@ export class StundenplanCard extends LitElement {
       highlight_current_time_text: cfg.highlight_current_time_text ?? false,
       highlight_current_time_text_color: (cfg.highlight_current_time_text_color ?? "#ff9100").toString(),
 
+      source_entity: (cfg.source_entity ?? "").toString(),
+      source_attribute: (cfg.source_attribute ?? "").toString(),
+      source_time_key: (cfg.source_time_key ?? "Stunde").toString(),
+
       rows,
     };
   }
@@ -351,39 +368,114 @@ export class StundenplanCard extends LitElement {
     return mins >= s && mins < e;
   }
 
+  private parseAnyJson(raw: any): any | null {
+    if (raw == null) return null;
+    if (typeof raw === "string") {
+      const txt = raw.trim();
+      if (!txt) return null;
+      try {
+        return JSON.parse(txt);
+      } catch {
+        return null;
+      }
+    }
+    return raw;
+  }
+
+  /**
+   * Optional: Rows aus HA Entity/Attribut bauen.
+   * Erwartet Array von Objekten:
+   * [
+   *  {"ID":1,"Stunde":"1. 07:45-08:30","Montag":"Bio","Dienstag":"Mathe"},
+   *  ...
+   * ]
+   * Keys für Tage müssen zu config.days passen (z.B. "Montag" wenn days=["Montag",...]).
+   */
+  private getRowsFromEntity(cfg: Required<StundenplanConfig>): Row[] | null {
+    const ent = (cfg.source_entity ?? "").toString().trim();
+    if (!ent) return null;
+    if (!this.hass?.states?.[ent]) return null;
+
+    const st = this.hass.states[ent];
+    const attrName = (cfg.source_attribute ?? "").toString().trim();
+
+    const raw = attrName ? st.attributes?.[attrName] : st.state;
+    const data = this.parseAnyJson(raw);
+    if (!Array.isArray(data)) return null;
+
+    const days = cfg.days ?? [];
+    const timeKey = (cfg.source_time_key ?? "Stunde").toString();
+
+    const out: Row[] = data.map((obj: any) => {
+      // optional: Break-Row support, falls er das später will
+      if (obj?.break === true) {
+        return {
+          break: true,
+          time: (obj.time ?? obj[timeKey] ?? "").toString(),
+          label: (obj.label ?? "Pause").toString(),
+        } as BreakRow;
+      }
+
+      const timeStr = (obj?.time ?? obj?.[timeKey] ?? "").toString();
+      const parsed = parseStartEndFromTime(timeStr);
+
+      const cells = Array.from({ length: days.length }, (_, i) => {
+        const key = (days[i] ?? "").toString();
+        const v = obj?.[key];
+        return (v ?? "").toString();
+      });
+
+      const lr: LessonRow = {
+        time: timeStr,
+        start: parsed.start,
+        end: parsed.end,
+        cells,
+      };
+
+      return lr;
+    });
+
+    return out.length ? out : null;
+  }
+
   protected render(): TemplateResult {
     if (!this.config) return html``;
 
-    const todayIdx = this.getTodayIndex(this.config.days ?? []);
+    const cfg = this.config;
+
+    // optional: rows aus Entity ziehen, fallback: manuell konfigurierte rows
+    const rows = this.getRowsFromEntity(cfg) ?? cfg.rows;
+
+    const todayIdx = this.getTodayIndex(cfg.days ?? []);
     const borderDefault = "1px solid var(--divider-color)";
 
-    const todayOverlay = cssColorFromHexOrCss(this.config.highlight_today_color ?? "", 0.12);
-    const currentOverlay = cssColorFromHexOrCss(this.config.highlight_current_color ?? "", 0.18);
+    const todayOverlay = cssColorFromHexOrCss(cfg.highlight_today_color ?? "", 0.12);
+    const currentOverlay = cssColorFromHexOrCss(cfg.highlight_current_color ?? "", 0.18);
 
-    const currentTextColor = (this.config.highlight_current_text_color ?? "").toString().trim();
-    const currentTimeTextColor = (this.config.highlight_current_time_text_color ?? "").toString().trim();
+    const currentTextColor = (cfg.highlight_current_text_color ?? "").toString().trim();
+    const currentTimeTextColor = (cfg.highlight_current_time_text_color ?? "").toString().trim();
 
     return html`
-      <ha-card header=${this.config.title ?? ""}>
+      <ha-card header=${cfg.title ?? ""}>
         <div class="card">
           <table>
             <thead>
               <tr>
                 <th class="time">Stunde</th>
-                ${this.config.days.map((d, i) => {
-                  const cls = this.config!.highlight_today && i === todayIdx ? "today" : "";
+                ${cfg.days.map((d, i) => {
+                  const cls = cfg.highlight_today && i === todayIdx ? "today" : "";
                   return html`<th class=${cls} style=${`--sp-hl:${todayOverlay};`}>${d}</th>`;
                 })}
               </tr>
             </thead>
 
             <tbody>
-              ${this.config.rows.map((r) => {
+              ${rows.map((r) => {
                 if (isBreakRow(r)) {
                   return html`
                     <tr class="break">
                       <td class="time">${r.time}</td>
-                      <td colspan=${this.config!.days.length}>${r.label ?? ""}</td>
+                      <td colspan=${cfg.days.length}>${r.label ?? ""}</td>
                     </tr>
                   `;
                 }
@@ -392,18 +484,19 @@ export class StundenplanCard extends LitElement {
                 const cells = row.cells ?? [];
                 const styles = row.cell_styles ?? [];
 
-                const isCurrent =
-                  !!this.config!.highlight_current &&
-                  !!row.start &&
-                  !!row.end &&
-                  this.isNowBetween(row.start, row.end);
+                // FIX: "isCurrent" darf NICHT von highlight_current abhängen,
+                // sonst verschwinden Text-Highlights wenn nur der Hintergrund deaktiviert ist.
+                const isCurrentTime =
+                  !!row.start && !!row.end && this.isNowBetween(row.start, row.end);
 
-                // Zeitspalte: Hintergrund + optional Textfarbe
-                let timeStyle =
-                  `--sp-hl:${currentOverlay};` +
-                  (isCurrent ? "box-shadow: inset 0 0 0 9999px var(--sp-hl);" : "");
+                // Zeitspalte: Hintergrund nur wenn highlight_current aktiv
+                let timeStyle = `--sp-hl:${currentOverlay};`;
+                if (cfg.highlight_current && isCurrentTime) {
+                  timeStyle += "box-shadow: inset 0 0 0 9999px var(--sp-hl);";
+                }
 
-                if (isCurrent && this.config!.highlight_current_time_text && currentTimeTextColor) {
+                // Zeitspalte: Textfarbe unabhängig vom Hintergrund-Highlight
+                if (isCurrentTime && cfg.highlight_current_time_text && currentTimeTextColor) {
                   timeStyle += `color:${currentTimeTextColor};`;
                 }
 
@@ -411,17 +504,17 @@ export class StundenplanCard extends LitElement {
                   <tr>
                     <td class="time" style=${timeStyle}>${row.time}</td>
 
-                    ${this.config!.days.map((_, i) => {
+                    ${cfg.days.map((_, i) => {
                       const val = cells[i] ?? "";
                       const cellStyle = styles[i] ?? null;
 
-                      const cls = this.config!.highlight_today && i === todayIdx ? "today" : "";
+                      const cls = cfg.highlight_today && i === todayIdx ? "today" : "";
                       let style = `--sp-hl:${todayOverlay};` + styleToString(cellStyle, borderDefault);
 
-                      // Aktuelles Fach – NUR heutige Spalte + aktuelle Zeit-Zeile
+                      // Textfarbe aktuelles Fach – unabhängig vom Hintergrund-Highlight (cfg.highlight_current)
                       if (
-                        isCurrent &&
-                        this.config!.highlight_current_text &&
+                        isCurrentTime &&
+                        cfg.highlight_current_text &&
                         currentTextColor &&
                         todayIdx >= 0 &&
                         i === todayIdx
@@ -624,6 +717,10 @@ export class StundenplanCardEditor extends LitElement {
       highlight_current_time_text: cfg.highlight_current_time_text ?? false,
       highlight_current_time_text_color: (cfg.highlight_current_time_text_color ?? "#ff9100").toString(),
 
+      source_entity: (cfg.source_entity ?? "").toString(),
+      source_attribute: (cfg.source_attribute ?? "").toString(),
+      source_time_key: (cfg.source_time_key ?? "Stunde").toString(),
+
       rows,
     };
   }
@@ -657,7 +754,6 @@ export class StundenplanCardEditor extends LitElement {
     this.emit({ ...this._config, days, rows });
   }
 
-  // WICHTIG: Wenn "time" geändert wird, start/end nachziehen, sofern leer oder auto-abgeleitet
   private updateRowTime(idx: number, value: string) {
     if (!this._config) return;
 
@@ -863,7 +959,7 @@ export class StundenplanCardEditor extends LitElement {
           </tbody>
         </table>
 
-        <div class="editorPreviewHint">Tipp: Klick auf ein Fach springt links zur passenden Zelle.</div>
+        <div class="editorPreviewHint">Tipp: Klick auf ein Fach springt zur passenden Zelle.</div>
       </div>
     `;
   }
@@ -871,7 +967,6 @@ export class StundenplanCardEditor extends LitElement {
   protected render(): TemplateResult {
     if (!this._config) return html``;
 
-    // Highlight Picker States
     const todayState = this.parseColorToHexAlpha(this._config.highlight_today_color, "#0096ff", 0.12);
     const currentState = this.parseColorToHexAlpha(this._config.highlight_current_color, "#4caf50", 0.18);
 
@@ -938,7 +1033,6 @@ export class StundenplanCardEditor extends LitElement {
           </div>
         </div>
 
-        <!-- Picker: Heute (Overlay) -->
         <div class="row">
           <label>Highlight-Farbe (Heute)</label>
           <div class="pickerRow">
@@ -961,7 +1055,6 @@ export class StundenplanCardEditor extends LitElement {
           <div class="hint">${this._config.highlight_today_color}</div>
         </div>
 
-        <!-- Picker: Aktuelle Stunde (Overlay Zeitspalte) -->
         <div class="row">
           <label>Highlight-Farbe (Aktuelle Stunde)</label>
           <div class="pickerRow">
@@ -984,7 +1077,6 @@ export class StundenplanCardEditor extends LitElement {
           <div class="hint">${this._config.highlight_current_color}</div>
         </div>
 
-        <!-- Picker: Textfarbe aktuelles Fach -->
         <div class="row">
           <label>Textfarbe (Aktuelles Fach)</label>
           <div class="pickerRow">
@@ -1001,7 +1093,6 @@ export class StundenplanCardEditor extends LitElement {
           </div>
         </div>
 
-        <!-- Picker: Textfarbe aktuelle Stunde (Zeitspalte) -->
         <div class="row">
           <label>Textfarbe (Aktuelle Stunde / Zeitspalte)</label>
           <div class="pickerRow">
@@ -1014,6 +1105,46 @@ export class StundenplanCardEditor extends LitElement {
               type="text"
               .value=${this._config.highlight_current_time_text_color ?? "#ff9100"}
               @input=${(e: any) => this.emit({ ...this._config!, highlight_current_time_text_color: e.target.value })}
+            />
+          </div>
+        </div>
+
+        <!-- OPTIONAL: Entity/Attribute inputs (simple) -->
+        <div class="row">
+          <label>Datenquelle (optional)</label>
+          <div class="hint">
+            Wenn gesetzt, werden die Zeilen aus einer Entität gelesen (JSON im state oder Attribut). Leer lassen = manueller Stundenplan.
+          </div>
+
+          <div class="timeGrid">
+            <div class="row">
+              <label>source_entity</label>
+              <input
+                type="text"
+                .value=${this._config.source_entity ?? ""}
+                placeholder="z.B. sensor.stundenplan"
+                @input=${(e: any) => this.emit({ ...this._config!, source_entity: e.target.value })}
+              />
+            </div>
+
+            <div class="row">
+              <label>source_attribute</label>
+              <input
+                type="text"
+                .value=${this._config.source_attribute ?? ""}
+                placeholder="z.B. plan (leer = state)"
+                @input=${(e: any) => this.emit({ ...this._config!, source_attribute: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div class="row">
+            <label>source_time_key</label>
+            <input
+              type="text"
+              .value=${this._config.source_time_key ?? "Stunde"}
+              placeholder='Default: "Stunde"'
+              @input=${(e: any) => this.emit({ ...this._config!, source_time_key: e.target.value })}
             />
           </div>
         </div>
@@ -1145,7 +1276,6 @@ export class StundenplanCardEditor extends LitElement {
                             </div>
                           </div>
 
-                          <!-- NUR NOCH VORSCHAUBILD (OHNE KLICK, OHNE "Vorschau (klicken)") -->
                           <div
                             class="preview"
                             style=${styleToString(st, "1px solid var(--divider-color)")}
