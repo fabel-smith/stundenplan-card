@@ -22,19 +22,23 @@ import { LitElement, html, css, TemplateResult } from "lit";
  *
  * UPDATE 3:
  * - Fix (Editor): Pausen können nun gezielt "unter" einer Zeile eingefügt werden (nicht nur am Ende).
+ *
+ * UPDATE 4 (Wechselwochen):
+ * - Optional: A/B-Woche nach ISO-Kalenderwoche (Parität) ODER via Mapping-Entity
+ * - Optional: getrennte Datenquellen für A- und B-Plan (source_entity_a/_b)
  */
 
 type CellStyle = {
-  bg?: string;        // HEX (#RRGGBB) oder CSS (rgba/var/rgb)
-  bg_alpha?: number;  // 0..1 (nur wenn bg HEX ist)
-  color?: string;     // HEX oder CSS
+  bg?: string;
+  bg_alpha?: number;
+  color?: string;
   border?: string;
 };
 
 type LessonRow = {
   time: string;
-  start?: string; // "07:45"
-  end?: string;   // "08:30"
+  start?: string;
+  end?: string;
   cells: string[];
   cell_styles?: (CellStyle | null)[];
 };
@@ -47,30 +51,47 @@ type BreakRow = {
 
 type Row = LessonRow | BreakRow;
 
+type WeekMode = "off" | "kw_parity" | "week_map";
+
 type StundenplanConfig = {
-  type: string; // "custom:stundenplan-card"
+  type: string;
   title?: string;
   days?: string[];
 
   highlight_today?: boolean;
   highlight_current?: boolean;
 
-  highlight_today_color?: string;   // rgba(...) oder #...
-  highlight_current_color?: string; // rgba(...) oder #...
+  highlight_today_color?: string;
+  highlight_current_color?: string;
 
-  // Textfarbe für aktuelles Fach (nur heutige Spalte + aktuelle Zeit-Zeile)
   highlight_current_text?: boolean;
-  highlight_current_text_color?: string; // rgba(...) oder #...
+  highlight_current_text_color?: string;
 
-  // Textfarbe in der Zeitspalte für aktuelle Stunde
   highlight_current_time_text?: boolean;
-  highlight_current_time_text_color?: string; // rgba(...) oder #...
+  highlight_current_time_text_color?: string;
 
-  // OPTIONAL: Datenquelle aus HA Entity/Attribut
-  source_entity?: string;      // z.B. "sensor.stundenplan"
-  source_attribute?: string;   // z.B. "plan" (wenn JSON im Attribut liegt)
-  source_time_key?: string;    // Default: "Stunde"
-  rows?: Row[];
+  // Single-Source (legacy / kompatibel)
+  source_entity?: string;
+  source_attribute?: string;
+  source_time_key?: string;
+
+  // Wechselwochen
+  week_mode?: WeekMode;
+
+  // KW-Parität: Wenn true => A=gerade KW, B=ungerade. Wenn false => A=ungerade, B=gerade.
+  week_a_is_even_kw?: boolean;
+
+  // Optionales Mapping (Override): Entity/Attribut, das die KW->A/B Zuordnung enthält
+  week_map_entity?: string;      // z.B. sensor.wechselwochen_map
+  week_map_attribute?: string;   // z.B. "map" (leer = state)
+
+  // Plan A/B Quellen
+  source_entity_a?: string;      // z.B. sensor.stundenplan_a
+  source_attribute_a?: string;   // z.B. plan
+  source_entity_b?: string;      // z.B. sensor.stundenplan_b
+  source_attribute_b?: string;   // z.B. plan
+
+  rows?: Row[]; // manueller Plan (Fallback)
 };
 
 function isBreakRow(r: any): r is BreakRow {
@@ -141,7 +162,6 @@ function cssColorFromHexOrCss(value: string, defaultAlpha: number): string {
   return v;
 }
 
-// start/end aus "time" extrahieren (z.B. "1. 07:45–08:30")
 function parseStartEndFromTime(time: string | undefined): { start?: string; end?: string } {
   const t = (time ?? "").toString();
   const m = t.match(/(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})/);
@@ -149,7 +169,6 @@ function parseStartEndFromTime(time: string | undefined): { start?: string; end?
   return { start: m[1], end: m[2] };
 }
 
-// robustes Matching von "Heute" anhand der days-Labels (Mo/Di/... oder Mon/Tue/... etc.)
 function normalizeDayLabel(label: string): string {
   return (label ?? "")
     .toString()
@@ -180,17 +199,38 @@ function todayCandidates(getDay: number): string[] {
   }
 }
 
+// ISO-Woche / ISO-Jahr (robust)
+function getISOWeekYear(date: Date): { isoWeek: number; isoYear: number } {
+  // Copy date so don't modify original
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  // ISO: Monday=1..Sunday=7
+  const dayNum = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
+  // Set to nearest Thursday: current date + 4 - current day number
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const isoYear = d.getUTCFullYear();
+  // Week 1 is the week with Jan 4th
+  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+  const yearStartDayNum = yearStart.getUTCDay() === 0 ? 7 : yearStart.getUTCDay();
+  const firstThursday = new Date(yearStart);
+  firstThursday.setUTCDate(yearStart.getUTCDate() + (4 - yearStartDayNum));
+  const diffMs = d.getTime() - firstThursday.getTime();
+  const isoWeek = 1 + Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
+  return { isoWeek, isoYear };
+}
+
+function normalizeWeekLetter(x: any): "A" | "B" | null {
+  const v = (x ?? "").toString().trim().toUpperCase();
+  if (v === "A" || v === "B") return v;
+  return null;
+}
+
 export class StundenplanCard extends LitElement {
   public getGridOptions() {
     return { columns: "full" };
   }
 
-  // HA injects hass into the card instance
   public hass: any;
-
   private config?: Required<StundenplanConfig>;
-
-  // >>> Auto-Update Timer (damit Highlights automatisch umspringen)
   private _tick?: number;
 
   connectedCallback(): void {
@@ -203,7 +243,6 @@ export class StundenplanCard extends LitElement {
     if (this._tick) window.clearInterval(this._tick);
     this._tick = undefined;
   }
-  // <<< Timer Ende
 
   static getStubConfig(): Required<StundenplanConfig> {
     return {
@@ -223,10 +262,21 @@ export class StundenplanCard extends LitElement {
       highlight_current_time_text: false,
       highlight_current_time_text_color: "#ff9100",
 
-      // Defaults für Entity-Mode
+      // Legacy Single-Source
       source_entity: "",
       source_attribute: "",
       source_time_key: "Stunde",
+
+      // Wechselwochen Defaults
+      week_mode: "off",
+      week_a_is_even_kw: true,
+      week_map_entity: "",
+      week_map_attribute: "",
+
+      source_entity_a: "",
+      source_attribute_a: "",
+      source_entity_b: "",
+      source_attribute_b: "",
 
       rows: [
         {
@@ -318,6 +368,11 @@ export class StundenplanCard extends LitElement {
       return out;
     });
 
+    const weekModeRaw = ((cfg.week_mode ?? "off") + "").toString().trim() as WeekMode;
+    const week_mode: WeekMode = (weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off")
+      ? weekModeRaw
+      : "off";
+
     return {
       type: (cfg.type ?? "custom:stundenplan-card").toString(),
       title: (cfg.title ?? "Mein Stundenplan").toString(),
@@ -338,6 +393,16 @@ export class StundenplanCard extends LitElement {
       source_entity: (cfg.source_entity ?? "").toString(),
       source_attribute: (cfg.source_attribute ?? "").toString(),
       source_time_key: (cfg.source_time_key ?? "Stunde").toString(),
+
+      week_mode,
+      week_a_is_even_kw: cfg.week_a_is_even_kw ?? true,
+      week_map_entity: (cfg.week_map_entity ?? "").toString(),
+      week_map_attribute: (cfg.week_map_attribute ?? "").toString(),
+
+      source_entity_a: (cfg.source_entity_a ?? "").toString(),
+      source_attribute_a: (cfg.source_attribute_a ?? "").toString(),
+      source_entity_b: (cfg.source_entity_b ?? "").toString(),
+      source_attribute_b: (cfg.source_attribute_b ?? "").toString(),
 
       rows,
     };
@@ -385,32 +450,24 @@ export class StundenplanCard extends LitElement {
     return raw;
   }
 
-  /**
-   * Optional: Rows aus HA Entity/Attribut bauen.
-   * Erwartet Array von Objekten:
-   * [
-   *  {"ID":1,"Stunde":"1. 07:45-08:30","Montag":"Bio","Dienstag":"Mathe"},
-   *  ...
-   * ]
-   * Keys für Tage müssen zu config.days passen (z.B. "Montag" wenn days=["Montag",...]).
-   */
-  private getRowsFromEntity(cfg: Required<StundenplanConfig>): Row[] | null {
-    const ent = (cfg.source_entity ?? "").toString().trim();
+  private readEntityJson(entityId: string, attributeName: string): any | null {
+    const ent = (entityId ?? "").toString().trim();
     if (!ent) return null;
     if (!this.hass?.states?.[ent]) return null;
 
     const st = this.hass.states[ent];
-    const attrName = (cfg.source_attribute ?? "").toString().trim();
+    const attr = (attributeName ?? "").toString().trim();
+    const raw = attr ? st.attributes?.[attr] : st.state;
+    return this.parseAnyJson(raw);
+  }
 
-    const raw = attrName ? st.attributes?.[attrName] : st.state;
-    const data = this.parseAnyJson(raw);
+  private buildRowsFromArray(cfg: Required<StundenplanConfig>, data: any[]): Row[] | null {
     if (!Array.isArray(data)) return null;
 
     const days = cfg.days ?? [];
     const timeKey = (cfg.source_time_key ?? "Stunde").toString();
 
     const out: Row[] = data.map((obj: any) => {
-      // optional: Break-Row support, falls er das später will
       if (obj?.break === true) {
         return {
           break: true,
@@ -441,13 +498,101 @@ export class StundenplanCard extends LitElement {
     return out.length ? out : null;
   }
 
+  private getRowsFromEntity(cfg: Required<StundenplanConfig>, entityId: string, attributeName: string): Row[] | null {
+    const data = this.readEntityJson(entityId, attributeName);
+    if (!Array.isArray(data)) return null;
+    return this.buildRowsFromArray(cfg, data);
+  }
+
+  private weekFromParity(cfg: Required<StundenplanConfig>): "A" | "B" {
+    const { isoWeek } = getISOWeekYear(new Date());
+    const even = isoWeek % 2 === 0;
+    const aIsEven = !!cfg.week_a_is_even_kw;
+    // A=even => even?A:B  | A=odd => even?B:A
+    return even === aIsEven ? "A" : "B";
+  }
+
+  private weekFromMap(cfg: Required<StundenplanConfig>): "A" | "B" | null {
+    const ent = (cfg.week_map_entity ?? "").toString().trim();
+    if (!ent) return null;
+
+    const attr = (cfg.week_map_attribute ?? "").toString().trim();
+    const mapData = this.readEntityJson(ent, attr);
+    if (!mapData || typeof mapData !== "object") return null;
+
+    const { isoWeek, isoYear } = getISOWeekYear(new Date());
+    const wKey = String(isoWeek);
+    const yKey = String(isoYear);
+
+    // Jahrsspezifisch: {"2026":{"1":"A","2":"B"}}
+    if (mapData?.[yKey] && typeof mapData[yKey] === "object") {
+      const v = normalizeWeekLetter(mapData[yKey][wKey]);
+      if (v) return v;
+    }
+
+    // Flat: {"1":"A","2":"B"}
+    const v2 = normalizeWeekLetter(mapData?.[wKey]);
+    if (v2) return v2;
+
+    return null;
+  }
+
+  private getActiveWeek(cfg: Required<StundenplanConfig>): "A" | "B" {
+    if (cfg.week_mode === "week_map") {
+      const mapped = this.weekFromMap(cfg);
+      if (mapped) return mapped;
+      // Fallback auf Parität, falls Mapping nicht gesetzt / unvollständig
+      return this.weekFromParity(cfg);
+    }
+    if (cfg.week_mode === "kw_parity") return this.weekFromParity(cfg);
+    return "A";
+  }
+
+  private getRowsResolved(cfg: Required<StundenplanConfig>): Row[] {
+    // Wechselwochen aktiv?
+    if (cfg.week_mode !== "off") {
+      const w = this.getActiveWeek(cfg);
+
+      const entA = (cfg.source_entity_a ?? "").trim();
+      const entB = (cfg.source_entity_b ?? "").trim();
+      const attrA = (cfg.source_attribute_a ?? "").trim();
+      const attrB = (cfg.source_attribute_b ?? "").trim();
+
+      // Wenn A/B-Entities gesetzt sind, nimm die
+      if (w === "A" && entA) {
+        const rA = this.getRowsFromEntity(cfg, entA, attrA);
+        if (rA) return rA;
+      }
+      if (w === "B" && entB) {
+        const rB = this.getRowsFromEntity(cfg, entB, attrB);
+        if (rB) return rB;
+      }
+
+      // Fallback: Legacy Single-Entity
+      const legacyEnt = (cfg.source_entity ?? "").trim();
+      if (legacyEnt) {
+        const rLegacy = this.getRowsFromEntity(cfg, legacyEnt, (cfg.source_attribute ?? "").trim());
+        if (rLegacy) return rLegacy;
+      }
+
+      // Fallback: manuell
+      return cfg.rows ?? [];
+    }
+
+    // Kein Wechselwochen-Modus: Legacy Entity oder manuell
+    const ent = (cfg.source_entity ?? "").toString().trim();
+    if (ent) {
+      const r = this.getRowsFromEntity(cfg, ent, (cfg.source_attribute ?? "").toString().trim());
+      if (r) return r;
+    }
+    return cfg.rows ?? [];
+  }
+
   protected render(): TemplateResult {
     if (!this.config) return html``;
 
     const cfg = this.config;
-
-    // optional: rows aus Entity ziehen, fallback: manuell konfigurierte rows
-    const rows = this.getRowsFromEntity(cfg) ?? cfg.rows;
+    const rows = this.getRowsResolved(cfg);
 
     const todayIdx = this.getTodayIndex(cfg.days ?? []);
     const borderDefault = "1px solid var(--divider-color)";
@@ -458,9 +603,16 @@ export class StundenplanCard extends LitElement {
     const currentTextColor = (cfg.highlight_current_text_color ?? "").toString().trim();
     const currentTimeTextColor = (cfg.highlight_current_time_text_color ?? "").toString().trim();
 
+    const showWeekBadge = cfg.week_mode !== "off";
+    const activeWeek = showWeekBadge ? this.getActiveWeek(cfg) : null;
+
     return html`
       <ha-card header=${cfg.title ?? ""}>
         <div class="card">
+          ${showWeekBadge
+            ? html`<div class="weekBadge">Woche: <b>${activeWeek}</b></div>`
+            : html``}
+
           <table>
             <thead>
               <tr>
@@ -487,17 +639,12 @@ export class StundenplanCard extends LitElement {
                 const cells = row.cells ?? [];
                 const styles = row.cell_styles ?? [];
 
-                // FIX: "isCurrent" darf NICHT von highlight_current abhängen,
-                // sonst verschwinden Text-Highlights wenn nur der Hintergrund deaktiviert ist.
                 const isCurrentTime = !!row.start && !!row.end && this.isNowBetween(row.start, row.end);
 
-                // Zeitspalte: Hintergrund nur wenn highlight_current aktiv
                 let timeStyle = `--sp-hl:${currentOverlay};`;
                 if (cfg.highlight_current && isCurrentTime) {
                   timeStyle += "box-shadow: inset 0 0 0 9999px var(--sp-hl);";
                 }
-
-                // Zeitspalte: Textfarbe unabhängig vom Hintergrund-Highlight
                 if (isCurrentTime && cfg.highlight_current_time_text && currentTimeTextColor) {
                   timeStyle += `color:${currentTimeTextColor};`;
                 }
@@ -513,7 +660,6 @@ export class StundenplanCard extends LitElement {
                       const cls = cfg.highlight_today && i === todayIdx ? "today" : "";
                       let style = `--sp-hl:${todayOverlay};` + styleToString(cellStyle, borderDefault);
 
-                      // Textfarbe aktuelles Fach – unabhängig vom Hintergrund-Highlight (cfg.highlight_current)
                       if (isCurrentTime && cfg.highlight_current_text && currentTextColor && todayIdx >= 0 && i === todayIdx) {
                         style += `color:${currentTextColor};`;
                       }
@@ -546,6 +692,16 @@ export class StundenplanCard extends LitElement {
 
     .card {
       padding: 12px;
+    }
+
+    .weekBadge {
+      margin: 0 0 10px 0;
+      padding: 8px 10px;
+      border: 1px solid var(--divider-color);
+      border-radius: 12px;
+      background: var(--secondary-background-color);
+      font-size: 13px;
+      opacity: 0.95;
     }
 
     table {
@@ -610,7 +766,6 @@ export class StundenplanCardEditor extends LitElement {
     }
   }
 
-  // --- Picker Helpers (Editor) ---
   private rgbaFromHex(hex: string, alpha: number): string {
     const rgb = hexToRgb(hex);
     if (!rgb) return `rgba(0,0,0,${clamp01(alpha)})`;
@@ -620,14 +775,12 @@ export class StundenplanCardEditor extends LitElement {
   private parseColorToHexAlpha(value: string, fallbackHex: string, fallbackAlpha: number): { hex: string; alpha: number } {
     const v = (value ?? "").toString().trim();
 
-    // HEX
     if (v.startsWith("#")) {
       const rgb = hexToRgb(v);
       if (rgb) return { hex: v, alpha: clamp01(fallbackAlpha) };
       return { hex: fallbackHex, alpha: clamp01(fallbackAlpha) };
     }
 
-    // rgba(r,g,b,a)
     const m = v.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)/i);
     if (m) {
       const r = Math.max(0, Math.min(255, Number(m[1])));
@@ -638,7 +791,6 @@ export class StundenplanCardEditor extends LitElement {
       return { hex: `#${toHex(r)}${toHex(g)}${toHex(b)}`, alpha: a };
     }
 
-    // rgb(r,g,b)
     const m2 = v.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
     if (m2) {
       const r = Math.max(0, Math.min(255, Number(m2[1])));
@@ -663,12 +815,16 @@ export class StundenplanCardEditor extends LitElement {
   }
 
   private normalizeConfig(cfg: StundenplanConfig): Required<StundenplanConfig> {
+    const stub = StundenplanCard.getStubConfig();
+
+    const merged: StundenplanConfig = { ...stub, ...cfg };
+
     const days =
-      Array.isArray(cfg.days) && cfg.days.length
-        ? cfg.days.map((d) => (d ?? "").toString())
+      Array.isArray(merged.days) && merged.days.length
+        ? merged.days.map((d) => (d ?? "").toString())
         : ["Mo", "Di", "Mi", "Do", "Fr"];
 
-    const rowsIn = Array.isArray(cfg.rows) ? cfg.rows : [];
+    const rowsIn = Array.isArray(merged.rows) ? merged.rows : [];
     const rows: Row[] = rowsIn.map((r: any) => {
       if (isBreakRow(r)) {
         return { break: true, time: (r.time ?? "").toString(), label: (r.label ?? "Pause").toString() };
@@ -691,31 +847,45 @@ export class StundenplanCardEditor extends LitElement {
         start: startRaw || parsed.start || undefined,
         end: endRaw || parsed.end || undefined,
         cells,
-        // im Editor immer vorhanden, damit bequem editierbar
         cell_styles,
       } as LessonRow;
     });
 
+    const weekModeRaw = ((merged.week_mode ?? "off") + "").toString().trim() as WeekMode;
+    const week_mode: WeekMode = (weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off")
+      ? weekModeRaw
+      : "off";
+
     return {
-      type: (cfg.type ?? "custom:stundenplan-card").toString(),
-      title: (cfg.title ?? "Mein Stundenplan").toString(),
+      type: (merged.type ?? "custom:stundenplan-card").toString(),
+      title: (merged.title ?? "Mein Stundenplan").toString(),
       days,
 
-      highlight_today: cfg.highlight_today ?? true,
-      highlight_current: cfg.highlight_current ?? false,
+      highlight_today: merged.highlight_today ?? true,
+      highlight_current: merged.highlight_current ?? false,
 
-      highlight_today_color: (cfg.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
-      highlight_current_color: (cfg.highlight_current_color ?? "rgba(76, 175, 80, 0.18)").toString(),
+      highlight_today_color: (merged.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
+      highlight_current_color: (merged.highlight_current_color ?? "rgba(76, 175, 80, 0.18)").toString(),
 
-      highlight_current_text: cfg.highlight_current_text ?? false,
-      highlight_current_text_color: (cfg.highlight_current_text_color ?? "#ff1744").toString(),
+      highlight_current_text: merged.highlight_current_text ?? false,
+      highlight_current_text_color: (merged.highlight_current_text_color ?? "#ff1744").toString(),
 
-      highlight_current_time_text: cfg.highlight_current_time_text ?? false,
-      highlight_current_time_text_color: (cfg.highlight_current_time_text_color ?? "#ff9100").toString(),
+      highlight_current_time_text: merged.highlight_current_time_text ?? false,
+      highlight_current_time_text_color: (merged.highlight_current_time_text_color ?? "#ff9100").toString(),
 
-      source_entity: (cfg.source_entity ?? "").toString(),
-      source_attribute: (cfg.source_attribute ?? "").toString(),
-      source_time_key: (cfg.source_time_key ?? "Stunde").toString(),
+      source_entity: (merged.source_entity ?? "").toString(),
+      source_attribute: (merged.source_attribute ?? "").toString(),
+      source_time_key: (merged.source_time_key ?? "Stunde").toString(),
+
+      week_mode,
+      week_a_is_even_kw: merged.week_a_is_even_kw ?? true,
+      week_map_entity: (merged.week_map_entity ?? "").toString(),
+      week_map_attribute: (merged.week_map_attribute ?? "").toString(),
+
+      source_entity_a: (merged.source_entity_a ?? "").toString(),
+      source_attribute_a: (merged.source_attribute_a ?? "").toString(),
+      source_entity_b: (merged.source_entity_b ?? "").toString(),
+      source_attribute_b: (merged.source_attribute_b ?? "").toString(),
 
       rows,
     };
@@ -743,7 +913,7 @@ export class StundenplanCardEditor extends LitElement {
       if (isBreakRow(r)) return r;
       const lr = r as LessonRow;
       const cells = Array.from({ length: days.length }, (_, i) => (lr.cells?.[i] ?? "").toString());
-      const styles = Array.from({ length: days.length }, (_, i) => normalizeCellStyle(lr.cell_styles?.[i]));
+      const styles = Array.from({ length: days.length }, (_, i) => normalizeCellStyle((lr as any).cell_styles?.[i]));
       return { ...lr, cells, cell_styles: styles };
     });
 
@@ -819,8 +989,8 @@ export class StundenplanCardEditor extends LitElement {
       if (i !== rowIdx || isBreakRow(r)) return r;
 
       const row = r as LessonRow;
-      const styles = Array.isArray(row.cell_styles)
-        ? [...row.cell_styles]
+      const styles = Array.isArray((row as any).cell_styles)
+        ? [...((row as any).cell_styles as (CellStyle | null)[])]
         : Array.from({ length: this._config!.days.length }, () => null as CellStyle | null);
 
       const current = styles[cellIdx] ? { ...(styles[cellIdx] as CellStyle) } : ({} as CellStyle);
@@ -863,7 +1033,6 @@ export class StundenplanCardEditor extends LitElement {
     this.emit({ ...this._config, rows });
   }
 
-  // --- INSERT HELPERS (neu) ---
   private addLessonRow(afterIdx?: number) {
     if (!this._config) return;
 
@@ -877,7 +1046,6 @@ export class StundenplanCardEditor extends LitElement {
 
     const rows = [...this._config.rows];
 
-    // Wenn afterIdx gesetzt ist, füge direkt darunter ein, sonst ans Ende.
     if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) {
       rows.splice(afterIdx + 1, 0, newRow);
     } else {
@@ -891,10 +1059,8 @@ export class StundenplanCardEditor extends LitElement {
     if (!this._config) return;
 
     const newRow: BreakRow = { break: true, time: "", label: "Pause" };
-
     const rows = [...this._config.rows];
 
-    // Wenn afterIdx gesetzt ist, füge direkt darunter ein, sonst ans Ende.
     if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) {
       rows.splice(afterIdx + 1, 0, newRow);
     } else {
@@ -954,7 +1120,7 @@ export class StundenplanCardEditor extends LitElement {
                   <td class="p-time">${lr.time}</td>
                   ${days.map((_, cellIdx) => {
                     const val = (lr.cells?.[cellIdx] ?? "").toString();
-                    const st = (lr.cell_styles?.[cellIdx] ?? null) as CellStyle | null;
+                    const st = ((lr as any).cell_styles?.[cellIdx] ?? null) as CellStyle | null;
 
                     return html`
                       <td
@@ -1125,11 +1291,111 @@ export class StundenplanCardEditor extends LitElement {
           </div>
         </div>
 
-        <!-- OPTIONAL: Entity/Attribute inputs (simple) -->
+        <!-- Wechselwochen -->
         <div class="row">
-          <label>Datenquelle (optional)</label>
+          <label>Wechselwochen (A/B)</label>
+          <div class="hint">
+            Optional. Wenn aktiviert, kann die Card automatisch A/B-Woche bestimmen (KW-Parität) oder via Mapping-Entity überschreiben.
+          </div>
+
+          <div class="row">
+            <label>week_mode</label>
+            <select
+              .value=${this._config.week_mode ?? "off"}
+              @change=${(e: any) => this.emit({ ...this._config!, week_mode: e.target.value })}
+            >
+              <option value="off">off (deaktiviert)</option>
+              <option value="kw_parity">kw_parity (gerade/ungerade KW)</option>
+              <option value="week_map">week_map (Mapping-Entity, Fallback Parität)</option>
+            </select>
+          </div>
+
+          <div class="checkboxLine">
+            <input
+              type="checkbox"
+              .checked=${this._config.week_a_is_even_kw ?? true}
+              @change=${(e: any) => this.emit({ ...this._config!, week_a_is_even_kw: e.target.checked })}
+            />
+            <span>A-Woche = gerade Kalenderwoche (ISO-KW)</span>
+          </div>
+          <div class="hint">Wenn deaktiviert: A-Woche = ungerade KW.</div>
+
+          <div class="timeGrid">
+            <div class="row">
+              <label>week_map_entity (optional)</label>
+              <input
+                type="text"
+                .value=${this._config.week_map_entity ?? ""}
+                placeholder="z.B. sensor.wechselwochen_map"
+                @input=${(e: any) => this.emit({ ...this._config!, week_map_entity: e.target.value })}
+              />
+            </div>
+
+            <div class="row">
+              <label>week_map_attribute</label>
+              <input
+                type="text"
+                .value=${this._config.week_map_attribute ?? ""}
+                placeholder="z.B. map (leer = state)"
+                @input=${(e: any) => this.emit({ ...this._config!, week_map_attribute: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div class="hint">
+            Mapping-Format (Beispiele):<br/>
+            <code>{"2026":{"1":"A","2":"B"}}</code> oder <code>{"1":"A","2":"B"}</code>
+          </div>
+
+          <div class="timeGrid" style="margin-top:10px;">
+            <div class="row">
+              <label>source_entity_a</label>
+              <input
+                type="text"
+                .value=${this._config.source_entity_a ?? ""}
+                placeholder="z.B. sensor.stundenplan_a"
+                @input=${(e: any) => this.emit({ ...this._config!, source_entity_a: e.target.value })}
+              />
+            </div>
+
+            <div class="row">
+              <label>source_attribute_a</label>
+              <input
+                type="text"
+                .value=${this._config.source_attribute_a ?? ""}
+                placeholder="z.B. plan"
+                @input=${(e: any) => this.emit({ ...this._config!, source_attribute_a: e.target.value })}
+              />
+            </div>
+
+            <div class="row">
+              <label>source_entity_b</label>
+              <input
+                type="text"
+                .value=${this._config.source_entity_b ?? ""}
+                placeholder="z.B. sensor.stundenplan_b"
+                @input=${(e: any) => this.emit({ ...this._config!, source_entity_b: e.target.value })}
+              />
+            </div>
+
+            <div class="row">
+              <label>source_attribute_b</label>
+              <input
+                type="text"
+                .value=${this._config.source_attribute_b ?? ""}
+                placeholder="z.B. plan"
+                @input=${(e: any) => this.emit({ ...this._config!, source_attribute_b: e.target.value })}
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Legacy Entity/Attribute inputs -->
+        <div class="row">
+          <label>Datenquelle (optional, Single)</label>
           <div class="hint">
             Wenn gesetzt, werden die Zeilen aus einer Entität gelesen (JSON im state oder Attribut). Leer lassen = manueller Stundenplan.
+            Bei Wechselwochen werden bevorzugt A/B-Quellen genutzt.
           </div>
 
           <div class="timeGrid">
@@ -1238,7 +1504,7 @@ export class StundenplanCardEditor extends LitElement {
                     ${(this._config!.days ?? []).map((d, i) => {
                       const row = r as LessonRow;
                       const val = (row.cells?.[i] ?? "").toString();
-                      const st = (row.cell_styles?.[i] ?? null) as CellStyle | null;
+                      const st = ((row as any).cell_styles?.[i] ?? null) as CellStyle | null;
 
                       const bgHex = st?.bg && st.bg.startsWith("#") ? st.bg : "#3b82f6";
                       const alpha = typeof st?.bg_alpha === "number" ? clamp01(st.bg_alpha) : 0.18;
@@ -1424,6 +1690,16 @@ export class StundenplanCardEditor extends LitElement {
       align-items: center;
     }
 
+    select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--divider-color);
+      background: var(--card-background-color);
+      color: var(--primary-text-color);
+    }
+
     .rowsHeader {
       display: flex;
       align-items: center;
@@ -1580,14 +1856,14 @@ export class StundenplanCardEditor extends LitElement {
   `;
 }
 
-/* Register (wichtig für HA) */
+/* Register */
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", StundenplanCard);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", StundenplanCardEditor);
 
 /* Picker-Metadaten */
 (window as any).customCards = (window as any).customCards || [];
 (window as any).customCards.push({
-  type: "stundenplan-card", // ohne "custom:"
+  type: "stundenplan-card",
   name: "Stundenplan Card",
   description: "Stundenplan mit visuellem Editor",
   preview: true,
