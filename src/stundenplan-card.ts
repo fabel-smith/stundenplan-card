@@ -1244,45 +1244,70 @@ export class StundenplanCardEditor extends LitElement {
           <div class="hint">Beispiel: Mo, Di, Mi, Do, Fr</div>
         </div>
 
-        <div class="row">
-          <label>Optionen</label>
+<div class="row">
+  <label>Optionen</label>
 
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_today ?? true} @change=${(e: any) => this.emit({ ...this._config!, highlight_today: e.target.checked })} />
-            <span>Heute hervorheben</span>
-          </div>
+  <!-- Hintergrund-Highlights -->
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.highlight_today ?? true}
+      @change=${(e: any) => this.emit({ ...this._config!, highlight_today: e.target.checked })}
+    />
+    <span>Heute hervorheben (Hintergrund – ganze Spalte)</span>
+  </div>
 
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_current ?? false} @change=${(e: any) => this.emit({ ...this._config!, highlight_current: e.target.checked })} />
-            <span>Aktuelle Stunde hervorheben</span>
-          </div>
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.highlight_current ?? false}
+      @change=${(e: any) => this.emit({ ...this._config!, highlight_current: e.target.checked })}
+    />
+    <span>Aktuelle Stunde hervorheben (Hintergrund – Zeitspalte)</span>
+  </div>
 
-          <!-- NEU -->
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_breaks ?? false} @change=${(e: any) => this.emit({ ...this._config!, highlight_breaks: e.target.checked })} />
-            <span>Pausen ebenfalls als „aktuell“ highlighten</span>
-          </div>
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.highlight_breaks ?? false}
+      @change=${(e: any) => this.emit({ ...this._config!, highlight_breaks: e.target.checked })}
+    />
+    <span>Pausen als aktuell markieren (Hintergrund)</span>
+  </div>
 
-          <!-- NEU (UPDATE 6) -->
-          <div class="checkboxLine">
-            <input
-              type="checkbox"
-              .checked=${this._config.free_only_column_highlight ?? true}
-              @change=${(e: any) => this.emit({ ...this._config!, free_only_column_highlight: e.target.checked })}
-            />
-            <span>Freistunden: nur Tag (Spalte) highlighten</span>
-          </div>
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.free_only_column_highlight ?? true}
+      @change=${(e: any) => this.emit({ ...this._config!, free_only_column_highlight: e.target.checked })}
+    />
+    <span>Freistunden: nur Tag hervorheben (Hintergrund – Spalte)</span>
+  </div>
 
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_current_text ?? false} @change=${(e: any) => this.emit({ ...this._config!, highlight_current_text: e.target.checked })} />
-            <span>Aktuelles Fach (Textfarbe) hervorheben</span>
-          </div>
+  <hr style="opacity:0.2; margin:10px 0;" />
 
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_current_time_text ?? false} @change=${(e: any) => this.emit({ ...this._config!, highlight_current_time_text: e.target.checked })} />
-            <span>Aktuelle Stunde (Textfarbe) hervorheben</span>
-          </div>
-        </div>
+  <!-- Text-Highlights -->
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.highlight_current_text ?? false}
+      @change=${(e: any) => this.emit({ ...this._config!, highlight_current_text: e.target.checked })}
+    />
+    <span>Aktuelles Fach hervorheben (Textfarbe)</span>
+  </div>
+
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.highlight_current_time_text ?? false}
+      @change=${(e: any) => this.emit({ ...this._config!, highlight_current_time_text: e.target.checked })}
+    />
+    <span>Aktuelle Stunde hervorheben (Textfarbe – Zeitspalte)</span>
+  </div>
+</div>
+
+
+
 
         <div class="row">
           <label>Highlight-Farbe (Heute)</label>

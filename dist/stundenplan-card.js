@@ -22,7 +22,7 @@ let Ct = class {
     return this.cssText;
   }
 };
-const zt = (o) => new Ct(typeof o == "string" ? o : o + "", void 0, lt), Mt = (o, ...t) => {
+const Bt = (o) => new Ct(typeof o == "string" ? o : o + "", void 0, lt), Mt = (o, ...t) => {
   const i = o.length === 1 ? o[0] : t.reduce((e, r, s) => e + ((n) => {
     if (n._$cssResult$ === !0) return n.cssText;
     if (typeof n == "number") return n;
@@ -38,7 +38,7 @@ const zt = (o) => new Ct(typeof o == "string" ? o : o + "", void 0, lt), Mt = (o
 }, gt = at ? (o) => o : (o) => o instanceof CSSStyleSheet ? ((t) => {
   let i = "";
   for (const e of t.cssRules) i += e.cssText;
-  return zt(i);
+  return Bt(i);
 })(o) : o;
 /**
  * @license
@@ -73,9 +73,9 @@ const { is: Dt, defineProperty: Ot, getOwnPropertyDescriptor: Wt, getOwnProperty
       }
   }
   return i;
-} }, Tt = (o, t) => !Dt(o, t), _t = { attribute: !0, type: String, converter: st, reflect: !1, useDefault: !1, hasChanged: Tt };
+} }, Ht = (o, t) => !Dt(o, t), _t = { attribute: !0, type: String, converter: st, reflect: !1, useDefault: !1, hasChanged: Ht };
 Symbol.metadata ?? (Symbol.metadata = Symbol("metadata")), k.litPropertyMetadata ?? (k.litPropertyMetadata = /* @__PURE__ */ new WeakMap());
-let R = class extends HTMLElement {
+let P = class extends HTMLElement {
   static addInitializer(t) {
     this._$Ei(), (this.l ?? (this.l = [])).push(t);
   }
@@ -202,7 +202,7 @@ let R = class extends HTMLElement {
     var n;
     if (t !== void 0) {
       const a = this.constructor;
-      if (r === !1 && (s = this[t]), e ?? (e = a.getPropertyOptions(t)), !((e.hasChanged ?? Tt)(s, i) || e.useDefault && e.reflect && s === ((n = this._$Ej) == null ? void 0 : n.get(t)) && !this.hasAttribute(a._$Eu(t, e)))) return;
+      if (r === !1 && (s = this[t]), e ?? (e = a.getPropertyOptions(t)), !((e.hasChanged ?? Ht)(s, i) || e.useDefault && e.reflect && s === ((n = this._$Ej) == null ? void 0 : n.get(t)) && !this.hasAttribute(a._$Eu(t, e)))) return;
       this.C(t, i, e);
     }
     this.isUpdatePending === !1 && (this._$ES = this._$EP());
@@ -278,28 +278,28 @@ let R = class extends HTMLElement {
   firstUpdated(t) {
   }
 };
-R.elementStyles = [], R.shadowRootOptions = { mode: "open" }, R[O("elementProperties")] = /* @__PURE__ */ new Map(), R[O("finalized")] = /* @__PURE__ */ new Map(), tt == null || tt({ ReactiveElement: R }), (k.reactiveElementVersions ?? (k.reactiveElementVersions = [])).push("2.1.2");
+P.elementStyles = [], P.shadowRootOptions = { mode: "open" }, P[O("elementProperties")] = /* @__PURE__ */ new Map(), P[O("finalized")] = /* @__PURE__ */ new Map(), tt == null || tt({ ReactiveElement: P }), (k.reactiveElementVersions ?? (k.reactiveElementVersions = [])).push("2.1.2");
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const W = globalThis, mt = (o) => o, q = W.trustedTypes, ft = q ? q.createPolicy("lit-html", { createHTML: (o) => o }) : void 0, Pt = "$lit$", x = `lit$${Math.random().toFixed(9).slice(2)}$`, Rt = "?" + x, Kt = `<${Rt}>`, T = document, L = () => T.createComment(""), F = (o) => o === null || typeof o != "object" && typeof o != "function", ct = Array.isArray, Jt = (o) => ct(o) || typeof (o == null ? void 0 : o[Symbol.iterator]) == "function", et = `[ 	
+const W = globalThis, mt = (o) => o, Z = W.trustedTypes, ft = Z ? Z.createPolicy("lit-html", { createHTML: (o) => o }) : void 0, Tt = "$lit$", x = `lit$${Math.random().toFixed(9).slice(2)}$`, Pt = "?" + x, Kt = `<${Pt}>`, H = document, L = () => H.createComment(""), F = (o) => o === null || typeof o != "object" && typeof o != "function", ct = Array.isArray, Jt = (o) => ct(o) || typeof (o == null ? void 0 : o[Symbol.iterator]) == "function", et = `[ 	
 \f\r]`, D = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, yt = /-->/g, bt = />/g, E = RegExp(`>|${et}(?:([^\\s"'>=/]+)(${et}*=${et}*(?:[^ 	
-\f\r"'\`<>=]|("|')|))|$)`, "g"), vt = /'/g, $t = /"/g, Ht = /^(?:script|style|textarea|title)$/i, Gt = (o) => (t, ...i) => ({ _$litType$: o, strings: t, values: i }), p = Gt(1), B = Symbol.for("lit-noChange"), _ = Symbol.for("lit-nothing"), wt = /* @__PURE__ */ new WeakMap(), C = T.createTreeWalker(T, 129);
+\f\r"'\`<>=]|("|')|))|$)`, "g"), vt = /'/g, $t = /"/g, Rt = /^(?:script|style|textarea|title)$/i, Gt = (o) => (t, ...i) => ({ _$litType$: o, strings: t, values: i }), p = Gt(1), z = Symbol.for("lit-noChange"), _ = Symbol.for("lit-nothing"), wt = /* @__PURE__ */ new WeakMap(), C = H.createTreeWalker(H, 129);
 function Nt(o, t) {
   if (!ct(o) || !o.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return ft !== void 0 ? ft.createHTML(t) : t;
 }
-const qt = (o, t) => {
+const Zt = (o, t) => {
   const i = o.length - 1, e = [];
   let r, s = t === 2 ? "<svg>" : t === 3 ? "<math>" : "", n = D;
   for (let a = 0; a < i; a++) {
     const c = o[a];
     let l, u, h = -1, d = 0;
-    for (; d < c.length && (n.lastIndex = d, u = n.exec(c), u !== null); ) d = n.lastIndex, n === D ? u[1] === "!--" ? n = yt : u[1] !== void 0 ? n = bt : u[2] !== void 0 ? (Ht.test(u[2]) && (r = RegExp("</" + u[2], "g")), n = E) : u[3] !== void 0 && (n = E) : n === E ? u[0] === ">" ? (n = r ?? D, h = -1) : u[1] === void 0 ? h = -2 : (h = n.lastIndex - u[2].length, l = u[1], n = u[3] === void 0 ? E : u[3] === '"' ? $t : vt) : n === $t || n === vt ? n = E : n === yt || n === bt ? n = D : (n = E, r = void 0);
+    for (; d < c.length && (n.lastIndex = d, u = n.exec(c), u !== null); ) d = n.lastIndex, n === D ? u[1] === "!--" ? n = yt : u[1] !== void 0 ? n = bt : u[2] !== void 0 ? (Rt.test(u[2]) && (r = RegExp("</" + u[2], "g")), n = E) : u[3] !== void 0 && (n = E) : n === E ? u[0] === ">" ? (n = r ?? D, h = -1) : u[1] === void 0 ? h = -2 : (h = n.lastIndex - u[2].length, l = u[1], n = u[3] === void 0 ? E : u[3] === '"' ? $t : vt) : n === $t || n === vt ? n = E : n === yt || n === bt ? n = D : (n = E, r = void 0);
     const g = n === E && o[a + 1].startsWith("/>") ? " " : "";
-    s += n === D ? c + Kt : h >= 0 ? (e.push(l), c.slice(0, h) + Pt + c.slice(h) + x + g) : c + x + (h === -2 ? a : g);
+    s += n === D ? c + Kt : h >= 0 ? (e.push(l), c.slice(0, h) + Tt + c.slice(h) + x + g) : c + x + (h === -2 ? a : g);
   }
   return [Nt(o, s + (o[i] || "<?>") + (t === 2 ? "</svg>" : t === 3 ? "</math>" : "")), e];
 };
@@ -308,26 +308,26 @@ class I {
     let r;
     this.parts = [];
     let s = 0, n = 0;
-    const a = t.length - 1, c = this.parts, [l, u] = qt(t, i);
+    const a = t.length - 1, c = this.parts, [l, u] = Zt(t, i);
     if (this.el = I.createElement(l, e), C.currentNode = this.el.content, i === 2 || i === 3) {
       const h = this.el.content.firstChild;
       h.replaceWith(...h.childNodes);
     }
     for (; (r = C.nextNode()) !== null && c.length < a; ) {
       if (r.nodeType === 1) {
-        if (r.hasAttributes()) for (const h of r.getAttributeNames()) if (h.endsWith(Pt)) {
+        if (r.hasAttributes()) for (const h of r.getAttributeNames()) if (h.endsWith(Tt)) {
           const d = u[n++], g = r.getAttribute(h).split(x), m = /([.?@])?(.*)/.exec(d);
           c.push({ type: 1, index: s, name: m[2], strings: g, ctor: m[1] === "." ? Yt : m[1] === "?" ? jt : m[1] === "@" ? Qt : X }), r.removeAttribute(h);
         } else h.startsWith(x) && (c.push({ type: 6, index: s }), r.removeAttribute(h));
-        if (Ht.test(r.tagName)) {
+        if (Rt.test(r.tagName)) {
           const h = r.textContent.split(x), d = h.length - 1;
           if (d > 0) {
-            r.textContent = q ? q.emptyScript : "";
+            r.textContent = Z ? Z.emptyScript : "";
             for (let g = 0; g < d; g++) r.append(h[g], L()), C.nextNode(), c.push({ type: 2, index: ++s });
             r.append(h[d], L());
           }
         }
-      } else if (r.nodeType === 8) if (r.data === Rt) c.push({ type: 2, index: s });
+      } else if (r.nodeType === 8) if (r.data === Pt) c.push({ type: 2, index: s });
       else {
         let h = -1;
         for (; (h = r.data.indexOf(x, h + 1)) !== -1; ) c.push({ type: 7, index: s }), h += x.length - 1;
@@ -336,18 +336,18 @@ class I {
     }
   }
   static createElement(t, i) {
-    const e = T.createElement("template");
+    const e = H.createElement("template");
     return e.innerHTML = t, e;
   }
 }
-function z(o, t, i = o, e) {
+function B(o, t, i = o, e) {
   var n, a;
-  if (t === B) return t;
+  if (t === z) return t;
   let r = e !== void 0 ? (n = i._$Co) == null ? void 0 : n[e] : i._$Cl;
   const s = F(t) ? void 0 : t._$litDirective$;
-  return (r == null ? void 0 : r.constructor) !== s && ((a = r == null ? void 0 : r._$AO) == null || a.call(r, !1), s === void 0 ? r = void 0 : (r = new s(o), r._$AT(o, i, e)), e !== void 0 ? (i._$Co ?? (i._$Co = []))[e] = r : i._$Cl = r), r !== void 0 && (t = z(o, r._$AS(o, t.values), r, e)), t;
+  return (r == null ? void 0 : r.constructor) !== s && ((a = r == null ? void 0 : r._$AO) == null || a.call(r, !1), s === void 0 ? r = void 0 : (r = new s(o), r._$AT(o, i, e)), e !== void 0 ? (i._$Co ?? (i._$Co = []))[e] = r : i._$Cl = r), r !== void 0 && (t = B(o, r._$AS(o, t.values), r, e)), t;
 }
-class Zt {
+class qt {
   constructor(t, i) {
     this._$AV = [], this._$AN = void 0, this._$AD = t, this._$AM = i;
   }
@@ -358,7 +358,7 @@ class Zt {
     return this._$AM._$AU;
   }
   u(t) {
-    const { el: { content: i }, parts: e } = this._$AD, r = ((t == null ? void 0 : t.creationScope) ?? T).importNode(i, !0);
+    const { el: { content: i }, parts: e } = this._$AD, r = ((t == null ? void 0 : t.creationScope) ?? H).importNode(i, !0);
     C.currentNode = r;
     let s = C.nextNode(), n = 0, a = 0, c = e[0];
     for (; c !== void 0; ) {
@@ -368,7 +368,7 @@ class Zt {
       }
       n !== (c == null ? void 0 : c.index) && (s = C.nextNode(), n++);
     }
-    return C.currentNode = T, r;
+    return C.currentNode = H, r;
   }
   p(t) {
     let i = 0;
@@ -395,7 +395,7 @@ class V {
     return this._$AB;
   }
   _$AI(t, i = this) {
-    t = z(this, t, i), F(t) ? t === _ || t == null || t === "" ? (this._$AH !== _ && this._$AR(), this._$AH = _) : t !== this._$AH && t !== B && this._(t) : t._$litType$ !== void 0 ? this.$(t) : t.nodeType !== void 0 ? this.T(t) : Jt(t) ? this.k(t) : this._(t);
+    t = B(this, t, i), F(t) ? t === _ || t == null || t === "" ? (this._$AH !== _ && this._$AR(), this._$AH = _) : t !== this._$AH && t !== z && this._(t) : t._$litType$ !== void 0 ? this.$(t) : t.nodeType !== void 0 ? this.T(t) : Jt(t) ? this.k(t) : this._(t);
   }
   O(t) {
     return this._$AA.parentNode.insertBefore(t, this._$AB);
@@ -404,14 +404,14 @@ class V {
     this._$AH !== t && (this._$AR(), this._$AH = this.O(t));
   }
   _(t) {
-    this._$AH !== _ && F(this._$AH) ? this._$AA.nextSibling.data = t : this.T(T.createTextNode(t)), this._$AH = t;
+    this._$AH !== _ && F(this._$AH) ? this._$AA.nextSibling.data = t : this.T(H.createTextNode(t)), this._$AH = t;
   }
   $(t) {
     var s;
     const { values: i, _$litType$: e } = t, r = typeof e == "number" ? this._$AC(t) : (e.el === void 0 && (e.el = I.createElement(Nt(e.h, e.h[0]), this.options)), e);
     if (((s = this._$AH) == null ? void 0 : s._$AD) === r) this._$AH.p(i);
     else {
-      const n = new Zt(r, this), a = n.u(this.options);
+      const n = new qt(r, this), a = n.u(this.options);
       n.p(i), this.T(a), this._$AH = n;
     }
   }
@@ -451,11 +451,11 @@ class X {
   _$AI(t, i = this, e, r) {
     const s = this.strings;
     let n = !1;
-    if (s === void 0) t = z(this, t, i, 0), n = !F(t) || t !== this._$AH && t !== B, n && (this._$AH = t);
+    if (s === void 0) t = B(this, t, i, 0), n = !F(t) || t !== this._$AH && t !== z, n && (this._$AH = t);
     else {
       const a = t;
       let c, l;
-      for (t = s[0], c = 0; c < s.length - 1; c++) l = z(this, a[e + c], i, c), l === B && (l = this._$AH[c]), n || (n = !F(l) || l !== this._$AH[c]), l === _ ? t = _ : t !== _ && (t += (l ?? "") + s[c + 1]), this._$AH[c] = l;
+      for (t = s[0], c = 0; c < s.length - 1; c++) l = B(this, a[e + c], i, c), l === z && (l = this._$AH[c]), n || (n = !F(l) || l !== this._$AH[c]), l === _ ? t = _ : t !== _ && (t += (l ?? "") + s[c + 1]), this._$AH[c] = l;
     }
     n && !r && this.j(t);
   }
@@ -484,7 +484,7 @@ class Qt extends X {
     super(t, i, e, r, s), this.type = 5;
   }
   _$AI(t, i = this) {
-    if ((t = z(this, t, i, 0) ?? _) === B) return;
+    if ((t = B(this, t, i, 0) ?? _) === z) return;
     const e = this._$AH, r = t === _ && e !== _ || t.capture !== e.capture || t.once !== e.once || t.passive !== e.passive, s = t !== _ && (e === _ || r);
     r && this.element.removeEventListener(this.name, this, e), s && this.element.addEventListener(this.name, this, t), this._$AH = t;
   }
@@ -501,7 +501,7 @@ class Xt {
     return this._$AM._$AU;
   }
   _$AI(t) {
-    z(this, t);
+    B(this, t);
   }
 }
 const it = W.litHtmlPolyfillSupport;
@@ -521,7 +521,7 @@ const te = (o, t, i) => {
  * SPDX-License-Identifier: BSD-3-Clause
  */
 const M = globalThis;
-class H extends R {
+class R extends P {
   constructor() {
     super(...arguments), this.renderOptions = { host: this }, this._$Do = void 0;
   }
@@ -543,13 +543,13 @@ class H extends R {
     super.disconnectedCallback(), (t = this._$Do) == null || t.setConnected(!1);
   }
   render() {
-    return B;
+    return z;
   }
 }
 var Et;
-H._$litElement$ = !0, H.finalized = !0, (Et = M.litElementHydrateSupport) == null || Et.call(M, { LitElement: H });
+R._$litElement$ = !0, R.finalized = !0, (Et = M.litElementHydrateSupport) == null || Et.call(M, { LitElement: R });
 const rt = M.litElementPolyfillSupport;
-rt == null || rt({ LitElement: H });
+rt == null || rt({ LitElement: R });
 (M.litElementVersions ?? (M.litElementVersions = [])).push("4.2.2");
 function y(o) {
   return !!o && o.break === !0;
@@ -557,7 +557,7 @@ function y(o) {
 function b(o) {
   return Math.min(1, Math.max(0, o));
 }
-function Z(o) {
+function q(o) {
   if (!o) return null;
   const t = o.replace("#", "").trim();
   if (t.length !== 6) return null;
@@ -573,7 +573,7 @@ function ee(o) {
   if (!(o != null && o.bg)) return null;
   const t = o.bg.trim();
   if (t.startsWith("rgba(") || t.startsWith("rgb(") || t.startsWith("var(")) return t;
-  const i = Z(t);
+  const i = q(t);
   if (!i) return t;
   const e = typeof o.bg_alpha == "number" ? b(o.bg_alpha) : 0.18;
   return `rgba(${i.r}, ${i.g}, ${i.b}, ${e})`;
@@ -587,7 +587,7 @@ function xt(o, t) {
   if (!i) return `rgba(0,0,0,${t})`;
   if (i.startsWith("rgba(") || i.startsWith("rgb(") || i.startsWith("var(")) return i;
   if (i.startsWith("#")) {
-    const e = Z(i);
+    const e = q(i);
     if (!e) return i;
     const r = b(t);
     return `rgba(${e.r}, ${e.g}, ${e.b}, ${r})`;
@@ -643,7 +643,7 @@ function se(o, t) {
     if (!re(i[e])) return !1;
   return !0;
 }
-const j = class j extends H {
+const j = class j extends R {
   getGridOptions() {
     return { columns: "full" };
   }
@@ -911,10 +911,10 @@ const j = class j extends H {
               ${i.map((h) => {
       if (y(h)) {
         const U = N(h.time), A = !!U.start && !!U.end && this.isNowBetween(U.start, U.end);
-        let P = `--sp-hl:${n};`, K = "";
-        return !!t.highlight_current && !!t.highlight_breaks && A && (P += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", K += `--sp-hl:${n}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), A && t.highlight_current_time_text && c && (P += `color:${c};`), p`
+        let T = `--sp-hl:${n};`, K = "";
+        return !!t.highlight_current && !!t.highlight_breaks && A && (T += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", K += `--sp-hl:${n}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), A && t.highlight_current_time_text && c && (T += `color:${c};`), p`
                     <tr class="break">
-                      <td class="time" style=${P}>${h.time}</td>
+                      <td class="time" style=${T}>${h.time}</td>
                       <td colspan=${t.days.length} style=${K}>${h.label ?? ""}</td>
                     </tr>
                   `;
@@ -926,10 +926,10 @@ const j = class j extends H {
                     <td class="time" style=${S}>${d.time}</td>
 
                     ${t.days.map((U, A) => {
-        const P = g[A] ?? "", K = m[A] ?? null, ht = t.highlight_today && A === e ? "today" : "";
+        const T = g[A] ?? "", K = m[A] ?? null, ht = t.highlight_today && A === e ? "today" : "";
         let ut = `--sp-hl:${s};` + nt(K, r);
-        const Bt = (P ?? "").toString().trim().length > 0;
-        return w && Bt && v && t.highlight_current_text && a && e >= 0 && A === e && (ut += `color:${a};`), p`<td class=${ht} style=${ut}>${P}</td>`;
+        const zt = (T ?? "").toString().trim().length > 0;
+        return w && zt && v && t.highlight_current_text && a && e >= 0 && A === e && (ut += `color:${a};`), p`<td class=${ht} style=${ut}>${T}</td>`;
       })}
                   </tr>
                 `;
@@ -1002,7 +1002,7 @@ j.styles = Mt`
     }
   `;
 let Y = j;
-const Q = class Q extends H {
+const Q = class Q extends R {
   setConfig(t) {
     const i = (((t == null ? void 0 : t.type) ?? "") + "").toString();
     if (i !== "custom:stundenplan-card" && i !== "stundenplan-card")
@@ -1017,13 +1017,13 @@ const Q = class Q extends H {
     }
   }
   rgbaFromHex(t, i) {
-    const e = Z(t);
+    const e = q(t);
     return e ? `rgba(${e.r}, ${e.g}, ${e.b}, ${b(i)})` : `rgba(0,0,0,${b(i)})`;
   }
   parseColorToHexAlpha(t, i, e) {
     const r = (t ?? "").toString().trim();
     if (r.startsWith("#"))
-      return Z(r) ? { hex: r, alpha: b(e) } : { hex: i, alpha: b(e) };
+      return q(r) ? { hex: r, alpha: b(e) } : { hex: i, alpha: b(e) };
     const s = r.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)/i);
     if (s) {
       const a = Math.max(0, Math.min(255, Number(s[1]))), c = Math.max(0, Math.min(255, Number(s[2]))), l = Math.max(0, Math.min(255, Number(s[3]))), u = b(Number(s[4])), h = (d) => d.toString(16).padStart(2, "0");
@@ -1266,45 +1266,70 @@ const Q = class Q extends H {
           <div class="hint">Beispiel: Mo, Di, Mi, Do, Fr</div>
         </div>
 
-        <div class="row">
-          <label>Optionen</label>
+<div class="row">
+  <label>Optionen</label>
 
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_today ?? !0} @change=${(e) => this.emit({ ...this._config, highlight_today: e.target.checked })} />
-            <span>Heute hervorheben</span>
-          </div>
+  <!-- Hintergrund-Highlights -->
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.highlight_today ?? !0}
+      @change=${(e) => this.emit({ ...this._config, highlight_today: e.target.checked })}
+    />
+    <span>Heute hervorheben (Hintergrund – ganze Spalte)</span>
+  </div>
 
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_current ?? !1} @change=${(e) => this.emit({ ...this._config, highlight_current: e.target.checked })} />
-            <span>Aktuelle Stunde hervorheben</span>
-          </div>
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.highlight_current ?? !1}
+      @change=${(e) => this.emit({ ...this._config, highlight_current: e.target.checked })}
+    />
+    <span>Aktuelle Stunde hervorheben (Hintergrund – Zeitspalte)</span>
+  </div>
 
-          <!-- NEU -->
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_breaks ?? !1} @change=${(e) => this.emit({ ...this._config, highlight_breaks: e.target.checked })} />
-            <span>Pausen ebenfalls als „aktuell“ highlighten</span>
-          </div>
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.highlight_breaks ?? !1}
+      @change=${(e) => this.emit({ ...this._config, highlight_breaks: e.target.checked })}
+    />
+    <span>Pausen als aktuell markieren (Hintergrund)</span>
+  </div>
 
-          <!-- NEU (UPDATE 6) -->
-          <div class="checkboxLine">
-            <input
-              type="checkbox"
-              .checked=${this._config.free_only_column_highlight ?? !0}
-              @change=${(e) => this.emit({ ...this._config, free_only_column_highlight: e.target.checked })}
-            />
-            <span>Freistunden: nur Tag (Spalte) highlighten</span>
-          </div>
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.free_only_column_highlight ?? !0}
+      @change=${(e) => this.emit({ ...this._config, free_only_column_highlight: e.target.checked })}
+    />
+    <span>Freistunden: nur Tag hervorheben (Hintergrund – Spalte)</span>
+  </div>
 
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_current_text ?? !1} @change=${(e) => this.emit({ ...this._config, highlight_current_text: e.target.checked })} />
-            <span>Aktuelles Fach (Textfarbe) hervorheben</span>
-          </div>
+  <hr style="opacity:0.2; margin:10px 0;" />
 
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.highlight_current_time_text ?? !1} @change=${(e) => this.emit({ ...this._config, highlight_current_time_text: e.target.checked })} />
-            <span>Aktuelle Stunde (Textfarbe) hervorheben</span>
-          </div>
-        </div>
+  <!-- Text-Highlights -->
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.highlight_current_text ?? !1}
+      @change=${(e) => this.emit({ ...this._config, highlight_current_text: e.target.checked })}
+    />
+    <span>Aktuelles Fach hervorheben (Textfarbe)</span>
+  </div>
+
+  <div class="checkboxLine">
+    <input
+      type="checkbox"
+      .checked=${this._config.highlight_current_time_text ?? !1}
+      @change=${(e) => this.emit({ ...this._config, highlight_current_time_text: e.target.checked })}
+    />
+    <span>Aktuelle Stunde hervorheben (Textfarbe – Zeitspalte)</span>
+  </div>
+</div>
+
+
+
 
         <div class="row">
           <label>Highlight-Farbe (Heute)</label>
