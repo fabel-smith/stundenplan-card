@@ -30,6 +30,10 @@ import { LitElement, html, css, TemplateResult } from "lit";
  * UPDATE 5:
  * - highlight_breaks: optional Pausen als "aktuell" highlighten
  * - Leere Stunden werden NICHT als aktuelles Fach (Text-Highlight) markiert
+ *
+ * UPDATE 6:
+ * - free_only_column_highlight: optional -> bei Freistunden nur Spalte (Heute) highlighten,
+ *   NICHT Zeitspalte / NICHT aktuelles Fach / NICHT aktuelle Zeit-Textfarbe
  */
 
 type CellStyle = {
@@ -67,6 +71,9 @@ type StundenplanConfig = {
 
   // NEU: Pausen optional als "aktuell" behandeln
   highlight_breaks?: boolean;
+
+  // NEU (UPDATE 6): Bei Freistunden nur Spalte (Heute) highlighten, NICHT Zeit/Zeile/Zelle
+  free_only_column_highlight?: boolean;
 
   highlight_today_color?: string;
   highlight_current_color?: string;
@@ -231,6 +238,21 @@ function normalizeWeekLetter(x: any): "A" | "B" | null {
   return null;
 }
 
+/** NEU (UPDATE 6): "Freistunde"-Erkennung */
+function isFreeCellValue(v: any): boolean {
+  const s = (v ?? "").toString().trim();
+  if (!s) return true;
+  return s === "-" || s === "–" || s === "---";
+}
+function isFreeLessonRow(row: LessonRow, daysCount: number): boolean {
+  const cells = Array.isArray(row?.cells) ? row.cells : [];
+  // Nur dann Freistunde, wenn ALLE Zellen "leer/---" sind
+  for (let i = 0; i < daysCount; i++) {
+    if (!isFreeCellValue(cells[i])) return false;
+  }
+  return true;
+}
+
 export class StundenplanCard extends LitElement {
   public getGridOptions() {
     return { columns: "full" };
@@ -262,6 +284,9 @@ export class StundenplanCard extends LitElement {
 
       // NEU
       highlight_breaks: false,
+
+      // NEU (UPDATE 6)
+      free_only_column_highlight: true,
 
       highlight_today_color: "rgba(0, 150, 255, 0.12)",
       highlight_current_color: "rgba(76, 175, 80, 0.18)",
@@ -379,7 +404,8 @@ export class StundenplanCard extends LitElement {
     });
 
     const weekModeRaw = ((cfg.week_mode ?? "off") + "").toString().trim() as WeekMode;
-    const week_mode: WeekMode = weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
+    const week_mode: WeekMode =
+      weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
 
     return {
       type: (cfg.type ?? "custom:stundenplan-card").toString(),
@@ -391,6 +417,9 @@ export class StundenplanCard extends LitElement {
 
       // NEU
       highlight_breaks: cfg.highlight_breaks ?? false,
+
+      // NEU (UPDATE 6)
+      free_only_column_highlight: cfg.free_only_column_highlight ?? true,
 
       highlight_today_color: (cfg.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
       highlight_current_color: (cfg.highlight_current_color ?? "rgba(76, 175, 80, 0.18)").toString(),
@@ -668,11 +697,18 @@ export class StundenplanCard extends LitElement {
 
                 const isCurrentTime = !!row.start && !!row.end && this.isNowBetween(row.start, row.end);
 
+                // NEU (UPDATE 6): Freistunde? Dann (optional) nur Spalte highlighten, sonst nix "aktuelles"
+                const isFree = isFreeLessonRow(row, (cfg.days ?? []).length);
+                const suppressCurrent = !!cfg.free_only_column_highlight && isFree;
+
+                // Wenn suppressCurrent=true -> wir tun so, als wäre NICHT current (für Zeit/Texts)
+                const allowCurrent = !suppressCurrent;
+
                 let timeStyle = `--sp-hl:${currentOverlay};`;
-                if (cfg.highlight_current && isCurrentTime) {
+                if (allowCurrent && cfg.highlight_current && isCurrentTime) {
                   timeStyle += "box-shadow: inset 0 0 0 9999px var(--sp-hl);";
                 }
-                if (isCurrentTime && cfg.highlight_current_time_text && currentTimeTextColor) {
+                if (allowCurrent && isCurrentTime && cfg.highlight_current_time_text && currentTimeTextColor) {
                   timeStyle += `color:${currentTimeTextColor};`;
                 }
 
@@ -691,6 +727,7 @@ export class StundenplanCard extends LitElement {
                       const hasValue = (val ?? "").toString().trim().length > 0;
 
                       if (
+                        allowCurrent &&
                         hasValue &&
                         isCurrentTime &&
                         cfg.highlight_current_text &&
@@ -889,7 +926,8 @@ export class StundenplanCardEditor extends LitElement {
     });
 
     const weekModeRaw = ((merged.week_mode ?? "off") + "").toString().trim() as WeekMode;
-    const week_mode: WeekMode = weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
+    const week_mode: WeekMode =
+      weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
 
     return {
       type: (merged.type ?? "custom:stundenplan-card").toString(),
@@ -901,6 +939,9 @@ export class StundenplanCardEditor extends LitElement {
 
       // NEU
       highlight_breaks: merged.highlight_breaks ?? false,
+
+      // NEU (UPDATE 6)
+      free_only_column_highlight: merged.free_only_column_highlight ?? true,
 
       highlight_today_color: (merged.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
       highlight_current_color: (merged.highlight_current_color ?? "rgba(76, 175, 80, 0.18)").toString(),
@@ -1220,6 +1261,16 @@ export class StundenplanCardEditor extends LitElement {
           <div class="checkboxLine">
             <input type="checkbox" .checked=${this._config.highlight_breaks ?? false} @change=${(e: any) => this.emit({ ...this._config!, highlight_breaks: e.target.checked })} />
             <span>Pausen ebenfalls als „aktuell“ highlighten</span>
+          </div>
+
+          <!-- NEU (UPDATE 6) -->
+          <div class="checkboxLine">
+            <input
+              type="checkbox"
+              .checked=${this._config.free_only_column_highlight ?? true}
+              @change=${(e: any) => this.emit({ ...this._config!, free_only_column_highlight: e.target.checked })}
+            />
+            <span>Freistunden: nur Tag (Spalte) highlighten</span>
           </div>
 
           <div class="checkboxLine">

@@ -154,4 +154,3 @@ Wenn nicht, kann optional auf gerade/ungerade zurückgefallen werden (je nach Ca
 <a href="https://www.buymeacoffee.com/fabelsmith" target="_blank">
   <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="45" alt="Buy Me a Coffee">
 </a>
-
