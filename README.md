@@ -1,8 +1,3 @@
-<a href="https://www.buymeacoffee.com/fabelsmith" target="_blank">
-  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="45" alt="Buy Me a Coffee">
-</a>
-
-
 # Stundenplan Card (Home Assistant)
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
@@ -155,3 +150,8 @@ Im Editor:
 
 Wenn die aktuelle KW im Mapping steht, wird sie verwendet.
 Wenn nicht, kann optional auf gerade/ungerade zurückgefallen werden (je nach Card-Einstellung).
+
+<a href="https://www.buymeacoffee.com/fabelsmith" target="_blank">
+  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="45" alt="Buy Me a Coffee">
+</a>
+
