@@ -46,6 +46,8 @@ type StundenplanConfig = {
   highlight_today?: boolean;
   highlight_current?: boolean;
   highlight_breaks?: boolean;
+
+  // ✅ Toggle: Wenn heutige Zelle in aktueller Stunde leer ist → nur Tages-Spalte highlighten (kein Zeit/Std Highlight)
   free_only_column_highlight?: boolean;
 
   highlight_today_color?: string;
@@ -200,12 +202,14 @@ function normalizeWeekLetter(x: any): "A" | "B" | null {
   return v === "A" || v === "B" ? v : null;
 }
 
-// UPDATE 6: Freistunden-Erkennung
+// Freistunden-Erkennung (Zelle)
 function isFreeCellValue(v: any): boolean {
   const s = (v ?? "").toString().trim();
   if (!s) return true;
   return s === "-" || s === "–" || s === "---";
 }
+
+// (legacy helper – bleibt drin)
 function isFreeLessonRow(row: LessonRow, daysCount: number): boolean {
   const cells = Array.isArray(row?.cells) ? row.cells : [];
   for (let i = 0; i < daysCount; i++) if (!isFreeCellValue(cells[i])) return false;
@@ -243,6 +247,8 @@ export class StundenplanCard extends LitElement {
       highlight_today: true,
       highlight_current: true,
       highlight_breaks: false,
+
+      // ✅ Default: an
       free_only_column_highlight: true,
 
       highlight_today_color: "rgba(0, 150, 255, 0.12)",
@@ -612,8 +618,13 @@ export class StundenplanCard extends LitElement {
 
                 const isCurrentTime = !!row.start && !!row.end && this.isNowBetween(row.start, row.end);
 
-                const isFree = isFreeLessonRow(row, (cfg.days ?? []).length);
-                const suppressCurrent = !!cfg.free_only_column_highlight && isFree;
+                // ✅ tors10hl-Logik: Freistunde bezieht sich auf die HEUTIGE ZELLE in der aktuellen Stunde
+                const todayVal = todayIdx >= 0 ? (cells[todayIdx] ?? "") : "";
+                const todayCellIsFree = todayIdx >= 0 ? isFreeCellValue(todayVal) : false;
+
+                // Wenn Toggle aktiv und heutige Zelle frei: KEIN "Aktuell"-Highlight (Zeit/Std/aktuelles Fach)
+                // Tag-Spalte bleibt (highlight_today) wie gewohnt.
+                const suppressCurrent = !!cfg.free_only_column_highlight && todayCellIsFree;
                 const allowCurrent = !suppressCurrent;
 
                 let timeStyle = `--sp-hl:${currentOverlay};`;
@@ -633,6 +644,7 @@ export class StundenplanCard extends LitElement {
 
                       const hasValue = (val ?? "").toString().trim().length > 0;
 
+                      // "Aktuelles Fach" nur wenn erlaubt UND heutige Zelle nicht frei ist
                       if (
                         allowCurrent &&
                         hasValue &&
@@ -732,24 +744,23 @@ export class StundenplanCardEditor extends LitElement {
     rowOpen: {} as Record<number, boolean>, // default: empty => all closed
   };
 
-public setConfig(cfg: StundenplanConfig): void {
-  const type = ((cfg?.type ?? "") + "").toString();
-  if (type !== "custom:stundenplan-card" && type !== "stundenplan-card") {
-    throw new Error(`Unsupported editor type: ${type}`);
+  public setConfig(cfg: StundenplanConfig): void {
+    const type = ((cfg?.type ?? "") + "").toString();
+    if (type !== "custom:stundenplan-card" && type !== "stundenplan-card") {
+      throw new Error(`Unsupported editor type: ${type}`);
+    }
+
+    // Merken, ob wir schon initialisiert sind (wichtig: UI-Zustand nicht bei jedem config-changed resetten)
+    const wasInitialized = !!this._config;
+
+    // Config normalisieren / klonen
+    this._config = this.normalizeConfig(this.clone(cfg));
+
+    // NUR beim ersten SetConfig alles "zu" setzen – danach UI-Status behalten
+    if (!wasInitialized) {
+      this._ui.rowOpen = {}; // Default: alle Zeilen geschlossen
+    }
   }
-
-  // Merken, ob wir schon initialisiert sind (wichtig: UI-Zustand nicht bei jedem config-changed resetten)
-  const wasInitialized = !!this._config;
-
-  // Config normalisieren / klonen
-  this._config = this.normalizeConfig(this.clone(cfg));
-
-  // NUR beim ersten SetConfig alles "zu" setzen – danach UI-Status behalten
-  if (!wasInitialized) {
-    this._ui.rowOpen = {}; // Default: alle Zeilen geschlossen
-  }
-}
-
 
   private clone<T>(obj: T): T {
     try {
@@ -929,7 +940,6 @@ public setConfig(cfg: StundenplanConfig): void {
 
     this.emit({ ...this._config, days, rows });
 
-    // rowOpen an neue Zeilenanzahl anpassen: alles zu lassen, aber Keys außerhalb entfernen
     const next: Record<number, boolean> = {};
     Object.entries(this._ui.rowOpen).forEach(([k, v]) => {
       const i = Number(k);
@@ -1056,8 +1066,6 @@ public setConfig(cfg: StundenplanConfig): void {
       const insertIdx = afterIdx + 1;
       this.shiftRowOpenAfterInsert(insertIdx);
       rows.splice(insertIdx, 0, newRow);
-      // Optional: neue Zeile geschlossen lassen (Default)
-      // this._ui.rowOpen[insertIdx] = false;
     } else {
       rows.push(newRow);
     }
@@ -1075,8 +1083,6 @@ public setConfig(cfg: StundenplanConfig): void {
       const insertIdx = afterIdx + 1;
       this.shiftRowOpenAfterInsert(insertIdx);
       rows.splice(insertIdx, 0, newRow);
-      // Default geschlossen
-      // this._ui.rowOpen[insertIdx] = false;
     } else {
       rows.push(newRow);
     }
@@ -1092,13 +1098,11 @@ public setConfig(cfg: StundenplanConfig): void {
   }
 
   private async jumpToCell(rowIdx: number, cellIdx: number) {
-    // Panels öffnen + Ziel-Zeile öffnen
     this._ui.openRows = true;
     this._ui.rowOpen[rowIdx] = true;
 
     this.requestUpdate();
 
-    // Warten bis DOM aktualisiert ist (updateComplete + 2 Frames ist robust)
     await this.updateComplete;
     await new Promise((r) => requestAnimationFrame(() => r(null)));
     await new Promise((r) => requestAnimationFrame(() => r(null)));
@@ -1177,7 +1181,12 @@ public setConfig(cfg: StundenplanConfig): void {
                     const st = ((lr as any).cell_styles?.[cellIdx] ?? null) as CellStyle | null;
 
                     return html`
-                      <td class="p-cell" style=${styleToString(st, borderDefault)} title="Klicken zum Bearbeiten" @click=${() => this.jumpToCell(rowIdx, cellIdx)}>
+                      <td
+                        class="p-cell"
+                        style=${styleToString(st, borderDefault)}
+                        title="Klicken zum Bearbeiten"
+                        @click=${() => this.jumpToCell(rowIdx, cellIdx)}
+                      >
                         ${val}
                       </td>
                     `;
@@ -1209,7 +1218,6 @@ public setConfig(cfg: StundenplanConfig): void {
       </div>
     `;
   }
-
 
   private renderHighlighting(): TemplateResult {
     if (!this._config) return html``;
@@ -1245,7 +1253,7 @@ public setConfig(cfg: StundenplanConfig): void {
         <div class="optRow">
           <div>
             <div class="optTitle">Freistunden: nur Tag hervorheben</div>
-            <div class="sub">Unterdrückt „Aktuell“-Highlights, wenn die gesamte Zeile leer ist.</div>
+            <div class="sub">Unterdrückt „Aktuell“-Highlights, wenn die heutige Zelle in der aktuellen Stunde leer ist.</div>
           </div>
           ${this.uiSwitch(!!c.free_only_column_highlight, (v) => this.emit({ ...c, free_only_column_highlight: v }))}
         </div>
@@ -1454,7 +1462,7 @@ public setConfig(cfg: StundenplanConfig): void {
     const days = c.days ?? [];
 
     return html`
-	<div class="rowsTop">
+      <div class="rowsTop">
         <div class="rowsTitle">Stundenplan (Zeilen)</div>
 
         <div class="btnBar">
@@ -1483,10 +1491,10 @@ public setConfig(cfg: StundenplanConfig): void {
 
         return html`
           <details
-  		class="rowPanel"
-  		?open=${this._ui.rowOpen[idx] ?? false}
-  		@toggle=${(e: any) => (this._ui.rowOpen[idx] = !!e.target.open)}
-	  >
+            class="rowPanel"
+            ?open=${this._ui.rowOpen[idx] ?? false}
+            @toggle=${(e: any) => (this._ui.rowOpen[idx] = !!e.target.open)}
+          >
             <summary>
               <div class="rowHead">
                 <div class="rowHeadTitle">${header || `Zeile ${idx + 1}`}</div>
@@ -1554,47 +1562,34 @@ public setConfig(cfg: StundenplanConfig): void {
 
                             <input id=${inputId} class="in" type="text" .value=${val} placeholder="Fach" @input=${(e: any) => this.updateRowCell(idx, i, e.target.value)} />
 
-<div class="cellStyles" ?hidden=${!this._ui.showCellStyles}>
-  <div class="styleLine">
-    <div class="styleLbl">Hintergrund</div>
-    <input
-      class="col"
-      type="color"
-      .value=${bgHex}
-      @input=${(e: any) => this.updateCellStyle(idx, i, { bg: e.target.value })}
-    />
-  </div>
+                            <div class="cellStyles" ?hidden=${!this._ui.showCellStyles}>
+                              <div class="styleLine">
+                                <div class="styleLbl">Hintergrund</div>
+                                <input class="col" type="color" .value=${bgHex} @input=${(e: any) => this.updateCellStyle(idx, i, { bg: e.target.value })} />
+                              </div>
 
-  <div class="styleLine">
-    <div class="styleLbl">Transparenz</div>
-    <div class="range">
-      <input
-        type="range"
-        min="0"
-        max="100"
-        .value=${String(alphaPct)}
-        @input=${(e: any) =>
-          this.updateCellStyle(idx, i, {
-            bg_alpha: Number(e.target.value) / 100,
-          })}
-      />
-      <div class="pct">${alphaPct}%</div>
-    </div>
-  </div>
+                              <div class="styleLine">
+                                <div class="styleLbl">Transparenz</div>
+                                <div class="range">
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    .value=${String(alphaPct)}
+                                    @input=${(e: any) =>
+                                      this.updateCellStyle(idx, i, {
+                                        bg_alpha: Number(e.target.value) / 100,
+                                      })}
+                                  />
+                                  <div class="pct">${alphaPct}%</div>
+                                </div>
+                              </div>
 
-  <div class="styleLine">
-    <div class="styleLbl">Text</div>
-    <input
-      class="col"
-      type="color"
-      .value=${textHex}
-      @input=${(e: any) =>
-        this.updateCellStyle(idx, i, { color: e.target.value })}
-    />
-  </div>
-</div>
-
-
+                              <div class="styleLine">
+                                <div class="styleLbl">Text</div>
+                                <input class="col" type="color" .value=${textHex} @input=${(e: any) => this.updateCellStyle(idx, i, { color: e.target.value })} />
+                              </div>
+                            </div>
                           </div>
                         `;
                       })}
@@ -1798,21 +1793,21 @@ public setConfig(cfg: StundenplanConfig): void {
       align-items: center;
       justify-content: flex-end;
     }
-   .toggleInline {
-     display: flex;
-     align-items: center;
-     gap: 10px;
-     padding: 6px 10px;
-     border: 1px solid var(--divider-color);
-     border-radius: 10px;
-     background: var(--secondary-background-color);
-   }
-   .toggleText {
-     font-size: 12px;
-     font-weight: 700;
-     opacity: 0.85;
-     white-space: nowrap;
-   }
+    .toggleInline {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      border: 1px solid var(--divider-color);
+      border-radius: 10px;
+      background: var(--secondary-background-color);
+    }
+    .toggleText {
+      font-size: 12px;
+      font-weight: 700;
+      opacity: 0.85;
+      white-space: nowrap;
+    }
 
     .btn {
       border: 1px solid var(--divider-color);
