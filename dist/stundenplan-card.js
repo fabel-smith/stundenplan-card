@@ -3,7 +3,7 @@
  * Copyright 2019 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const q = globalThis, lt = q.ShadowRoot && (q.ShadyCSS === void 0 || q.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, ct = Symbol(), ut = /* @__PURE__ */ new WeakMap();
+const K = globalThis, lt = K.ShadowRoot && (K.ShadyCSS === void 0 || K.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, ct = Symbol(), ut = /* @__PURE__ */ new WeakMap();
 let Et = class {
   constructor(t, e, i) {
     if (this._$cssResult$ = !0, i !== ct) throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
@@ -32,7 +32,7 @@ const zt = (n) => new Et(typeof n == "string" ? n : n + "", void 0, ct), Tt = (n
 }, Bt = (n, t) => {
   if (lt) n.adoptedStyleSheets = t.map((e) => e instanceof CSSStyleSheet ? e : e.styleSheet);
   else for (const e of t) {
-    const i = document.createElement("style"), s = q.litNonce;
+    const i = document.createElement("style"), s = K.litNonce;
     s !== void 0 && i.setAttribute("nonce", s), i.textContent = e.cssText, n.appendChild(i);
   }
 }, pt = lt ? (n) => n : (n) => n instanceof CSSStyleSheet ? ((t) => {
@@ -284,9 +284,9 @@ P.elementStyles = [], P.shadowRootOptions = { mode: "open" }, P[D("elementProper
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const W = globalThis, mt = (n) => n, G = W.trustedTypes, ft = G ? G.createPolicy("lit-html", { createHTML: (n) => n }) : void 0, Mt = "$lit$", A = `lit$${Math.random().toFixed(9).slice(2)}$`, Pt = "?" + A, Vt = `<${Pt}>`, M = document, F = () => M.createComment(""), L = (n) => n === null || typeof n != "object" && typeof n != "function", ht = Array.isArray, Kt = (n) => ht(n) || typeof (n == null ? void 0 : n[Symbol.iterator]) == "function", it = `[ 	
+const W = globalThis, mt = (n) => n, G = W.trustedTypes, ft = G ? G.createPolicy("lit-html", { createHTML: (n) => n }) : void 0, Mt = "$lit$", A = `lit$${Math.random().toFixed(9).slice(2)}$`, Pt = "?" + A, Vt = `<${Pt}>`, M = document, F = () => M.createComment(""), L = (n) => n === null || typeof n != "object" && typeof n != "function", ht = Array.isArray, qt = (n) => ht(n) || typeof (n == null ? void 0 : n[Symbol.iterator]) == "function", it = `[ 	
 \f\r]`, U = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, vt = /-->/g, bt = />/g, E = RegExp(`>|${it}(?:([^\\s"'>=/]+)(${it}*=${it}*(?:[^ 	
-\f\r"'\`<>=]|("|')|))|$)`, "g"), yt = /'/g, wt = /"/g, Ht = /^(?:script|style|textarea|title)$/i, qt = (n) => (t, ...e) => ({ _$litType$: n, strings: t, values: e }), p = qt(1), O = Symbol.for("lit-noChange"), _ = Symbol.for("lit-nothing"), $t = /* @__PURE__ */ new WeakMap(), T = M.createTreeWalker(M, 129);
+\f\r"'\`<>=]|("|')|))|$)`, "g"), yt = /'/g, wt = /"/g, Ht = /^(?:script|style|textarea|title)$/i, Kt = (n) => (t, ...e) => ({ _$litType$: n, strings: t, values: e }), p = Kt(1), O = Symbol.for("lit-noChange"), _ = Symbol.for("lit-nothing"), $t = /* @__PURE__ */ new WeakMap(), T = M.createTreeWalker(M, 129);
 function Nt(n, t) {
   if (!ht(n) || !n.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return ft !== void 0 ? ft.createHTML(t) : t;
@@ -395,7 +395,7 @@ class Z {
     return this._$AB;
   }
   _$AI(t, e = this) {
-    t = z(this, t, e), L(t) ? t === _ || t == null || t === "" ? (this._$AH !== _ && this._$AR(), this._$AH = _) : t !== this._$AH && t !== O && this._(t) : t._$litType$ !== void 0 ? this.$(t) : t.nodeType !== void 0 ? this.T(t) : Kt(t) ? this.k(t) : this._(t);
+    t = z(this, t, e), L(t) ? t === _ || t == null || t === "" ? (this._$AH !== _ && this._$AR(), this._$AH = _) : t !== this._$AH && t !== O && this._(t) : t._$litType$ !== void 0 ? this.$(t) : t.nodeType !== void 0 ? this.T(t) : qt(t) ? this.k(t) : this._(t);
   }
   O(t) {
     return this._$AA.parentNode.insertBefore(t, this._$AB);
@@ -880,11 +880,11 @@ const Q = class Q extends H {
               ${e.map((h) => {
       if (w(h)) {
         const k = N(h.time), m = !!k.start && !!k.end && this.isNowBetween(k.start, k.end), V = !!t.highlight_current && !!t.highlight_breaks && m;
-        let B = `--sp-hl:${o};`, K = "";
-        return V && (B += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", K += `--sp-hl:${o}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), m && t.highlight_current_time_text && l && (B += `color:${l};`), p`
+        let B = `--sp-hl:${o};`, q = "";
+        return V && (B += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", q += `--sp-hl:${o}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), m && t.highlight_current_time_text && l && (B += `color:${l};`), p`
                     <tr class="break">
                       <td class="time" style=${B}>${h.time}</td>
-                      <td colspan=${t.days.length} style=${K}>${h.label ?? ""}</td>
+                      <td colspan=${t.days.length} style=${q}>${h.label ?? ""}</td>
                     </tr>
                   `;
       }
@@ -895,10 +895,10 @@ const Q = class Q extends H {
                     <td class="time" style=${$}>${u.time}</td>
 
                     ${t.days.map((k, m) => {
-        const V = g[m] ?? "", B = f[m] ?? null, K = t.highlight_today && m === i ? "today" : "";
+        const V = g[m] ?? "", B = f[m] ?? null, q = t.highlight_today && m === i ? "today" : "";
         let dt = `--sp-hl:${r};` + ot(B, s);
         const Ot = (V ?? "").toString().trim().length > 0;
-        return y && Ot && b && t.highlight_current_text && a && i >= 0 && m === i && (dt += `color:${a};`), p`<td class=${K} style=${dt}>${V}</td>`;
+        return y && Ot && b && t.highlight_current_text && a && i >= 0 && m === i && (dt += `color:${a};`), p`<td class=${q} style=${dt}>${V}</td>`;
       })}
                   </tr>
                 `;
@@ -965,11 +965,11 @@ let Y = Q;
 const X = class X extends H {
   constructor() {
     super(...arguments), this._ui = {
-      openGeneral: !0,
-      openHighlight: !0,
+      openGeneral: !1,
+      openHighlight: !1,
       openColors: !1,
       openSources: !1,
-      openRows: !0,
+      openRows: !1,
       showCellStyles: !0,
       rowOpen: {}
       // default: empty => all closed
@@ -1500,19 +1500,20 @@ const X = class X extends H {
     const t = this._config, e = t.days ?? [];
     return p`
 	<div class="rowsTop">
-  		<div class="rowsTitle">Stundenplan (Zeilen)</div>
+        <div class="rowsTitle">Stundenplan (Zeilen)</div>
 
-  		<div class="btnBar">
-    			<div class="toggleInline">
-      				<div class="toggleText">Cell-Styles</div>
-      				${this.uiSwitch(!!this._ui.showCellStyles, (i) => this._ui.showCellStyles = i)}
-    		</div>
+        <div class="btnBar">
+          <div class="toggleInline">
+            <div class="toggleText">Cell-Styles</div>
+            ${this.uiSwitch(!!this._ui.showCellStyles, (i) => {
+      this._ui.showCellStyles = i, this.requestUpdate();
+    })}
+          </div>
 
-		<button class="btn" @click=${() => this.addLessonRow()}>+ Stunde</button>
-    		<button class="btn" @click=${() => this.addBreakRow()}>+ Pause</button>
-  	</div>
-</div>
-
+          <button class="btn" @click=${() => this.addLessonRow()}>+ Stunde</button>
+          <button class="btn" @click=${() => this.addBreakRow()}>+ Pause</button>
+        </div>
+      </div>
 
       <div class="sub" style="margin-bottom:10px;">
         Pro Zeile: Zeit + optional Start/Ende. Per Klick in der Vorschau springst du zur passenden Zelle.
@@ -1582,27 +1583,45 @@ const X = class X extends H {
 
                             <input id=${S} class="in" type="text" .value=${h} placeholder="Fach" @input=${(m) => this.updateRowCell(s, d, m.target.value)} />
 
-                            ${this._ui.showCellStyles ? p`
-                                  <div class="cellStyles">
-                                    <div class="styleLine">
-                                      <div class="styleLbl">Hintergrund</div>
-                                      <input class="col" type="color" .value=${g} @input=${(m) => this.updateCellStyle(s, d, { bg: m.target.value })} />
-                                    </div>
+<div class="cellStyles" ?hidden=${!this._ui.showCellStyles}>
+  <div class="styleLine">
+    <div class="styleLbl">Hintergrund</div>
+    <input
+      class="col"
+      type="color"
+      .value=${g}
+      @input=${(m) => this.updateCellStyle(s, d, { bg: m.target.value })}
+    />
+  </div>
 
-                                    <div class="styleLine">
-                                      <div class="styleLbl">Transparenz</div>
-                                      <div class="range">
-                                        <input type="range" min="0" max="100" .value=${String(b)} @input=${(m) => this.updateCellStyle(s, d, { bg_alpha: Number(m.target.value) / 100 })} />
-                                        <div class="pct">${b}%</div>
-                                      </div>
-                                    </div>
+  <div class="styleLine">
+    <div class="styleLbl">Transparenz</div>
+    <div class="range">
+      <input
+        type="range"
+        min="0"
+        max="100"
+        .value=${String(b)}
+        @input=${(m) => this.updateCellStyle(s, d, {
+          bg_alpha: Number(m.target.value) / 100
+        })}
+      />
+      <div class="pct">${b}%</div>
+    </div>
+  </div>
 
-                                    <div class="styleLine">
-                                      <div class="styleLbl">Text</div>
-                                      <input class="col" type="color" .value=${x} @input=${(m) => this.updateCellStyle(s, d, { color: m.target.value })} />
-                                    </div>
-                                  </div>
-                                ` : p``}
+  <div class="styleLine">
+    <div class="styleLbl">Text</div>
+    <input
+      class="col"
+      type="color"
+      .value=${x}
+      @input=${(m) => this.updateCellStyle(s, d, { color: m.target.value })}
+    />
+  </div>
+</div>
+
+
                           </div>
                         `;
       })}
@@ -2051,6 +2070,9 @@ X.properties = {
       display: grid;
       gap: 10px;
       margin-top: 2px;
+    }
+    .cellStyles[hidden] {
+      display: none;
     }
     .styleLine {
       display: grid;

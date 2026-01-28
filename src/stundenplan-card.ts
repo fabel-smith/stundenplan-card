@@ -723,11 +723,11 @@ export class StundenplanCardEditor extends LitElement {
 
   // Editor UX: defaults (Row-Panels default: closed)
   private _ui = {
-    openGeneral: true,
-    openHighlight: true,
+    openGeneral: false,
+    openHighlight: false,
     openColors: false,
     openSources: false,
-    openRows: true,
+    openRows: false,
     showCellStyles: true,
     rowOpen: {} as Record<number, boolean>, // default: empty => all closed
   };
@@ -1445,19 +1445,21 @@ export class StundenplanCardEditor extends LitElement {
 
     return html`
 	<div class="rowsTop">
-  		<div class="rowsTitle">Stundenplan (Zeilen)</div>
+        <div class="rowsTitle">Stundenplan (Zeilen)</div>
 
-  		<div class="btnBar">
-    			<div class="toggleInline">
-      				<div class="toggleText">Cell-Styles</div>
-      				${this.uiSwitch(!!this._ui.showCellStyles, (v) => (this._ui.showCellStyles = v))}
-    		</div>
+        <div class="btnBar">
+          <div class="toggleInline">
+            <div class="toggleText">Cell-Styles</div>
+            ${this.uiSwitch(!!this._ui.showCellStyles, (v) => {
+              this._ui.showCellStyles = v;
+              this.requestUpdate();
+            })}
+          </div>
 
-		<button class="btn" @click=${() => this.addLessonRow()}>+ Stunde</button>
-    		<button class="btn" @click=${() => this.addBreakRow()}>+ Pause</button>
-  	</div>
-</div>
-
+          <button class="btn" @click=${() => this.addLessonRow()}>+ Stunde</button>
+          <button class="btn" @click=${() => this.addBreakRow()}>+ Pause</button>
+        </div>
+      </div>
 
       <div class="sub" style="margin-bottom:10px;">
         Pro Zeile: Zeit + optional Start/Ende. Per Klick in der Vorschau springst du zur passenden Zelle.
@@ -1542,29 +1544,47 @@ export class StundenplanCardEditor extends LitElement {
 
                             <input id=${inputId} class="in" type="text" .value=${val} placeholder="Fach" @input=${(e: any) => this.updateRowCell(idx, i, e.target.value)} />
 
-                            ${this._ui.showCellStyles
-                              ? html`
-                                  <div class="cellStyles">
-                                    <div class="styleLine">
-                                      <div class="styleLbl">Hintergrund</div>
-                                      <input class="col" type="color" .value=${bgHex} @input=${(e: any) => this.updateCellStyle(idx, i, { bg: e.target.value })} />
-                                    </div>
+<div class="cellStyles" ?hidden=${!this._ui.showCellStyles}>
+  <div class="styleLine">
+    <div class="styleLbl">Hintergrund</div>
+    <input
+      class="col"
+      type="color"
+      .value=${bgHex}
+      @input=${(e: any) => this.updateCellStyle(idx, i, { bg: e.target.value })}
+    />
+  </div>
 
-                                    <div class="styleLine">
-                                      <div class="styleLbl">Transparenz</div>
-                                      <div class="range">
-                                        <input type="range" min="0" max="100" .value=${String(alphaPct)} @input=${(e: any) => this.updateCellStyle(idx, i, { bg_alpha: Number(e.target.value) / 100 })} />
-                                        <div class="pct">${alphaPct}%</div>
-                                      </div>
-                                    </div>
+  <div class="styleLine">
+    <div class="styleLbl">Transparenz</div>
+    <div class="range">
+      <input
+        type="range"
+        min="0"
+        max="100"
+        .value=${String(alphaPct)}
+        @input=${(e: any) =>
+          this.updateCellStyle(idx, i, {
+            bg_alpha: Number(e.target.value) / 100,
+          })}
+      />
+      <div class="pct">${alphaPct}%</div>
+    </div>
+  </div>
 
-                                    <div class="styleLine">
-                                      <div class="styleLbl">Text</div>
-                                      <input class="col" type="color" .value=${textHex} @input=${(e: any) => this.updateCellStyle(idx, i, { color: e.target.value })} />
-                                    </div>
-                                  </div>
-                                `
-                              : html``}
+  <div class="styleLine">
+    <div class="styleLbl">Text</div>
+    <input
+      class="col"
+      type="color"
+      .value=${textHex}
+      @input=${(e: any) =>
+        this.updateCellStyle(idx, i, { color: e.target.value })}
+    />
+  </div>
+</div>
+
+
                           </div>
                         `;
                       })}
@@ -2013,6 +2033,9 @@ export class StundenplanCardEditor extends LitElement {
       display: grid;
       gap: 10px;
       margin-top: 2px;
+    }
+    .cellStyles[hidden] {
+      display: none;
     }
     .styleLine {
       display: grid;
