@@ -233,7 +233,7 @@ export class StundenplanCard extends LitElement {
     super.connectedCallback();
 
     // Stundenplan laden (einmal)
-    loadSplanAsJson("/splan/sdaten/splank.xml", "5a")
+    loadSplanAsJson("/local/splan/sdaten/splank.xml", "5a")
       .then((data) => {
         console.log("SPLAN DATA", data);
         this._splanData = data;

@@ -643,7 +643,7 @@ const X = class X extends N {
     return { columns: "full" };
   }
   connectedCallback() {
-    super.connectedCallback(), ne("/splan/sdaten/splank.xml", "5a").then((t) => {
+    super.connectedCallback(), ne("/local/splan/sdaten/splank.xml", "5a").then((t) => {
       console.log("SPLAN DATA", t), this._splanData = t, this.requestUpdate();
     }).catch((t) => console.error("SPLAN ERROR", t)), this._tick = window.setInterval(() => this.requestUpdate(), 3e4);
   }
