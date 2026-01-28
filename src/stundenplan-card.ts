@@ -732,14 +732,24 @@ export class StundenplanCardEditor extends LitElement {
     rowOpen: {} as Record<number, boolean>, // default: empty => all closed
   };
 
-  public setConfig(cfg: StundenplanConfig): void {
-    const type = ((cfg?.type ?? "") + "").toString();
-    if (type !== "custom:stundenplan-card" && type !== "stundenplan-card") throw new Error(`Unsupported editor type: ${type}`);
-    this._config = this.normalizeConfig(this.clone(cfg));
-
-    // Default alles zu: rowOpen leer lassen (keine automatische Öffnung)
-    this._ui.rowOpen = {};
+public setConfig(cfg: StundenplanConfig): void {
+  const type = ((cfg?.type ?? "") + "").toString();
+  if (type !== "custom:stundenplan-card" && type !== "stundenplan-card") {
+    throw new Error(`Unsupported editor type: ${type}`);
   }
+
+  // Merken, ob wir schon initialisiert sind (wichtig: UI-Zustand nicht bei jedem config-changed resetten)
+  const wasInitialized = !!this._config;
+
+  // Config normalisieren / klonen
+  this._config = this.normalizeConfig(this.clone(cfg));
+
+  // NUR beim ersten SetConfig alles "zu" setzen – danach UI-Status behalten
+  if (!wasInitialized) {
+    this._ui.rowOpen = {}; // Default: alle Zeilen geschlossen
+  }
+}
+
 
   private clone<T>(obj: T): T {
     try {

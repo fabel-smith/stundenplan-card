@@ -977,8 +977,10 @@ const X = class X extends H {
   }
   setConfig(t) {
     const e = (((t == null ? void 0 : t.type) ?? "") + "").toString();
-    if (e !== "custom:stundenplan-card" && e !== "stundenplan-card") throw new Error(`Unsupported editor type: ${e}`);
-    this._config = this.normalizeConfig(this.clone(t)), this._ui.rowOpen = {};
+    if (e !== "custom:stundenplan-card" && e !== "stundenplan-card")
+      throw new Error(`Unsupported editor type: ${e}`);
+    const i = !!this._config;
+    this._config = this.normalizeConfig(this.clone(t)), i || (this._ui.rowOpen = {});
   }
   clone(t) {
     try {
