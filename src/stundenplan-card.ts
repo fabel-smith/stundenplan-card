@@ -3,11 +3,12 @@ import { LitElement, html, css, TemplateResult } from "lit";
 /**
  * Stundenplan Card (Home Assistant)
  *
- * Ziele dieses Refactors (PR-Stand):
- * - Editor deutlich strukturierter (Panels/Accordion via <details>)
- * - Farben + Cell-Styles sauber einklappbar (weniger “Overload”)
- * - Klar getrennte Bereiche: Allgemein / Highlights / Farben / Datenquelle / Zeilen
- * - UX: Vorschau bleibt oben, Row-Editor ist einklappbar, Fokus-Sprung per Klick
+ * PR-Stand:
+ * - Editor strukturiert (Panels/Accordion via <details>)
+ * - Farben + Cell-Styles einklappbar (weniger Overload)
+ * - Bereiche: Allgemein / Highlights / Farben / Datenquelle / Zeilen
+ * - UX: Vorschau oben, Row-Editor einklappbar, Fokus-Sprung per Klick (öffnet Panels/Row automatisch)
+ * - Default: alle Zeilen geschlossen
  * - Abwärtskompatibel zu bestehenden Configs
  */
 
@@ -352,7 +353,8 @@ export class StundenplanCard extends LitElement {
     });
 
     const weekModeRaw = ((cfg.week_mode ?? "off") + "").toString().trim() as WeekMode;
-    const week_mode: WeekMode = weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
+    const week_mode: WeekMode =
+      weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
 
     return {
       type: (cfg.type ?? "custom:stundenplan-card").toString(),
@@ -719,20 +721,24 @@ export class StundenplanCardEditor extends LitElement {
   public hass: any;
   private _config?: Required<StundenplanConfig>;
 
-  // Editor UX: defaults
+  // Editor UX: defaults (Row-Panels default: closed)
   private _ui = {
     openGeneral: true,
     openHighlight: true,
     openColors: false,
     openSources: false,
     openRows: true,
-    showCellStyles: false, // massiv entlastend
+    showCellStyles: true,
+    rowOpen: {} as Record<number, boolean>, // default: empty => all closed
   };
 
   public setConfig(cfg: StundenplanConfig): void {
     const type = ((cfg?.type ?? "") + "").toString();
     if (type !== "custom:stundenplan-card" && type !== "stundenplan-card") throw new Error(`Unsupported editor type: ${type}`);
     this._config = this.normalizeConfig(this.clone(cfg));
+
+    // Default alles zu: rowOpen leer lassen (keine automatische Öffnung)
+    this._ui.rowOpen = {};
   }
 
   private clone<T>(obj: T): T {
@@ -747,6 +753,28 @@ export class StundenplanCardEditor extends LitElement {
   private emit(cfg: any) {
     this._config = cfg;
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: cfg }, bubbles: true, composed: true }));
+  }
+
+  /* ---------- Row open state: keep indices stable on insert/remove ---------- */
+
+  private shiftRowOpenAfterInsert(insertIdx: number) {
+    const next: Record<number, boolean> = {};
+    for (const [k, v] of Object.entries(this._ui.rowOpen)) {
+      const i = Number(k);
+      if (Number.isNaN(i)) continue;
+      next[i >= insertIdx ? i + 1 : i] = v;
+    }
+    this._ui.rowOpen = next;
+  }
+
+  private shiftRowOpenAfterRemove(removeIdx: number) {
+    const next: Record<number, boolean> = {};
+    for (const [k, v] of Object.entries(this._ui.rowOpen)) {
+      const i = Number(k);
+      if (Number.isNaN(i) || i === removeIdx) continue;
+      next[i > removeIdx ? i - 1 : i] = v;
+    }
+    this._ui.rowOpen = next;
   }
 
   /* ---------- Color helpers (Highlight colors) ---------- */
@@ -890,6 +918,14 @@ export class StundenplanCardEditor extends LitElement {
     });
 
     this.emit({ ...this._config, days, rows });
+
+    // rowOpen an neue Zeilenanzahl anpassen: alles zu lassen, aber Keys außerhalb entfernen
+    const next: Record<number, boolean> = {};
+    Object.entries(this._ui.rowOpen).forEach(([k, v]) => {
+      const i = Number(k);
+      if (!Number.isNaN(i) && i >= 0 && i < rows.length) next[i] = v;
+    });
+    this._ui.rowOpen = next;
   }
 
   /* ---------- Editor: Rows ---------- */
@@ -1005,8 +1041,16 @@ export class StundenplanCardEditor extends LitElement {
     };
 
     const rows = [...this._config.rows];
-    if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) rows.splice(afterIdx + 1, 0, newRow);
-    else rows.push(newRow);
+
+    if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) {
+      const insertIdx = afterIdx + 1;
+      this.shiftRowOpenAfterInsert(insertIdx);
+      rows.splice(insertIdx, 0, newRow);
+      // Optional: neue Zeile geschlossen lassen (Default)
+      // this._ui.rowOpen[insertIdx] = false;
+    } else {
+      rows.push(newRow);
+    }
 
     this.emit({ ...this._config, rows });
   }
@@ -1016,8 +1060,16 @@ export class StundenplanCardEditor extends LitElement {
     const newRow: BreakRow = { break: true, time: "", label: "Pause" };
 
     const rows = [...this._config.rows];
-    if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) rows.splice(afterIdx + 1, 0, newRow);
-    else rows.push(newRow);
+
+    if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) {
+      const insertIdx = afterIdx + 1;
+      this.shiftRowOpenAfterInsert(insertIdx);
+      rows.splice(insertIdx, 0, newRow);
+      // Default geschlossen
+      // this._ui.rowOpen[insertIdx] = false;
+    } else {
+      rows.push(newRow);
+    }
 
     this.emit({ ...this._config, rows });
   }
@@ -1025,13 +1077,26 @@ export class StundenplanCardEditor extends LitElement {
   private removeRow(idx: number) {
     if (!this._config) return;
     const rows = this._config.rows.filter((_, i) => i !== idx);
+    this.shiftRowOpenAfterRemove(idx);
     this.emit({ ...this._config, rows });
   }
 
-  private jumpToCell(rowIdx: number, cellIdx: number) {
+  private async jumpToCell(rowIdx: number, cellIdx: number) {
+    // Panels öffnen + Ziel-Zeile öffnen
+    this._ui.openRows = true;
+    this._ui.rowOpen[rowIdx] = true;
+
+    this.requestUpdate();
+
+    // Warten bis DOM aktualisiert ist (updateComplete + 2 Frames ist robust)
+    await this.updateComplete;
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+
     const id = `sp-cell-${rowIdx}-${cellIdx}`;
     const el = this.renderRoot?.getElementById(id) as HTMLElement | null;
     if (!el) return;
+
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     (el as HTMLInputElement).focus?.();
   }
@@ -1039,7 +1104,6 @@ export class StundenplanCardEditor extends LitElement {
   /* ---------- UI blocks ---------- */
 
   private uiSwitch(checked: boolean, onChange: (v: boolean) => void) {
-    // HA hat je nach Version mwc-switch / ha-switch; wir nutzen plain checkbox (robust) aber UX-stylish via CSS.
     return html`
       <label class="switch">
         <input type="checkbox" .checked=${checked} @change=${(e: any) => onChange(!!e.target.checked)} />
@@ -1107,12 +1171,7 @@ export class StundenplanCardEditor extends LitElement {
                     const st = ((lr as any).cell_styles?.[cellIdx] ?? null) as CellStyle | null;
 
                     return html`
-                      <td
-                        class="p-cell"
-                        style=${styleToString(st, borderDefault)}
-                        title="Klicken zum Bearbeiten"
-                        @click=${() => this.jumpToCell(rowIdx, cellIdx)}
-                      >
+                      <td class="p-cell" style=${styleToString(st, borderDefault)} title="Klicken zum Bearbeiten" @click=${() => this.jumpToCell(rowIdx, cellIdx)}>
                         ${val}
                       </td>
                     `;
@@ -1144,6 +1203,7 @@ export class StundenplanCardEditor extends LitElement {
       </div>
     `;
   }
+
 
   private renderHighlighting(): TemplateResult {
     if (!this._config) return html``;
@@ -1407,7 +1467,11 @@ export class StundenplanCardEditor extends LitElement {
         const lr = r as LessonRow;
 
         return html`
-          <details class="rowPanel" open>
+          <details
+  		class="rowPanel"
+  		?open=${this._ui.rowOpen[idx] ?? false}
+  		@toggle=${(e: any) => (this._ui.rowOpen[idx] = !!e.target.open)}
+	  >
             <summary>
               <div class="rowHead">
                 <div class="rowHeadTitle">${header || `Zeile ${idx + 1}`}</div>
