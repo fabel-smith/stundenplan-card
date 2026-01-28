@@ -1,40 +1,17 @@
 import { LitElement, html, css, TemplateResult } from "lit";
 
 /**
- * Stundenplan Card
- * - Visueller Editor
- * - highlight_today (Spalte)
- * - highlight_current (aktuelle Stunde -> Zeitspalte Hintergrund)
- * - highlight_current_text (aktuelles Fach -> Textfarbe NUR am heutigen Tag)
- * - highlight_current_time_text (aktuelle Stunde -> Textfarbe in der Zeitspalte)
- * - Highlight-Farben konfigurierbar (today/current/current_text/current_time_text)
- * - Highlight-Farben im Editor per Picker (HEX + Alpha -> rgba)
- * - Editor: Klick auf Vorschau springt/fokussiert die Zelle
- * - Editor: Wenn "time" geändert wird, werden start/end automatisch nachgezogen (wenn auto/leer)
- * - Auto-Refresh (Timer): Highlights springen automatisch um (ohne Dashboard-Reload)
+ * Stundenplan Card (Home Assistant)
  *
- * UPDATE:
- * - Echte Vorschau-Tabelle hinzugefügt (Klick auf Fach -> springt links zur passenden Eingabezelle)
- *
- * UPDATE 2:
- * - Optional: Daten aus Entity/Attribut laden (source_entity / source_attribute)
- * - Fix: Textfarbe der aktuellen Stunde/Fach bleibt unabhängig von highlight_current (Hintergrund)
- *
- * UPDATE 3:
- * - Fix (Editor): Pausen können nun gezielt "unter" einer Zeile eingefügt werden (nicht nur am Ende).
- *
- * UPDATE 4 (Wechselwochen):
- * - Optional: A/B-Woche nach ISO-Kalenderwoche (Parität) ODER via Mapping-Entity
- * - Optional: getrennte Datenquellen für A- und B-Plan (source_entity_a/_b)
- *
- * UPDATE 5:
- * - highlight_breaks: optional Pausen als "aktuell" highlighten
- * - Leere Stunden werden NICHT als aktuelles Fach (Text-Highlight) markiert
- *
- * UPDATE 6:
- * - free_only_column_highlight: optional -> bei Freistunden nur Spalte (Heute) highlighten,
- *   NICHT Zeitspalte / NICHT aktuelles Fach / NICHT aktuelle Zeit-Textfarbe
+ * Ziele dieses Refactors (PR-Stand):
+ * - Editor deutlich strukturierter (Panels/Accordion via <details>)
+ * - Farben + Cell-Styles sauber einklappbar (weniger “Overload”)
+ * - Klar getrennte Bereiche: Allgemein / Highlights / Farben / Datenquelle / Zeilen
+ * - UX: Vorschau bleibt oben, Row-Editor ist einklappbar, Fokus-Sprung per Klick
+ * - Abwärtskompatibel zu bestehenden Configs
  */
+
+/* ===================== Types ===================== */
 
 type CellStyle = {
   bg?: string;
@@ -58,7 +35,6 @@ type BreakRow = {
 };
 
 type Row = LessonRow | BreakRow;
-
 type WeekMode = "off" | "kw_parity" | "week_map";
 
 type StundenplanConfig = {
@@ -68,11 +44,7 @@ type StundenplanConfig = {
 
   highlight_today?: boolean;
   highlight_current?: boolean;
-
-  // NEU: Pausen optional als "aktuell" behandeln
   highlight_breaks?: boolean;
-
-  // NEU (UPDATE 6): Bei Freistunden nur Spalte (Heute) highlighten, NICHT Zeit/Zeile/Zelle
   free_only_column_highlight?: boolean;
 
   highlight_today_color?: string;
@@ -84,28 +56,24 @@ type StundenplanConfig = {
   highlight_current_time_text?: boolean;
   highlight_current_time_text_color?: string;
 
-  // Single-Source (legacy / kompatibel)
+  // Single-Source (legacy)
   source_entity?: string;
   source_attribute?: string;
   source_time_key?: string;
 
   // Wechselwochen
   week_mode?: WeekMode;
-
-  // KW-Parität: Wenn true => A=gerade KW, B=ungerade. Wenn false => A=ungerade, B=gerade.
   week_a_is_even_kw?: boolean;
-
-  // Optionales Mapping (Override): Entity/Attribut, das die KW->A/B Zuordnung enthält
-  week_map_entity?: string; // z.B. sensor.wechselwochen_map
-  week_map_attribute?: string; // z.B. "map" (leer = state)
+  week_map_entity?: string;
+  week_map_attribute?: string;
 
   // Plan A/B Quellen
-  source_entity_a?: string; // z.B. sensor.stundenplan_a
-  source_attribute_a?: string; // z.B. plan
-  source_entity_b?: string; // z.B. sensor.stundenplan_b
-  source_attribute_b?: string; // z.B. plan
+  source_entity_a?: string;
+  source_attribute_a?: string;
+  source_entity_b?: string;
+  source_attribute_b?: string;
 
-  rows?: Row[]; // manueller Plan (Fallback)
+  rows?: Row[];
 };
 
 function isBreakRow(r: any): r is BreakRow {
@@ -135,21 +103,18 @@ function normalizeCellStyle(s: any): CellStyle | null {
   if (typeof s.color === "string" && s.color.trim()) out.color = s.color.trim();
   if (typeof s.border === "string" && s.border.trim()) out.border = s.border.trim();
 
-  if (typeof s.bg_alpha === "number" && !Number.isNaN(s.bg_alpha)) {
-    out.bg_alpha = clamp01(s.bg_alpha);
-  }
-
+  if (typeof s.bg_alpha === "number" && !Number.isNaN(s.bg_alpha)) out.bg_alpha = clamp01(s.bg_alpha);
   return Object.keys(out).length ? out : null;
 }
 
 function backgroundCssFromStyle(st: CellStyle | null): string | null {
   if (!st?.bg) return null;
   const bg = st.bg.trim();
-
   if (bg.startsWith("rgba(") || bg.startsWith("rgb(") || bg.startsWith("var(")) return bg;
 
   const rgb = hexToRgb(bg);
   if (!rgb) return bg;
+
   const a = typeof st.bg_alpha === "number" ? clamp01(st.bg_alpha) : 0.18;
   return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`;
 }
@@ -170,8 +135,7 @@ function cssColorFromHexOrCss(value: string, defaultAlpha: number): string {
   if (v.startsWith("#")) {
     const rgb = hexToRgb(v);
     if (!rgb) return v;
-    const a = clamp01(defaultAlpha);
-    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`;
+    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${clamp01(defaultAlpha)})`;
   }
   return v;
 }
@@ -215,18 +179,16 @@ function todayCandidates(getDay: number): string[] {
 
 // ISO-Woche / ISO-Jahr (robust)
 function getISOWeekYear(date: Date): { isoWeek: number; isoYear: number } {
-  // Copy date so don't modify original
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  // ISO: Monday=1..Sunday=7
   const dayNum = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
-  // Set to nearest Thursday: current date + 4 - current day number
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const isoYear = d.getUTCFullYear();
-  // Week 1 is the week with Jan 4th
+
   const yearStart = new Date(Date.UTC(isoYear, 0, 1));
   const yearStartDayNum = yearStart.getUTCDay() === 0 ? 7 : yearStart.getUTCDay();
   const firstThursday = new Date(yearStart);
   firstThursday.setUTCDate(yearStart.getUTCDate() + (4 - yearStartDayNum));
+
   const diffMs = d.getTime() - firstThursday.getTime();
   const isoWeek = 1 + Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
   return { isoWeek, isoYear };
@@ -234,11 +196,10 @@ function getISOWeekYear(date: Date): { isoWeek: number; isoYear: number } {
 
 function normalizeWeekLetter(x: any): "A" | "B" | null {
   const v = (x ?? "").toString().trim().toUpperCase();
-  if (v === "A" || v === "B") return v;
-  return null;
+  return v === "A" || v === "B" ? v : null;
 }
 
-/** NEU (UPDATE 6): "Freistunde"-Erkennung */
+// UPDATE 6: Freistunden-Erkennung
 function isFreeCellValue(v: any): boolean {
   const s = (v ?? "").toString().trim();
   if (!s) return true;
@@ -246,12 +207,11 @@ function isFreeCellValue(v: any): boolean {
 }
 function isFreeLessonRow(row: LessonRow, daysCount: number): boolean {
   const cells = Array.isArray(row?.cells) ? row.cells : [];
-  // Nur dann Freistunde, wenn ALLE Zellen "leer/---" sind
-  for (let i = 0; i < daysCount; i++) {
-    if (!isFreeCellValue(cells[i])) return false;
-  }
+  for (let i = 0; i < daysCount; i++) if (!isFreeCellValue(cells[i])) return false;
   return true;
 }
+
+/* ===================== Card ===================== */
 
 export class StundenplanCard extends LitElement {
   public getGridOptions() {
@@ -281,11 +241,7 @@ export class StundenplanCard extends LitElement {
 
       highlight_today: true,
       highlight_current: true,
-
-      // NEU
       highlight_breaks: false,
-
-      // NEU (UPDATE 6)
       free_only_column_highlight: true,
 
       highlight_today_color: "rgba(0, 150, 255, 0.12)",
@@ -297,12 +253,10 @@ export class StundenplanCard extends LitElement {
       highlight_current_time_text: false,
       highlight_current_time_text_color: "#ff9100",
 
-      // Legacy Single-Source
       source_entity: "",
       source_attribute: "",
       source_time_key: "Stunde",
 
-      // Wechselwochen Defaults
       week_mode: "off",
       week_a_is_even_kw: true,
       week_map_entity: "",
@@ -366,18 +320,12 @@ export class StundenplanCard extends LitElement {
 
   private normalizeConfig(cfg: StundenplanConfig): Required<StundenplanConfig> {
     const days =
-      Array.isArray(cfg.days) && cfg.days.length
-        ? cfg.days.map((d) => (d ?? "").toString())
-        : ["Mo", "Di", "Mi", "Do", "Fr"];
+      Array.isArray(cfg.days) && cfg.days.length ? cfg.days.map((d) => (d ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"];
 
     const rowsIn = Array.isArray(cfg.rows) ? cfg.rows : [];
     const rows: Row[] = rowsIn.map((r: any) => {
       if (isBreakRow(r)) {
-        return {
-          break: true,
-          time: (r.time ?? "").toString(),
-          label: (r.label ?? "Pause").toString(),
-        };
+        return { break: true, time: (r.time ?? "").toString(), label: (r.label ?? "Pause").toString() };
       }
 
       const cellsIn = Array.isArray(r?.cells) ? r.cells : [];
@@ -404,8 +352,7 @@ export class StundenplanCard extends LitElement {
     });
 
     const weekModeRaw = ((cfg.week_mode ?? "off") + "").toString().trim() as WeekMode;
-    const week_mode: WeekMode =
-      weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
+    const week_mode: WeekMode = weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
 
     return {
       type: (cfg.type ?? "custom:stundenplan-card").toString(),
@@ -414,11 +361,7 @@ export class StundenplanCard extends LitElement {
 
       highlight_today: cfg.highlight_today ?? true,
       highlight_current: cfg.highlight_current ?? false,
-
-      // NEU
       highlight_breaks: cfg.highlight_breaks ?? false,
-
-      // NEU (UPDATE 6)
       free_only_column_highlight: cfg.free_only_column_highlight ?? true,
 
       highlight_today_color: (cfg.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
@@ -454,9 +397,7 @@ export class StundenplanCard extends LitElement {
     if (!candidates.size) return -1;
 
     const normDays = (days ?? []).map((x) => normalizeDayLabel(x));
-    for (let i = 0; i < normDays.length; i++) {
-      if (candidates.has(normDays[i])) return i;
-    }
+    for (let i = 0; i < normDays.length; i++) if (candidates.has(normDays[i])) return i;
     return -1;
   }
 
@@ -509,11 +450,7 @@ export class StundenplanCard extends LitElement {
 
     const out: Row[] = data.map((obj: any) => {
       if (obj?.break === true) {
-        return {
-          break: true,
-          time: (obj.time ?? obj[timeKey] ?? "").toString(),
-          label: (obj.label ?? "Pause").toString(),
-        } as BreakRow;
+        return { break: true, time: (obj.time ?? obj[timeKey] ?? "").toString(), label: (obj.label ?? "Pause").toString() };
       }
 
       const timeStr = (obj?.time ?? obj?.[timeKey] ?? "").toString();
@@ -521,17 +458,10 @@ export class StundenplanCard extends LitElement {
 
       const cells = Array.from({ length: days.length }, (_, i) => {
         const key = (days[i] ?? "").toString();
-        const v = obj?.[key];
-        return (v ?? "").toString();
+        return (obj?.[key] ?? "").toString();
       });
 
-      const lr: LessonRow = {
-        time: timeStr,
-        start: parsed.start,
-        end: parsed.end,
-        cells,
-      };
-
+      const lr: LessonRow = { time: timeStr, start: parsed.start, end: parsed.end, cells };
       return lr;
     });
 
@@ -548,7 +478,6 @@ export class StundenplanCard extends LitElement {
     const { isoWeek } = getISOWeekYear(new Date());
     const even = isoWeek % 2 === 0;
     const aIsEven = !!cfg.week_a_is_even_kw;
-    // A=even => even?A:B  | A=odd => even?B:A
     return even === aIsEven ? "A" : "B";
   }
 
@@ -564,13 +493,11 @@ export class StundenplanCard extends LitElement {
     const wKey = String(isoWeek);
     const yKey = String(isoYear);
 
-    // Jahrsspezifisch: {"2026":{"1":"A","2":"B"}}
     if (mapData?.[yKey] && typeof mapData[yKey] === "object") {
       const v = normalizeWeekLetter(mapData[yKey][wKey]);
       if (v) return v;
     }
 
-    // Flat: {"1":"A","2":"B"}
     const v2 = normalizeWeekLetter(mapData?.[wKey]);
     if (v2) return v2;
 
@@ -578,18 +505,12 @@ export class StundenplanCard extends LitElement {
   }
 
   private getActiveWeek(cfg: Required<StundenplanConfig>): "A" | "B" {
-    if (cfg.week_mode === "week_map") {
-      const mapped = this.weekFromMap(cfg);
-      if (mapped) return mapped;
-      // Fallback auf Parität, falls Mapping nicht gesetzt / unvollständig
-      return this.weekFromParity(cfg);
-    }
+    if (cfg.week_mode === "week_map") return this.weekFromMap(cfg) ?? this.weekFromParity(cfg);
     if (cfg.week_mode === "kw_parity") return this.weekFromParity(cfg);
     return "A";
   }
 
   private getRowsResolved(cfg: Required<StundenplanConfig>): Row[] {
-    // Wechselwochen aktiv?
     if (cfg.week_mode !== "off") {
       const w = this.getActiveWeek(cfg);
 
@@ -598,7 +519,6 @@ export class StundenplanCard extends LitElement {
       const attrA = (cfg.source_attribute_a ?? "").trim();
       const attrB = (cfg.source_attribute_b ?? "").trim();
 
-      // Wenn A/B-Entities gesetzt sind, nimm die
       if (w === "A" && entA) {
         const rA = this.getRowsFromEntity(cfg, entA, attrA);
         if (rA) return rA;
@@ -608,23 +528,17 @@ export class StundenplanCard extends LitElement {
         if (rB) return rB;
       }
 
-      // Fallback: Legacy Single-Entity
       const legacyEnt = (cfg.source_entity ?? "").trim();
       if (legacyEnt) {
         const rLegacy = this.getRowsFromEntity(cfg, legacyEnt, (cfg.source_attribute ?? "").trim());
         if (rLegacy) return rLegacy;
       }
 
-      // Fallback: manuell
       return cfg.rows ?? [];
     }
 
-    // Kein Wechselwochen-Modus: Legacy Entity oder manuell
     const ent = (cfg.source_entity ?? "").toString().trim();
-    if (ent) {
-      const r = this.getRowsFromEntity(cfg, ent, (cfg.source_attribute ?? "").toString().trim());
-      if (r) return r;
-    }
+    if (ent) return this.getRowsFromEntity(cfg, ent, (cfg.source_attribute ?? "").toString().trim()) ?? (cfg.rows ?? []);
     return cfg.rows ?? [];
   }
 
@@ -665,14 +579,13 @@ export class StundenplanCard extends LitElement {
             <tbody>
               ${rows.map((r) => {
                 if (isBreakRow(r)) {
-                  // NEU: Pausen optional als "aktuell" highlighten (wenn highlight_breaks)
                   const parsed = parseStartEndFromTime(r.time);
                   const isCurrentBreak = !!parsed.start && !!parsed.end && this.isNowBetween(parsed.start, parsed.end);
 
+                  const doHighlightBreak = !!cfg.highlight_current && !!cfg.highlight_breaks && isCurrentBreak;
+
                   let breakTimeStyle = `--sp-hl:${currentOverlay};`;
                   let breakCellStyle = "";
-
-                  const doHighlightBreak = !!cfg.highlight_current && !!cfg.highlight_breaks && isCurrentBreak;
 
                   if (doHighlightBreak) {
                     breakTimeStyle += "box-shadow: inset 0 0 0 9999px var(--sp-hl);";
@@ -697,20 +610,13 @@ export class StundenplanCard extends LitElement {
 
                 const isCurrentTime = !!row.start && !!row.end && this.isNowBetween(row.start, row.end);
 
-                // NEU (UPDATE 6): Freistunde? Dann (optional) nur Spalte highlighten, sonst nix "aktuelles"
                 const isFree = isFreeLessonRow(row, (cfg.days ?? []).length);
                 const suppressCurrent = !!cfg.free_only_column_highlight && isFree;
-
-                // Wenn suppressCurrent=true -> wir tun so, als wäre NICHT current (für Zeit/Texts)
                 const allowCurrent = !suppressCurrent;
 
                 let timeStyle = `--sp-hl:${currentOverlay};`;
-                if (allowCurrent && cfg.highlight_current && isCurrentTime) {
-                  timeStyle += "box-shadow: inset 0 0 0 9999px var(--sp-hl);";
-                }
-                if (allowCurrent && isCurrentTime && cfg.highlight_current_time_text && currentTimeTextColor) {
-                  timeStyle += `color:${currentTimeTextColor};`;
-                }
+                if (allowCurrent && cfg.highlight_current && isCurrentTime) timeStyle += "box-shadow: inset 0 0 0 9999px var(--sp-hl);";
+                if (allowCurrent && isCurrentTime && cfg.highlight_current_time_text && currentTimeTextColor) timeStyle += `color:${currentTimeTextColor};`;
 
                 return html`
                   <tr>
@@ -723,7 +629,6 @@ export class StundenplanCard extends LitElement {
                       const cls = cfg.highlight_today && i === todayIdx ? "today" : "";
                       let style = `--sp-hl:${todayOverlay};` + styleToString(cellStyle, borderDefault);
 
-                      // NEU: leere Stunden NICHT als aktuelles Fach markieren (Text-Highlight nur bei Inhalt)
                       const hasValue = (val ?? "").toString().trim().length > 0;
 
                       if (
@@ -756,18 +661,15 @@ export class StundenplanCard extends LitElement {
       width: 100%;
       max-width: 100%;
     }
-
     ha-card {
       display: block;
       width: 100%;
       max-width: 100%;
       box-sizing: border-box;
     }
-
     .card {
       padding: 12px;
     }
-
     .weekBadge {
       margin: 0 0 10px 0;
       padding: 8px 10px;
@@ -777,34 +679,28 @@ export class StundenplanCard extends LitElement {
       font-size: 13px;
       opacity: 0.95;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
     }
-
     th,
     td {
       padding: 6px;
       text-align: center;
       border: 1px solid var(--divider-color);
     }
-
     th {
       background: var(--secondary-background-color);
       font-weight: 700;
     }
-
     .time {
       font-weight: 700;
       white-space: nowrap;
     }
-
     td.today,
     th.today {
       box-shadow: inset 0 0 0 9999px var(--sp-hl, rgba(0, 150, 255, 0.12));
     }
-
     .break {
       font-style: italic;
       opacity: 0.75;
@@ -812,7 +708,7 @@ export class StundenplanCard extends LitElement {
   `;
 }
 
-/* ----------------- Editor ----------------- */
+/* ===================== Editor ===================== */
 
 export class StundenplanCardEditor extends LitElement {
   static properties = {
@@ -823,11 +719,19 @@ export class StundenplanCardEditor extends LitElement {
   public hass: any;
   private _config?: Required<StundenplanConfig>;
 
+  // Editor UX: defaults
+  private _ui = {
+    openGeneral: true,
+    openHighlight: true,
+    openColors: false,
+    openSources: false,
+    openRows: true,
+    showCellStyles: false, // massiv entlastend
+  };
+
   public setConfig(cfg: StundenplanConfig): void {
     const type = ((cfg?.type ?? "") + "").toString();
-    if (type !== "custom:stundenplan-card" && type !== "stundenplan-card") {
-      throw new Error(`Unsupported editor type: ${type}`);
-    }
+    if (type !== "custom:stundenplan-card" && type !== "stundenplan-card") throw new Error(`Unsupported editor type: ${type}`);
     this._config = this.normalizeConfig(this.clone(cfg));
   }
 
@@ -839,6 +743,13 @@ export class StundenplanCardEditor extends LitElement {
       return JSON.parse(JSON.stringify(obj));
     }
   }
+
+  private emit(cfg: any) {
+    this._config = cfg;
+    this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: cfg }, bubbles: true, composed: true }));
+  }
+
+  /* ---------- Color helpers (Highlight colors) ---------- */
 
   private rgbaFromHex(hex: string, alpha: number): string {
     const rgb = hexToRgb(hex);
@@ -879,8 +790,7 @@ export class StundenplanCardEditor extends LitElement {
 
   private setHighlightRgba(key: keyof StundenplanConfig, hex: string, alpha01: number) {
     if (!this._config) return;
-    const rgba = this.rgbaFromHex(hex, alpha01);
-    this.emit({ ...this._config, [key]: rgba });
+    this.emit({ ...this._config, [key]: this.rgbaFromHex(hex, alpha01) });
   }
 
   private setHighlightHexOnly(key: keyof StundenplanConfig, hex: string) {
@@ -888,21 +798,18 @@ export class StundenplanCardEditor extends LitElement {
     this.emit({ ...this._config, [key]: hex });
   }
 
+  /* ---------- Normalization ---------- */
+
   private normalizeConfig(cfg: StundenplanConfig): Required<StundenplanConfig> {
     const stub = StundenplanCard.getStubConfig();
-
     const merged: StundenplanConfig = { ...stub, ...cfg };
 
     const days =
-      Array.isArray(merged.days) && merged.days.length
-        ? merged.days.map((d) => (d ?? "").toString())
-        : ["Mo", "Di", "Mi", "Do", "Fr"];
+      Array.isArray(merged.days) && merged.days.length ? merged.days.map((d) => (d ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"];
 
     const rowsIn = Array.isArray(merged.rows) ? merged.rows : [];
     const rows: Row[] = rowsIn.map((r: any) => {
-      if (isBreakRow(r)) {
-        return { break: true, time: (r.time ?? "").toString(), label: (r.label ?? "Pause").toString() };
-      }
+      if (isBreakRow(r)) return { break: true, time: (r.time ?? "").toString(), label: (r.label ?? "Pause").toString() };
 
       const cellsIn = Array.isArray(r?.cells) ? r.cells : [];
       const cells = Array.from({ length: days.length }, (_, i) => (cellsIn[i] ?? "").toString());
@@ -926,8 +833,7 @@ export class StundenplanCardEditor extends LitElement {
     });
 
     const weekModeRaw = ((merged.week_mode ?? "off") + "").toString().trim() as WeekMode;
-    const week_mode: WeekMode =
-      weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
+    const week_mode: WeekMode = weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
 
     return {
       type: (merged.type ?? "custom:stundenplan-card").toString(),
@@ -936,11 +842,7 @@ export class StundenplanCardEditor extends LitElement {
 
       highlight_today: merged.highlight_today ?? true,
       highlight_current: merged.highlight_current ?? false,
-
-      // NEU
       highlight_breaks: merged.highlight_breaks ?? false,
-
-      // NEU (UPDATE 6)
       free_only_column_highlight: merged.free_only_column_highlight ?? true,
 
       highlight_today_color: (merged.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
@@ -970,16 +872,7 @@ export class StundenplanCardEditor extends LitElement {
     };
   }
 
-  private emit(cfg: any) {
-    this._config = cfg;
-    this.dispatchEvent(
-      new CustomEvent("config-changed", {
-        detail: { config: cfg },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
+  /* ---------- Editor: Basic config ---------- */
 
   private setDaysFromString(value: string) {
     if (!this._config) return;
@@ -999,16 +892,16 @@ export class StundenplanCardEditor extends LitElement {
     this.emit({ ...this._config, days, rows });
   }
 
+  /* ---------- Editor: Rows ---------- */
+
   private updateRowTime(idx: number, value: string) {
     if (!this._config) return;
 
     const rows = this._config.rows.map((r, i) => {
       if (i !== idx) return r;
-
       if (isBreakRow(r)) return { ...r, time: value };
 
       const lr = r as LessonRow;
-
       const oldParsed = parseStartEndFromTime(lr.time);
       const newParsed = parseStartEndFromTime(value);
 
@@ -1031,21 +924,13 @@ export class StundenplanCardEditor extends LitElement {
 
   private updateRowStart(idx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => {
-      if (i !== idx || isBreakRow(r)) return r;
-      const lr = r as LessonRow;
-      return { ...lr, start: value || undefined };
-    });
+    const rows = this._config.rows.map((r, i) => (i !== idx || isBreakRow(r) ? r : ({ ...(r as LessonRow), start: value || undefined } as LessonRow)));
     this.emit({ ...this._config, rows });
   }
 
   private updateRowEnd(idx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => {
-      if (i !== idx || isBreakRow(r)) return r;
-      const lr = r as LessonRow;
-      return { ...lr, end: value || undefined };
-    });
+    const rows = this._config.rows.map((r, i) => (i !== idx || isBreakRow(r) ? r : ({ ...(r as LessonRow), end: value || undefined } as LessonRow)));
     this.emit({ ...this._config, rows });
   }
 
@@ -1073,7 +958,6 @@ export class StundenplanCardEditor extends LitElement {
         : Array.from({ length: this._config!.days.length }, () => null as CellStyle | null);
 
       const current = styles[cellIdx] ? { ...(styles[cellIdx] as CellStyle) } : ({} as CellStyle);
-
       const next: CellStyle = { ...current, ...patch };
       if (typeof next.bg_alpha === "number") next.bg_alpha = clamp01(next.bg_alpha);
 
@@ -1090,9 +974,7 @@ export class StundenplanCardEditor extends LitElement {
     const rows = this._config.rows.map((r, i) => {
       if (i !== idx) return r;
 
-      if (isBreak) {
-        return { break: true, time: (r as any).time ?? "", label: (r as any).label ?? "Pause" };
-      }
+      if (isBreak) return { break: true, time: (r as any).time ?? "", label: (r as any).label ?? "Pause" };
 
       return {
         time: (r as any).time ?? "",
@@ -1114,7 +996,6 @@ export class StundenplanCardEditor extends LitElement {
 
   private addLessonRow(afterIdx?: number) {
     if (!this._config) return;
-
     const newRow: LessonRow = {
       time: "",
       start: "",
@@ -1124,27 +1005,19 @@ export class StundenplanCardEditor extends LitElement {
     };
 
     const rows = [...this._config.rows];
-
-    if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) {
-      rows.splice(afterIdx + 1, 0, newRow);
-    } else {
-      rows.push(newRow);
-    }
+    if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) rows.splice(afterIdx + 1, 0, newRow);
+    else rows.push(newRow);
 
     this.emit({ ...this._config, rows });
   }
 
   private addBreakRow(afterIdx?: number) {
     if (!this._config) return;
-
     const newRow: BreakRow = { break: true, time: "", label: "Pause" };
-    const rows = [...this._config.rows];
 
-    if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) {
-      rows.splice(afterIdx + 1, 0, newRow);
-    } else {
-      rows.push(newRow);
-    }
+    const rows = [...this._config.rows];
+    if (typeof afterIdx === "number" && afterIdx >= 0 && afterIdx < rows.length) rows.splice(afterIdx + 1, 0, newRow);
+    else rows.push(newRow);
 
     this.emit({ ...this._config, rows });
   }
@@ -1163,6 +1036,29 @@ export class StundenplanCardEditor extends LitElement {
     (el as HTMLInputElement).focus?.();
   }
 
+  /* ---------- UI blocks ---------- */
+
+  private uiSwitch(checked: boolean, onChange: (v: boolean) => void) {
+    // HA hat je nach Version mwc-switch / ha-switch; wir nutzen plain checkbox (robust) aber UX-stylish via CSS.
+    return html`
+      <label class="switch">
+        <input type="checkbox" .checked=${checked} @change=${(e: any) => onChange(!!e.target.checked)} />
+        <span class="slider" aria-hidden="true"></span>
+      </label>
+    `;
+  }
+
+  private panel(title: string, open: boolean, onToggle: (open: boolean) => void, body: TemplateResult) {
+    return html`
+      <details class="panel" ?open=${open} @toggle=${(e: any) => onToggle(!!e.target.open)}>
+        <summary>
+          <div class="panelTitle">${title}</div>
+        </summary>
+        <div class="panelBody">${body}</div>
+      </details>
+    `;
+  }
+
   private renderEditorPreview(): TemplateResult {
     if (!this._config) return html``;
 
@@ -1171,8 +1067,17 @@ export class StundenplanCardEditor extends LitElement {
     const rows = this._config.rows ?? [];
 
     return html`
-      <div class="editorPreview">
-        <div class="editorPreviewTitle">Vorschau</div>
+      <div class="previewWrap">
+        <div class="previewTop">
+          <div>
+            <div class="previewTitle">Vorschau</div>
+            <div class="previewHint">Klick auf ein Fach springt zur passenden Zelle im Editor.</div>
+          </div>
+
+          <button class="btn" @click=${() => (this._ui.showCellStyles = !this._ui.showCellStyles)}>
+            ${this._ui.showCellStyles ? "Cell-Styles ausblenden" : "Cell-Styles anzeigen"}
+          </button>
+        </div>
 
         <table class="previewTable">
           <thead>
@@ -1217,403 +1122,415 @@ export class StundenplanCardEditor extends LitElement {
             })}
           </tbody>
         </table>
-
-        <div class="editorPreviewHint">Tipp: Klick auf ein Fach springt zur passenden Zelle.</div>
       </div>
+    `;
+  }
+
+  private renderGeneral(): TemplateResult {
+    if (!this._config) return html``;
+
+    return html`
+      <div class="grid2">
+        <div class="field">
+          <label class="lbl">Titel</label>
+          <input class="in" type="text" .value=${this._config.title ?? ""} @input=${(e: any) => this.emit({ ...this._config!, title: e.target.value })} />
+        </div>
+
+        <div class="field">
+          <label class="lbl">Tage (Komma getrennt)</label>
+          <input class="in" type="text" .value=${(this._config.days ?? []).join(", ")} @input=${(e: any) => this.setDaysFromString(e.target.value)} />
+          <div class="sub">Beispiel: Mo, Di, Mi, Do, Fr</div>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderHighlighting(): TemplateResult {
+    if (!this._config) return html``;
+
+    const c = this._config;
+
+    return html`
+      <div class="stack">
+        <div class="optRow">
+          <div>
+            <div class="optTitle">Heute hervorheben</div>
+            <div class="sub">Hintergrund für die heutige Spalte.</div>
+          </div>
+          ${this.uiSwitch(!!c.highlight_today, (v) => this.emit({ ...c, highlight_today: v }))}
+        </div>
+
+        <div class="optRow">
+          <div>
+            <div class="optTitle">Aktuelle Stunde hervorheben</div>
+            <div class="sub">Hintergrund in der Zeitspalte (Zeile bleibt neutral).</div>
+          </div>
+          ${this.uiSwitch(!!c.highlight_current, (v) => this.emit({ ...c, highlight_current: v }))}
+        </div>
+
+        <div class="optRow">
+          <div>
+            <div class="optTitle">Pausen als aktuell markieren</div>
+            <div class="sub">Wenn die Pause „jetzt“ ist, wird sie wie eine aktuelle Stunde behandelt.</div>
+          </div>
+          ${this.uiSwitch(!!c.highlight_breaks, (v) => this.emit({ ...c, highlight_breaks: v }))}
+        </div>
+
+        <div class="optRow">
+          <div>
+            <div class="optTitle">Freistunden: nur Tag hervorheben</div>
+            <div class="sub">Unterdrückt „Aktuell“-Highlights, wenn die gesamte Zeile leer ist.</div>
+          </div>
+          ${this.uiSwitch(!!c.free_only_column_highlight, (v) => this.emit({ ...c, free_only_column_highlight: v }))}
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="optRow">
+          <div>
+            <div class="optTitle">Aktuelles Fach (Textfarbe)</div>
+            <div class="sub">Nur am heutigen Tag, nur wenn Zelle nicht leer ist.</div>
+          </div>
+          ${this.uiSwitch(!!c.highlight_current_text, (v) => this.emit({ ...c, highlight_current_text: v }))}
+        </div>
+
+        <div class="optRow">
+          <div>
+            <div class="optTitle">Aktuelle Stunde (Zeitspalte Textfarbe)</div>
+            <div class="sub">Zusätzlich zur Zeitspalten-Hinterlegung.</div>
+          </div>
+          ${this.uiSwitch(!!c.highlight_current_time_text, (v) => this.emit({ ...c, highlight_current_time_text: v }))}
+        </div>
+      </div>
+    `;
+  }
+
+  private colorRow(
+    label: string,
+    hint: string,
+    hexAlpha: { hex: string; alpha: number },
+    onHex: (hex: string) => void,
+    onAlpha: (a01: number) => void,
+    previewText: string
+  ) {
+    const alphaPct = Math.round(clamp01(hexAlpha.alpha) * 100);
+
+    return html`
+      <div class="colorRow">
+        <div>
+          <div class="optTitle">${label}</div>
+          <div class="sub">${hint}</div>
+        </div>
+
+        <div class="colorControls">
+          <input class="col" type="color" .value=${hexAlpha.hex} @input=${(e: any) => onHex(e.target.value)} />
+          <div class="range">
+            <input type="range" min="0" max="100" .value=${String(alphaPct)} @input=${(e: any) => onAlpha(Number(e.target.value) / 100)} />
+            <div class="pct">${alphaPct}%</div>
+          </div>
+        </div>
+
+        <div class="mono">${previewText}</div>
+      </div>
+    `;
+  }
+
+  private renderColors(): TemplateResult {
+    if (!this._config) return html``;
+
+    const today = this.parseColorToHexAlpha(this._config.highlight_today_color, "#0096ff", 0.12);
+    const current = this.parseColorToHexAlpha(this._config.highlight_current_color, "#4caf50", 0.18);
+
+    return html`
+      <div class="stack">
+        ${this.colorRow(
+          "Highlight-Farbe: Heute (Hintergrund)",
+          "Spalten-Overlay für den aktuellen Wochentag.",
+          today,
+          (hex) => this.setHighlightRgba("highlight_today_color", hex, today.alpha),
+          (a) => this.setHighlightRgba("highlight_today_color", today.hex, a),
+          this._config.highlight_today_color
+        )}
+
+        ${this.colorRow(
+          "Highlight-Farbe: Aktuelle Stunde (Hintergrund)",
+          "Zeitspalten-Overlay (und optional Pausen).",
+          current,
+          (hex) => this.setHighlightRgba("highlight_current_color", hex, current.alpha),
+          (a) => this.setHighlightRgba("highlight_current_color", current.hex, a),
+          this._config.highlight_current_color
+        )}
+
+        <div class="divider"></div>
+
+        <div class="grid2">
+          <div class="field">
+            <label class="lbl">Textfarbe: Aktuelles Fach</label>
+            <div class="inRow">
+              <input class="col" type="color" .value=${(this._config.highlight_current_text_color ?? "#ff1744").toString()} @input=${(e: any) => this.setHighlightHexOnly("highlight_current_text_color", e.target.value)} />
+              <input class="in" type="text" .value=${this._config.highlight_current_text_color ?? "#ff1744"} @input=${(e: any) => this.emit({ ...this._config!, highlight_current_text_color: e.target.value })} />
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="lbl">Textfarbe: Zeitspalte (aktuelle Stunde)</label>
+            <div class="inRow">
+              <input class="col" type="color" .value=${(this._config.highlight_current_time_text_color ?? "#ff9100").toString()} @input=${(e: any) => this.setHighlightHexOnly("highlight_current_time_text_color", e.target.value)} />
+              <input class="in" type="text" .value=${this._config.highlight_current_time_text_color ?? "#ff9100"} @input=${(e: any) => this.emit({ ...this._config!, highlight_current_time_text_color: e.target.value })} />
+            </div>
+          </div>
+        </div>
+
+        <div class="sub">
+          Tipp: Du kannst auch <span class="mono">rgb()/rgba()</span> oder <span class="mono">var(--...)</span> Werte direkt in YAML setzen – der Editor hält es kompatibel.
+        </div>
+      </div>
+    `;
+  }
+
+  private renderSources(): TemplateResult {
+    if (!this._config) return html``;
+
+    const c = this._config;
+
+    return html`
+      <div class="stack">
+        <div class="sub">
+          Optional: Plan aus Entity laden (JSON im state oder Attribut). Bei Wechselwochen werden bevorzugt A/B-Quellen genutzt. Ohne Entity → manueller Plan.
+        </div>
+
+        <div class="panelMinor">
+          <div class="minorTitle">Wechselwochen (A/B)</div>
+
+          <div class="field">
+            <label class="lbl">week_mode</label>
+            <select class="in" .value=${c.week_mode ?? "off"} @change=${(e: any) => this.emit({ ...c, week_mode: e.target.value })}>
+              <option value="off">off (deaktiviert)</option>
+              <option value="kw_parity">kw_parity (gerade/ungerade ISO-KW)</option>
+              <option value="week_map">week_map (Mapping-Entity, Fallback Parität)</option>
+            </select>
+          </div>
+
+          <div class="optRow">
+            <div>
+              <div class="optTitle">A-Woche = gerade Kalenderwoche</div>
+              <div class="sub">Wenn deaktiviert: A-Woche = ungerade KW.</div>
+            </div>
+            ${this.uiSwitch(!!c.week_a_is_even_kw, (v) => this.emit({ ...c, week_a_is_even_kw: v }))}
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label class="lbl">week_map_entity (optional)</label>
+              <input class="in" type="text" .value=${c.week_map_entity ?? ""} placeholder="z.B. sensor.wechselwochen_map" @input=${(e: any) => this.emit({ ...c, week_map_entity: e.target.value })} />
+            </div>
+
+            <div class="field">
+              <label class="lbl">week_map_attribute</label>
+              <input class="in" type="text" .value=${c.week_map_attribute ?? ""} placeholder="z.B. map (leer = state)" @input=${(e: any) => this.emit({ ...c, week_map_attribute: e.target.value })} />
+            </div>
+          </div>
+
+          <div class="sub">
+            Mapping-Format: <span class="mono">{"2026":{"1":"A","2":"B"}}</span> oder <span class="mono">{"1":"A","2":"B"}</span>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="grid2">
+            <div class="field">
+              <label class="lbl">source_entity_a</label>
+              <input class="in" type="text" .value=${c.source_entity_a ?? ""} placeholder="z.B. sensor.stundenplan_a" @input=${(e: any) => this.emit({ ...c, source_entity_a: e.target.value })} />
+            </div>
+            <div class="field">
+              <label class="lbl">source_attribute_a</label>
+              <input class="in" type="text" .value=${c.source_attribute_a ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_a: e.target.value })} />
+            </div>
+            <div class="field">
+              <label class="lbl">source_entity_b</label>
+              <input class="in" type="text" .value=${c.source_entity_b ?? ""} placeholder="z.B. sensor.stundenplan_b" @input=${(e: any) => this.emit({ ...c, source_entity_b: e.target.value })} />
+            </div>
+            <div class="field">
+              <label class="lbl">source_attribute_b</label>
+              <input class="in" type="text" .value=${c.source_attribute_b ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_b: e.target.value })} />
+            </div>
+          </div>
+        </div>
+
+        <div class="panelMinor">
+          <div class="minorTitle">Single-Source (Legacy / einfach)</div>
+
+          <div class="grid2">
+            <div class="field">
+              <label class="lbl">source_entity</label>
+              <input class="in" type="text" .value=${c.source_entity ?? ""} placeholder="z.B. sensor.stundenplan" @input=${(e: any) => this.emit({ ...c, source_entity: e.target.value })} />
+            </div>
+
+            <div class="field">
+              <label class="lbl">source_attribute</label>
+              <input class="in" type="text" .value=${c.source_attribute ?? ""} placeholder="z.B. plan (leer = state)" @input=${(e: any) => this.emit({ ...c, source_attribute: e.target.value })} />
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="lbl">source_time_key</label>
+            <input class="in" type="text" .value=${c.source_time_key ?? "Stunde"} placeholder='Default: "Stunde"' @input=${(e: any) => this.emit({ ...c, source_time_key: e.target.value })} />
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderRows(): TemplateResult {
+    if (!this._config) return html``;
+
+    const c = this._config;
+    const days = c.days ?? [];
+
+    return html`
+      <div class="rowsTop">
+        <div class="rowsTitle">Stundenplan (Zeilen)</div>
+        <div class="btnBar">
+          <button class="btn" @click=${() => this.addLessonRow()}>+ Stunde</button>
+          <button class="btn" @click=${() => this.addBreakRow()}>+ Pause</button>
+        </div>
+      </div>
+
+      <div class="sub" style="margin-bottom:10px;">
+        Pro Zeile: Zeit + optional Start/Ende. Per Klick in der Vorschau springst du zur passenden Zelle.
+      </div>
+
+      ${c.rows.map((r, idx) => {
+        const isBreak = isBreakRow(r);
+        const header = isBreak ? `Pause · ${(r as any).time ?? ""}` : `Stunde · ${(r as any).time ?? ""}`;
+        const label = isBreak ? ((r as BreakRow).label ?? "Pause") : "";
+        const lr = r as LessonRow;
+
+        return html`
+          <details class="rowPanel" open>
+            <summary>
+              <div class="rowHead">
+                <div class="rowHeadTitle">${header || `Zeile ${idx + 1}`}</div>
+                <div class="rowHeadMeta">${isBreak ? label : `${(lr.start ?? "") || "Start?"} – ${(lr.end ?? "") || "Ende?"}`}</div>
+              </div>
+            </summary>
+
+            <div class="rowBody">
+              <div class="grid2">
+                <div class="field">
+                  <label class="lbl">Zeit / Stunde</label>
+                  <input class="in" type="text" .value=${(r as any).time ?? ""} placeholder="z. B. 1. 08:00–08:45" @input=${(e: any) => this.updateRowTime(idx, e.target.value)} />
+                </div>
+
+                <div class="field">
+                  <label class="lbl">Typ</label>
+                  <div class="optRow" style="padding:8px 10px;">
+                    <div>
+                      <div class="optTitle">Pause</div>
+                      <div class="sub">Zeile als Pause rendern (colspan).</div>
+                    </div>
+                    ${this.uiSwitch(isBreak, (v) => this.toggleBreak(idx, v))}
+                  </div>
+                </div>
+              </div>
+
+              ${isBreak
+                ? html`
+                    <div class="field">
+                      <label class="lbl">Pausentext</label>
+                      <input class="in" type="text" .value=${(r as BreakRow).label ?? "Pause"} placeholder="z. B. Große Pause" @input=${(e: any) => this.updateBreakLabel(idx, e.target.value)} />
+                    </div>
+                  `
+                : html`
+                    <div class="grid2">
+                      <div class="field">
+                        <label class="lbl">Start (HH:MM)</label>
+                        <input class="in" type="text" .value=${(lr.start ?? "") as any} placeholder="z.B. 07:45" @input=${(e: any) => this.updateRowStart(idx, e.target.value)} />
+                      </div>
+                      <div class="field">
+                        <label class="lbl">Ende (HH:MM)</label>
+                        <input class="in" type="text" .value=${(lr.end ?? "") as any} placeholder="z.B. 08:30" @input=${(e: any) => this.updateRowEnd(idx, e.target.value)} />
+                      </div>
+                    </div>
+
+                    <div class="cellsGrid">
+                      ${days.map((d, i) => {
+                        const val = (lr.cells?.[i] ?? "").toString();
+                        const st = ((lr as any).cell_styles?.[i] ?? null) as CellStyle | null;
+
+                        const bgHex = st?.bg && st.bg.startsWith("#") ? st.bg : "#3b82f6";
+                        const alpha = typeof st?.bg_alpha === "number" ? clamp01(st.bg_alpha) : 0.18;
+                        const alphaPct = Math.round(alpha * 100);
+                        const textHex = st?.color && st.color.startsWith("#") ? st.color : "#ffffff";
+
+                        const inputId = `sp-cell-${idx}-${i}`;
+                        const compactPreview = styleToString(st, "1px solid var(--divider-color)");
+
+                        return html`
+                          <div class="cell">
+                            <div class="cellTop">
+                              <div class="cellDay">${d}</div>
+                              <div class="cellMiniPreview" style=${compactPreview} title="Zellvorschau">${val || "…"}</div>
+                            </div>
+
+                            <input id=${inputId} class="in" type="text" .value=${val} placeholder="Fach" @input=${(e: any) => this.updateRowCell(idx, i, e.target.value)} />
+
+                            ${this._ui.showCellStyles
+                              ? html`
+                                  <div class="cellStyles">
+                                    <div class="styleLine">
+                                      <div class="styleLbl">Hintergrund</div>
+                                      <input class="col" type="color" .value=${bgHex} @input=${(e: any) => this.updateCellStyle(idx, i, { bg: e.target.value })} />
+                                    </div>
+
+                                    <div class="styleLine">
+                                      <div class="styleLbl">Transparenz</div>
+                                      <div class="range">
+                                        <input type="range" min="0" max="100" .value=${String(alphaPct)} @input=${(e: any) => this.updateCellStyle(idx, i, { bg_alpha: Number(e.target.value) / 100 })} />
+                                        <div class="pct">${alphaPct}%</div>
+                                      </div>
+                                    </div>
+
+                                    <div class="styleLine">
+                                      <div class="styleLbl">Text</div>
+                                      <input class="col" type="color" .value=${textHex} @input=${(e: any) => this.updateCellStyle(idx, i, { color: e.target.value })} />
+                                    </div>
+                                  </div>
+                                `
+                              : html``}
+                          </div>
+                        `;
+                      })}
+                    </div>
+                  `}
+
+              <div class="rowActions">
+                <button class="btn" @click=${() => this.addLessonRow(idx)}>+ Stunde darunter</button>
+                <button class="btn" @click=${() => this.addBreakRow(idx)}>+ Pause darunter</button>
+                <button class="btn danger" @click=${() => this.removeRow(idx)}>Löschen</button>
+              </div>
+            </div>
+          </details>
+        `;
+      })}
     `;
   }
 
   protected render(): TemplateResult {
     if (!this._config) return html``;
 
-    const todayState = this.parseColorToHexAlpha(this._config.highlight_today_color, "#0096ff", 0.12);
-    const currentState = this.parseColorToHexAlpha(this._config.highlight_current_color, "#4caf50", 0.18);
-
     return html`
       ${this.renderEditorPreview()}
 
-      <div class="section">
-        <div class="row">
-          <label>Titel</label>
-          <input type="text" .value=${this._config.title ?? ""} @input=${(e: any) => this.emit({ ...this._config!, title: e.target.value })} />
-        </div>
+      ${this.panel("Allgemein", this._ui.openGeneral, (v) => (this._ui.openGeneral = v), this.renderGeneral())}
 
-        <div class="row">
-          <label>Tage (Komma getrennt)</label>
-          <input type="text" .value=${(this._config.days ?? []).join(", ")} @input=${(e: any) => this.setDaysFromString(e.target.value)} />
-          <div class="hint">Beispiel: Mo, Di, Mi, Do, Fr</div>
-        </div>
+      ${this.panel("Highlights", this._ui.openHighlight, (v) => (this._ui.openHighlight = v), this.renderHighlighting())}
 
-<div class="row">
-  <label>Optionen</label>
+      ${this.panel("Farben", this._ui.openColors, (v) => (this._ui.openColors = v), this.renderColors())}
 
-  <!-- Hintergrund-Highlights -->
-  <div class="checkboxLine">
-    <input
-      type="checkbox"
-      .checked=${this._config.highlight_today ?? true}
-      @change=${(e: any) => this.emit({ ...this._config!, highlight_today: e.target.checked })}
-    />
-    <span>Heute hervorheben (Hintergrund – ganze Spalte)</span>
-  </div>
+      ${this.panel("Datenquellen", this._ui.openSources, (v) => (this._ui.openSources = v), this.renderSources())}
 
-  <div class="checkboxLine">
-    <input
-      type="checkbox"
-      .checked=${this._config.highlight_current ?? false}
-      @change=${(e: any) => this.emit({ ...this._config!, highlight_current: e.target.checked })}
-    />
-    <span>Aktuelle Stunde hervorheben (Hintergrund – Zeitspalte)</span>
-  </div>
-
-  <div class="checkboxLine">
-    <input
-      type="checkbox"
-      .checked=${this._config.highlight_breaks ?? false}
-      @change=${(e: any) => this.emit({ ...this._config!, highlight_breaks: e.target.checked })}
-    />
-    <span>Pausen als aktuell markieren (Hintergrund)</span>
-  </div>
-
-  <div class="checkboxLine">
-    <input
-      type="checkbox"
-      .checked=${this._config.free_only_column_highlight ?? true}
-      @change=${(e: any) => this.emit({ ...this._config!, free_only_column_highlight: e.target.checked })}
-    />
-    <span>Freistunden: nur Tag hervorheben (Hintergrund – Spalte)</span>
-  </div>
-
-  <hr style="opacity:0.2; margin:10px 0;" />
-
-  <!-- Text-Highlights -->
-  <div class="checkboxLine">
-    <input
-      type="checkbox"
-      .checked=${this._config.highlight_current_text ?? false}
-      @change=${(e: any) => this.emit({ ...this._config!, highlight_current_text: e.target.checked })}
-    />
-    <span>Aktuelles Fach hervorheben (Textfarbe)</span>
-  </div>
-
-  <div class="checkboxLine">
-    <input
-      type="checkbox"
-      .checked=${this._config.highlight_current_time_text ?? false}
-      @change=${(e: any) => this.emit({ ...this._config!, highlight_current_time_text: e.target.checked })}
-    />
-    <span>Aktuelle Stunde hervorheben (Textfarbe – Zeitspalte)</span>
-  </div>
-</div>
-
-
-
-
-        <div class="row">
-          <label>Highlight-Farbe (Heute)</label>
-          <div class="pickerRow">
-            <input type="color" .value=${todayState.hex} @input=${(e: any) => this.setHighlightRgba("highlight_today_color", e.target.value, todayState.alpha)} />
-            <div class="rangeWrap">
-              <input
-                type="range"
-                min="0"
-                max="100"
-                .value=${String(Math.round(todayState.alpha * 100))}
-                @input=${(e: any) => this.setHighlightRgba("highlight_today_color", todayState.hex, Number(e.target.value) / 100)}
-              />
-              <div class="styleHint">${Math.round(todayState.alpha * 100)}%</div>
-            </div>
-          </div>
-          <div class="hint">${this._config.highlight_today_color}</div>
-        </div>
-
-        <div class="row">
-          <label>Highlight-Farbe (Aktuelle Stunde)</label>
-          <div class="pickerRow">
-            <input type="color" .value=${currentState.hex} @input=${(e: any) => this.setHighlightRgba("highlight_current_color", e.target.value, currentState.alpha)} />
-            <div class="rangeWrap">
-              <input
-                type="range"
-                min="0"
-                max="100"
-                .value=${String(Math.round(currentState.alpha * 100))}
-                @input=${(e: any) => this.setHighlightRgba("highlight_current_color", currentState.hex, Number(e.target.value) / 100)}
-              />
-              <div class="styleHint">${Math.round(currentState.alpha * 100)}%</div>
-            </div>
-          </div>
-          <div class="hint">${this._config.highlight_current_color}</div>
-        </div>
-
-        <div class="row">
-          <label>Textfarbe (Aktuelles Fach)</label>
-          <div class="pickerRow">
-            <input type="color" .value=${(this._config.highlight_current_text_color ?? "#ff1744").toString()} @input=${(e: any) => this.setHighlightHexOnly("highlight_current_text_color", e.target.value)} />
-            <input type="text" .value=${this._config.highlight_current_text_color ?? "#ff1744"} @input=${(e: any) => this.emit({ ...this._config!, highlight_current_text_color: e.target.value })} />
-          </div>
-        </div>
-
-        <div class="row">
-          <label>Textfarbe (Aktuelle Stunde / Zeitspalte)</label>
-          <div class="pickerRow">
-            <input
-              type="color"
-              .value=${(this._config.highlight_current_time_text_color ?? "#ff9100").toString()}
-              @input=${(e: any) => this.setHighlightHexOnly("highlight_current_time_text_color", e.target.value)}
-            />
-            <input
-              type="text"
-              .value=${this._config.highlight_current_time_text_color ?? "#ff9100"}
-              @input=${(e: any) => this.emit({ ...this._config!, highlight_current_time_text_color: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <!-- Wechselwochen -->
-        <div class="row">
-          <label>Wechselwochen (A/B)</label>
-          <div class="hint">
-            Optional. Wenn aktiviert, kann die Card automatisch A/B-Woche bestimmen (KW-Parität) oder via Mapping-Entity überschreiben.
-          </div>
-
-          <div class="row">
-            <label>week_mode</label>
-            <select .value=${this._config.week_mode ?? "off"} @change=${(e: any) => this.emit({ ...this._config!, week_mode: e.target.value })}>
-              <option value="off">off (deaktiviert)</option>
-              <option value="kw_parity">kw_parity (gerade/ungerade KW)</option>
-              <option value="week_map">week_map (Mapping-Entity, Fallback Parität)</option>
-            </select>
-          </div>
-
-          <div class="checkboxLine">
-            <input type="checkbox" .checked=${this._config.week_a_is_even_kw ?? true} @change=${(e: any) => this.emit({ ...this._config!, week_a_is_even_kw: e.target.checked })} />
-            <span>A-Woche = gerade Kalenderwoche (ISO-KW)</span>
-          </div>
-          <div class="hint">Wenn deaktiviert: A-Woche = ungerade KW.</div>
-
-          <div class="timeGrid">
-            <div class="row">
-              <label>week_map_entity (optional)</label>
-              <input
-                type="text"
-                .value=${this._config.week_map_entity ?? ""}
-                placeholder="z.B. sensor.wechselwochen_map"
-                @input=${(e: any) => this.emit({ ...this._config!, week_map_entity: e.target.value })}
-              />
-            </div>
-
-            <div class="row">
-              <label>week_map_attribute</label>
-              <input
-                type="text"
-                .value=${this._config.week_map_attribute ?? ""}
-                placeholder="z.B. map (leer = state)"
-                @input=${(e: any) => this.emit({ ...this._config!, week_map_attribute: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div class="hint">
-            Mapping-Format (Beispiele):<br />
-            <code>{"2026":{"1":"A","2":"B"}}</code> oder <code>{"1":"A","2":"B"}</code>
-          </div>
-
-          <div class="timeGrid" style="margin-top:10px;">
-            <div class="row">
-              <label>source_entity_a</label>
-              <input
-                type="text"
-                .value=${this._config.source_entity_a ?? ""}
-                placeholder="z.B. sensor.stundenplan_a"
-                @input=${(e: any) => this.emit({ ...this._config!, source_entity_a: e.target.value })}
-              />
-            </div>
-
-            <div class="row">
-              <label>source_attribute_a</label>
-              <input
-                type="text"
-                .value=${this._config.source_attribute_a ?? ""}
-                placeholder="z.B. plan"
-                @input=${(e: any) => this.emit({ ...this._config!, source_attribute_a: e.target.value })}
-              />
-            </div>
-
-            <div class="row">
-              <label>source_entity_b</label>
-              <input
-                type="text"
-                .value=${this._config.source_entity_b ?? ""}
-                placeholder="z.B. sensor.stundenplan_b"
-                @input=${(e: any) => this.emit({ ...this._config!, source_entity_b: e.target.value })}
-              />
-            </div>
-
-            <div class="row">
-              <label>source_attribute_b</label>
-              <input
-                type="text"
-                .value=${this._config.source_attribute_b ?? ""}
-                placeholder="z.B. plan"
-                @input=${(e: any) => this.emit({ ...this._config!, source_attribute_b: e.target.value })}
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- Legacy Entity/Attribute inputs -->
-        <div class="row">
-          <label>Datenquelle (optional, Single)</label>
-          <div class="hint">
-            Wenn gesetzt, werden die Zeilen aus einer Entität gelesen (JSON im state oder Attribut). Leer lassen = manueller Stundenplan. Bei Wechselwochen werden bevorzugt
-            A/B-Quellen genutzt.
-          </div>
-
-          <div class="timeGrid">
-            <div class="row">
-              <label>source_entity</label>
-              <input
-                type="text"
-                .value=${this._config.source_entity ?? ""}
-                placeholder="z.B. sensor.stundenplan"
-                @input=${(e: any) => this.emit({ ...this._config!, source_entity: e.target.value })}
-              />
-            </div>
-
-            <div class="row">
-              <label>source_attribute</label>
-              <input
-                type="text"
-                .value=${this._config.source_attribute ?? ""}
-                placeholder="z.B. plan (leer = state)"
-                @input=${(e: any) => this.emit({ ...this._config!, source_attribute: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div class="row">
-            <label>source_time_key</label>
-            <input
-              type="text"
-              .value=${this._config.source_time_key ?? "Stunde"}
-              placeholder='Default: "Stunde"'
-              @input=${(e: any) => this.emit({ ...this._config!, source_time_key: e.target.value })}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div class="rowsHeader">
-        <h3>Stundenplan (Zeilen)</h3>
-        <div class="btnBar">
-          <button @click=${() => this.addLessonRow()}>+ Stunde</button>
-          <button @click=${() => this.addBreakRow()}>+ Pause</button>
-        </div>
-      </div>
-
-      ${this._config.rows.map(
-        (r, idx) => html`
-          <div class="rowCard">
-            <div class="rowTop">
-              <div>
-                <label>Zeit / Stunde</label>
-                <input type="text" .value=${(r as any).time ?? ""} placeholder="z. B. 1. 08:00–08:45" @input=${(e: any) => this.updateRowTime(idx, e.target.value)} />
-              </div>
-
-              <div class="checkboxLine" style="margin-top: 20px;">
-                <input type="checkbox" .checked=${isBreakRow(r)} @change=${(e: any) => this.toggleBreak(idx, e.target.checked)} />
-                <span>Pause</span>
-              </div>
-
-              <div class="rowActions">
-                <button class="mini" title="Stunde darunter einfügen" @click=${() => this.addLessonRow(idx)}>+ Stunde</button>
-                <button class="mini" title="Pause darunter einfügen" @click=${() => this.addBreakRow(idx)}>+ Pause</button>
-                <button class="danger" @click=${() => this.removeRow(idx)}>Löschen</button>
-              </div>
-            </div>
-
-            ${isBreakRow(r)
-              ? html`
-                  <div class="row">
-                    <label>Pausentext</label>
-                    <input type="text" .value=${(r as BreakRow).label ?? "Pause"} placeholder="z. B. Pause" @input=${(e: any) => this.updateBreakLabel(idx, e.target.value)} />
-                  </div>
-                `
-              : html`
-                  <div class="timeGrid">
-                    <div class="row">
-                      <label>Start (HH:MM)</label>
-                      <input type="text" .value=${(r as LessonRow).start ?? ""} placeholder="z.B. 07:45" @input=${(e: any) => this.updateRowStart(idx, e.target.value)} />
-                    </div>
-                    <div class="row">
-                      <label>Ende (HH:MM)</label>
-                      <input type="text" .value=${(r as LessonRow).end ?? ""} placeholder="z.B. 08:30" @input=${(e: any) => this.updateRowEnd(idx, e.target.value)} />
-                    </div>
-                  </div>
-
-                  <div class="cellsGrid">
-                    ${(this._config!.days ?? []).map((d, i) => {
-                      const row = r as LessonRow;
-                      const val = (row.cells?.[i] ?? "").toString();
-                      const st = ((row as any).cell_styles?.[i] ?? null) as CellStyle | null;
-
-                      const bgHex = st?.bg && st.bg.startsWith("#") ? st.bg : "#3b82f6";
-                      const alpha = typeof st?.bg_alpha === "number" ? clamp01(st.bg_alpha) : 0.18;
-                      const alphaPct = Math.round(alpha * 100);
-                      const textHex = st?.color && st.color.startsWith("#") ? st.color : "#ffffff";
-
-                      const inputId = `sp-cell-${idx}-${i}`;
-
-                      return html`
-                        <div class="cellBox">
-                          <div class="cellLabel">${d}</div>
-
-                          <input
-                            id=${inputId}
-                            type="text"
-                            class="cellInput"
-                            .value=${val}
-                            placeholder="Fach"
-                            @input=${(e: any) => this.updateRowCell(idx, i, e.target.value)}
-                          />
-
-                          <div class="styleGrid">
-                            <div class="styleLine">
-                              <div class="styleLabel">Hintergrund</div>
-                              <input type="color" .value=${bgHex} @input=${(e: any) => this.updateCellStyle(idx, i, { bg: e.target.value })} />
-                            </div>
-
-                            <div class="styleLine">
-                              <div class="styleLabel">Transparenz</div>
-                              <div class="rangeWrap">
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="100"
-                                  .value=${String(alphaPct)}
-                                  @input=${(e: any) => this.updateCellStyle(idx, i, { bg_alpha: Number(e.target.value) / 100 })}
-                                />
-                                <div class="styleHint">${alphaPct}%</div>
-                              </div>
-                            </div>
-
-                            <div class="styleLine">
-                              <div class="styleLabel">Text</div>
-                              <input type="color" .value=${textHex} @input=${(e: any) => this.updateCellStyle(idx, i, { color: e.target.value })} />
-                            </div>
-                          </div>
-
-                          <div class="preview" style=${styleToString(st, "1px solid var(--divider-color)")} aria-label="Vorschau" title="Vorschau">
-                            ${val}
-                          </div>
-                        </div>
-                      `;
-                    })}
-                  </div>
-                `}
-          </div>
-        `
-      )}
+      ${this.panel("Zeilen & Fächer", this._ui.openRows, (v) => (this._ui.openRows = v), this.renderRows())}
     `;
   }
 
@@ -1621,29 +1538,39 @@ export class StundenplanCardEditor extends LitElement {
     :host {
       display: block;
       box-sizing: border-box;
+      padding: 0;
     }
 
-    .editorPreview {
+    /* ---------- Preview ---------- */
+    .previewWrap {
       border: 1px solid var(--divider-color);
       border-radius: 14px;
       padding: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
       background: var(--card-background-color);
     }
-
-    .editorPreviewTitle {
-      font-size: 14px;
-      font-weight: 600;
-      opacity: 0.9;
+    .previewTop {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
       margin-bottom: 10px;
     }
-
+    .previewTitle {
+      font-size: 14px;
+      font-weight: 700;
+      opacity: 0.9;
+    }
+    .previewHint {
+      margin-top: 2px;
+      font-size: 12px;
+      opacity: 0.7;
+    }
     .previewTable {
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
     }
-
     .previewTable th,
     .previewTable td {
       border: 1px solid var(--divider-color);
@@ -1654,162 +1581,315 @@ export class StundenplanCardEditor extends LitElement {
       white-space: nowrap;
       font-size: 12px;
     }
-
     .previewTable th {
       background: var(--secondary-background-color);
       font-weight: 700;
     }
-
     .p-time {
       font-weight: 700;
       white-space: nowrap;
       width: 110px;
     }
-
     .p-break {
       font-style: italic;
       opacity: 0.8;
     }
-
     .p-cell {
       cursor: pointer;
       user-select: none;
     }
-
     .p-cell:hover {
       filter: brightness(1.06);
     }
 
-    .editorPreviewHint {
-      margin-top: 8px;
-      font-size: 12px;
-      opacity: 0.7;
-    }
-
-    .section {
-      margin-bottom: 18px;
-    }
-    .row {
+    /* ---------- Panels (Accordion) ---------- */
+    .panel {
+      border: 1px solid var(--divider-color);
+      border-radius: 14px;
+      background: var(--card-background-color);
       margin-bottom: 12px;
+      overflow: hidden;
     }
-    label {
-      display: block;
-      margin-bottom: 6px;
-      opacity: 0.85;
-      font-size: 13px;
-    }
-    input[type="text"] {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid var(--divider-color);
-      background: var(--card-background-color);
-      color: var(--primary-text-color);
-    }
-    .hint {
-      opacity: 0.7;
-      font-size: 12px;
-      margin-top: 4px;
-      word-break: break-word;
-    }
-    .checkboxLine {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      user-select: none;
-      margin-top: 6px;
-    }
-
-    .pickerRow {
-      display: grid;
-      grid-template-columns: 70px 1fr;
-      gap: 10px;
-      align-items: center;
-    }
-
-    select {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid var(--divider-color);
-      background: var(--card-background-color);
-      color: var(--primary-text-color);
-    }
-
-    .rowsHeader {
+    .panel summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 12px;
+      background: var(--secondary-background-color);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      margin: 18px 0 10px;
+      gap: 10px;
+      user-select: none;
     }
-    .rowsHeader h3 {
-      margin: 0;
+    .panel summary::-webkit-details-marker {
+      display: none;
+    }
+    .panelTitle {
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 700;
       opacity: 0.9;
     }
+    .panelBody {
+      padding: 12px;
+    }
 
+    /* ---------- Layout helpers ---------- */
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 800px) {
+      .grid2 {
+        grid-template-columns: 1fr;
+      }
+    }
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+    .lbl {
+      font-size: 13px;
+      opacity: 0.85;
+    }
+    .sub {
+      font-size: 12px;
+      opacity: 0.7;
+      line-height: 1.35;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      opacity: 0.85;
+      word-break: break-word;
+    }
+    .divider {
+      height: 1px;
+      background: var(--divider-color);
+      opacity: 0.55;
+      margin: 2px 0;
+    }
+
+    /* ---------- Inputs / Buttons ---------- */
+    .in {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--divider-color);
+      background: var(--card-background-color);
+      color: var(--primary-text-color);
+      outline: none;
+    }
+    .in:focus {
+      box-shadow: 0 0 0 2px rgba(100, 160, 255, 0.25);
+    }
+    .inRow {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
     .btnBar {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
     }
-    button {
+    .btn {
       border: 1px solid var(--divider-color);
       background: var(--secondary-background-color);
       color: var(--primary-text-color);
       border-radius: 10px;
       padding: 8px 10px;
       cursor: pointer;
-    }
-    button:hover {
-      filter: brightness(1.05);
-    }
-    button.danger {
-      background: rgba(255, 0, 0, 0.08);
-    }
-
-    .rowCard {
-      border: 1px solid var(--divider-color);
-      border-radius: 14px;
-      padding: 12px;
-      margin-bottom: 12px;
-      background: var(--card-background-color);
-    }
-
-    .rowTop {
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: 10px;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .rowActions {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      justify-content: flex-end;
-      margin-top: 20px;
-      flex-wrap: wrap;
-    }
-
-    button.mini {
-      padding: 7px 9px;
-      border-radius: 10px;
-      font-size: 12px;
-      line-height: 1;
       white-space: nowrap;
     }
+    .btn:hover {
+      filter: brightness(1.05);
+    }
+    .btn.danger {
+      background: rgba(255, 0, 0, 0.08);
+    }
+    select.in {
+      padding: 10px;
+    }
 
-    .timeGrid {
+    /* ---------- Switch (robust) ---------- */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 26px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(120, 120, 120, 0.35);
+      transition: 0.2s;
+      border-radius: 999px;
+      border: 1px solid var(--divider-color);
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--card-background-color);
+      transition: 0.2s;
+      border-radius: 999px;
+      border: 1px solid var(--divider-color);
+    }
+    .switch input:checked + .slider {
+      background: rgba(90, 160, 255, 0.45);
+    }
+    .switch input:checked + .slider:before {
+      transform: translate(18px, -50%);
+    }
+
+    /* ---------- Highlight option rows ---------- */
+    .optRow {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid var(--divider-color);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .optTitle {
+      font-size: 13px;
+      font-weight: 700;
+      opacity: 0.9;
+      margin-bottom: 2px;
+    }
+
+    /* ---------- Colors ---------- */
+    .colorRow {
+      border: 1px solid var(--divider-color);
+      border-radius: 12px;
+      padding: 10px;
+      display: grid;
       gap: 10px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .colorControls {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+    .col {
+      width: 44px;
+      height: 34px;
+      padding: 0;
+      border: 1px solid var(--divider-color);
+      border-radius: 10px;
+      background: var(--card-background-color);
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+    .range {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .pct {
+      min-width: 44px;
+      text-align: right;
+      font-size: 12px;
+      opacity: 0.75;
+    }
+
+    /* ---------- Data sources minor panels ---------- */
+    .panelMinor {
+      border: 1px solid var(--divider-color);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.02);
+      display: grid;
+      gap: 10px;
+    }
+    .minorTitle {
+      font-size: 13px;
+      font-weight: 700;
+      opacity: 0.9;
+    }
+
+    /* ---------- Rows ---------- */
+    .rowsTop {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
       margin-bottom: 8px;
+    }
+    .rowsTitle {
+      font-size: 14px;
+      font-weight: 700;
+      opacity: 0.9;
+    }
+
+    .rowPanel {
+      border: 1px solid var(--divider-color);
+      border-radius: 14px;
+      background: var(--card-background-color);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .rowPanel summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px;
+      background: var(--secondary-background-color);
+      user-select: none;
+    }
+    .rowPanel summary::-webkit-details-marker {
+      display: none;
+    }
+    .rowHead {
+      display: grid;
+      gap: 4px;
+    }
+    .rowHeadTitle {
+      font-size: 13px;
+      font-weight: 700;
+      opacity: 0.95;
+    }
+    .rowHeadMeta {
+      font-size: 12px;
+      opacity: 0.7;
+    }
+    .rowBody {
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+    }
+    .rowActions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 2px;
     }
 
     .cellsGrid {
@@ -1817,92 +1897,65 @@ export class StundenplanCardEditor extends LitElement {
       gap: 10px;
       grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     }
-
-    .cellBox {
+    .cell {
       border: 1px solid var(--divider-color);
       border-radius: 12px;
       padding: 10px;
-      background: var(--card-background-color);
-    }
-
-    .cellLabel {
-      opacity: 0.7;
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-
-    .cellInput {
-      margin-bottom: 8px;
-    }
-
-    .styleGrid {
+      background: rgba(255, 255, 255, 0.02);
       display: grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
-      margin-top: 8px;
-      margin-bottom: 8px;
+      gap: 8px;
     }
-
+    .cellTop {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+    }
+    .cellDay {
+      font-size: 12px;
+      opacity: 0.75;
+      font-weight: 700;
+    }
+    .cellMiniPreview {
+      border-radius: 10px;
+      padding: 6px 8px;
+      font-size: 12px;
+      opacity: 0.9;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cellStyles {
+      display: grid;
+      gap: 10px;
+      margin-top: 2px;
+    }
     .styleLine {
       display: grid;
       grid-template-columns: 110px 1fr;
       gap: 10px;
       align-items: center;
     }
-
-    .styleLabel {
+    .styleLbl {
+      font-size: 12px;
       opacity: 0.75;
-      font-size: 12px;
     }
-
-    .rangeWrap {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .styleHint {
-      opacity: 0.7;
-      font-size: 12px;
-      min-width: 44px;
-      text-align: right;
-    }
-
     input[type="range"] {
       width: 100%;
-    }
-
-    input[type="color"] {
-      width: 100%;
-      height: 34px;
-      padding: 0;
-      border: 1px solid var(--divider-color);
-      border-radius: 8px;
-      background: var(--card-background-color);
-      box-sizing: border-box;
-      cursor: pointer;
-    }
-
-    .preview {
-      border-radius: 10px;
-      padding: 8px;
-      text-align: center;
-      opacity: 0.85;
-      background: rgba(255, 255, 255, 0.04);
     }
   `;
 }
 
-/* Register */
+/* ===================== Register ===================== */
+
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", StundenplanCard);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", StundenplanCardEditor);
 
-/* Picker-Metadaten */
 (window as any).customCards = (window as any).customCards || [];
 (window as any).customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan mit visuellem Editor",
+  description: "Stundenplan mit visuellem Editor (strukturierter PR-Stand)",
   preview: true,
 });
