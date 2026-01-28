@@ -22,7 +22,7 @@ let Et = class {
     return this.cssText;
   }
 };
-const zt = (n) => new Et(typeof n == "string" ? n : n + "", void 0, ct), Rt = (n, ...t) => {
+const zt = (n) => new Et(typeof n == "string" ? n : n + "", void 0, ct), Tt = (n, ...t) => {
   const e = n.length === 1 ? n[0] : t.reduce((i, s, r) => i + ((o) => {
     if (o._$cssResult$ === !0) return o.cssText;
     if (typeof o == "number") return o;
@@ -73,7 +73,7 @@ const { is: Ut, defineProperty: Dt, getOwnPropertyDescriptor: Wt, getOwnProperty
       }
   }
   return e;
-} }, Tt = (n, t) => !Ut(n, t), _t = { attribute: !0, type: String, converter: nt, reflect: !1, useDefault: !1, hasChanged: Tt };
+} }, Rt = (n, t) => !Ut(n, t), _t = { attribute: !0, type: String, converter: nt, reflect: !1, useDefault: !1, hasChanged: Rt };
 Symbol.metadata ?? (Symbol.metadata = Symbol("metadata")), C.litPropertyMetadata ?? (C.litPropertyMetadata = /* @__PURE__ */ new WeakMap());
 let P = class extends HTMLElement {
   static addInitializer(t) {
@@ -202,7 +202,7 @@ let P = class extends HTMLElement {
     var o;
     if (t !== void 0) {
       const a = this.constructor;
-      if (s === !1 && (r = this[t]), i ?? (i = a.getPropertyOptions(t)), !((i.hasChanged ?? Tt)(r, e) || i.useDefault && i.reflect && r === ((o = this._$Ej) == null ? void 0 : o.get(t)) && !this.hasAttribute(a._$Eu(t, i)))) return;
+      if (s === !1 && (r = this[t]), i ?? (i = a.getPropertyOptions(t)), !((i.hasChanged ?? Rt)(r, e) || i.useDefault && i.reflect && r === ((o = this._$Ej) == null ? void 0 : o.get(t)) && !this.hasAttribute(a._$Eu(t, i)))) return;
       this.C(t, e, i);
     }
     this.isUpdatePending === !1 && (this._$ES = this._$EP());
@@ -285,8 +285,8 @@ P.elementStyles = [], P.shadowRootOptions = { mode: "open" }, P[D("elementProper
  * SPDX-License-Identifier: BSD-3-Clause
  */
 const W = globalThis, mt = (n) => n, G = W.trustedTypes, ft = G ? G.createPolicy("lit-html", { createHTML: (n) => n }) : void 0, Mt = "$lit$", A = `lit$${Math.random().toFixed(9).slice(2)}$`, Pt = "?" + A, Vt = `<${Pt}>`, M = document, F = () => M.createComment(""), L = (n) => n === null || typeof n != "object" && typeof n != "function", ht = Array.isArray, Kt = (n) => ht(n) || typeof (n == null ? void 0 : n[Symbol.iterator]) == "function", it = `[ 	
-\f\r]`, U = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, bt = /-->/g, vt = />/g, E = RegExp(`>|${it}(?:([^\\s"'>=/]+)(${it}*=${it}*(?:[^ 	
-\f\r"'\`<>=]|("|')|))|$)`, "g"), yt = /'/g, wt = /"/g, Ht = /^(?:script|style|textarea|title)$/i, qt = (n) => (t, ...e) => ({ _$litType$: n, strings: t, values: e }), p = qt(1), O = Symbol.for("lit-noChange"), _ = Symbol.for("lit-nothing"), $t = /* @__PURE__ */ new WeakMap(), R = M.createTreeWalker(M, 129);
+\f\r]`, U = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, vt = /-->/g, bt = />/g, E = RegExp(`>|${it}(?:([^\\s"'>=/]+)(${it}*=${it}*(?:[^ 	
+\f\r"'\`<>=]|("|')|))|$)`, "g"), yt = /'/g, wt = /"/g, Ht = /^(?:script|style|textarea|title)$/i, qt = (n) => (t, ...e) => ({ _$litType$: n, strings: t, values: e }), p = qt(1), O = Symbol.for("lit-noChange"), _ = Symbol.for("lit-nothing"), $t = /* @__PURE__ */ new WeakMap(), T = M.createTreeWalker(M, 129);
 function Nt(n, t) {
   if (!ht(n) || !n.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return ft !== void 0 ? ft.createHTML(t) : t;
@@ -297,7 +297,7 @@ const Jt = (n, t) => {
   for (let a = 0; a < e; a++) {
     const l = n[a];
     let c, d, h = -1, u = 0;
-    for (; u < l.length && (o.lastIndex = u, d = o.exec(l), d !== null); ) u = o.lastIndex, o === U ? d[1] === "!--" ? o = bt : d[1] !== void 0 ? o = vt : d[2] !== void 0 ? (Ht.test(d[2]) && (s = RegExp("</" + d[2], "g")), o = E) : d[3] !== void 0 && (o = E) : o === E ? d[0] === ">" ? (o = s ?? U, h = -1) : d[1] === void 0 ? h = -2 : (h = o.lastIndex - d[2].length, c = d[1], o = d[3] === void 0 ? E : d[3] === '"' ? wt : yt) : o === wt || o === yt ? o = E : o === bt || o === vt ? o = U : (o = E, s = void 0);
+    for (; u < l.length && (o.lastIndex = u, d = o.exec(l), d !== null); ) u = o.lastIndex, o === U ? d[1] === "!--" ? o = vt : d[1] !== void 0 ? o = bt : d[2] !== void 0 ? (Ht.test(d[2]) && (s = RegExp("</" + d[2], "g")), o = E) : d[3] !== void 0 && (o = E) : o === E ? d[0] === ">" ? (o = s ?? U, h = -1) : d[1] === void 0 ? h = -2 : (h = o.lastIndex - d[2].length, c = d[1], o = d[3] === void 0 ? E : d[3] === '"' ? wt : yt) : o === wt || o === yt ? o = E : o === vt || o === bt ? o = U : (o = E, s = void 0);
     const g = o === E && n[a + 1].startsWith("/>") ? " " : "";
     r += o === U ? l + Vt : h >= 0 ? (i.push(c), l.slice(0, h) + Mt + l.slice(h) + A + g) : l + A + (h === -2 ? a : g);
   }
@@ -309,11 +309,11 @@ class I {
     this.parts = [];
     let r = 0, o = 0;
     const a = t.length - 1, l = this.parts, [c, d] = Jt(t, e);
-    if (this.el = I.createElement(c, i), R.currentNode = this.el.content, e === 2 || e === 3) {
+    if (this.el = I.createElement(c, i), T.currentNode = this.el.content, e === 2 || e === 3) {
       const h = this.el.content.firstChild;
       h.replaceWith(...h.childNodes);
     }
-    for (; (s = R.nextNode()) !== null && l.length < a; ) {
+    for (; (s = T.nextNode()) !== null && l.length < a; ) {
       if (s.nodeType === 1) {
         if (s.hasAttributes()) for (const h of s.getAttributeNames()) if (h.endsWith(Mt)) {
           const u = d[o++], g = s.getAttribute(h).split(A), f = /([.?@])?(.*)/.exec(u);
@@ -323,7 +323,7 @@ class I {
           const h = s.textContent.split(A), u = h.length - 1;
           if (u > 0) {
             s.textContent = G ? G.emptyScript : "";
-            for (let g = 0; g < u; g++) s.append(h[g], F()), R.nextNode(), l.push({ type: 2, index: ++r });
+            for (let g = 0; g < u; g++) s.append(h[g], F()), T.nextNode(), l.push({ type: 2, index: ++r });
             s.append(h[u], F());
           }
         }
@@ -359,16 +359,16 @@ class Gt {
   }
   u(t) {
     const { el: { content: e }, parts: i } = this._$AD, s = ((t == null ? void 0 : t.creationScope) ?? M).importNode(e, !0);
-    R.currentNode = s;
-    let r = R.nextNode(), o = 0, a = 0, l = i[0];
+    T.currentNode = s;
+    let r = T.nextNode(), o = 0, a = 0, l = i[0];
     for (; l !== void 0; ) {
       if (o === l.index) {
         let c;
         l.type === 2 ? c = new Z(r, r.nextSibling, this, t) : l.type === 1 ? c = new l.ctor(r, l.name, l.strings, this, t) : l.type === 6 && (c = new Xt(r, this, t)), this._$AV.push(c), l = i[++a];
       }
-      o !== (l == null ? void 0 : l.index) && (r = R.nextNode(), o++);
+      o !== (l == null ? void 0 : l.index) && (r = T.nextNode(), o++);
     }
-    return R.currentNode = M, s;
+    return T.currentNode = M, s;
   }
   p(t) {
     let e = 0;
@@ -520,7 +520,7 @@ const te = (n, t, e) => {
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const T = globalThis;
+const R = globalThis;
 class H extends P {
   constructor() {
     super(...arguments), this.renderOptions = { host: this }, this._$Do = void 0;
@@ -547,14 +547,14 @@ class H extends P {
   }
 }
 var Ct;
-H._$litElement$ = !0, H.finalized = !0, (Ct = T.litElementHydrateSupport) == null || Ct.call(T, { LitElement: H });
-const rt = T.litElementPolyfillSupport;
+H._$litElement$ = !0, H.finalized = !0, (Ct = R.litElementHydrateSupport) == null || Ct.call(R, { LitElement: H });
+const rt = R.litElementPolyfillSupport;
 rt == null || rt({ LitElement: H });
-(T.litElementVersions ?? (T.litElementVersions = [])).push("4.2.2");
+(R.litElementVersions ?? (R.litElementVersions = [])).push("4.2.2");
 function w(n) {
   return !!n && n.break === !0;
 }
-function b(n) {
+function v(n) {
   return Math.min(1, Math.max(0, n));
 }
 function j(n) {
@@ -567,7 +567,7 @@ function j(n) {
 function J(n) {
   if (!n || typeof n != "object") return null;
   const t = {};
-  return typeof n.bg == "string" && n.bg.trim() && (t.bg = n.bg.trim()), typeof n.color == "string" && n.color.trim() && (t.color = n.color.trim()), typeof n.border == "string" && n.border.trim() && (t.border = n.border.trim()), typeof n.bg_alpha == "number" && !Number.isNaN(n.bg_alpha) && (t.bg_alpha = b(n.bg_alpha)), Object.keys(t).length ? t : null;
+  return typeof n.bg == "string" && n.bg.trim() && (t.bg = n.bg.trim()), typeof n.color == "string" && n.color.trim() && (t.color = n.color.trim()), typeof n.border == "string" && n.border.trim() && (t.border = n.border.trim()), typeof n.bg_alpha == "number" && !Number.isNaN(n.bg_alpha) && (t.bg_alpha = v(n.bg_alpha)), Object.keys(t).length ? t : null;
 }
 function ee(n) {
   if (!(n != null && n.bg)) return null;
@@ -575,7 +575,7 @@ function ee(n) {
   if (t.startsWith("rgba(") || t.startsWith("rgb(") || t.startsWith("var(")) return t;
   const e = j(t);
   if (!e) return t;
-  const i = typeof n.bg_alpha == "number" ? b(n.bg_alpha) : 0.18;
+  const i = typeof n.bg_alpha == "number" ? v(n.bg_alpha) : 0.18;
   return `rgba(${e.r}, ${e.g}, ${e.b}, ${i})`;
 }
 function ot(n, t) {
@@ -588,7 +588,7 @@ function xt(n, t) {
   if (e.startsWith("rgba(") || e.startsWith("rgb(") || e.startsWith("var(")) return e;
   if (e.startsWith("#")) {
     const i = j(e);
-    return i ? `rgba(${i.r}, ${i.g}, ${i.b}, ${b(t)})` : e;
+    return i ? `rgba(${i.r}, ${i.g}, ${i.b}, ${v(t)})` : e;
   }
   return e;
 }
@@ -725,10 +725,10 @@ const Q = class Q extends H {
     const e = Array.isArray(t.days) && t.days.length ? t.days.map((a) => (a ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], s = (Array.isArray(t.rows) ? t.rows : []).map((a) => {
       if (w(a))
         return { break: !0, time: (a.time ?? "").toString(), label: (a.label ?? "Pause").toString() };
-      const l = Array.isArray(a == null ? void 0 : a.cells) ? a.cells : [], c = Array.from({ length: e.length }, (S, y) => (l[y] ?? "").toString()), d = Array.isArray(a == null ? void 0 : a.cell_styles) ? a.cell_styles : [], h = Array.from({ length: e.length }, (S, y) => J(d[y])), u = ((a == null ? void 0 : a.time) ?? "").toString(), g = N(u), f = ((a == null ? void 0 : a.start) ?? "").toString().trim(), v = ((a == null ? void 0 : a.end) ?? "").toString().trim(), x = {
+      const l = Array.isArray(a == null ? void 0 : a.cells) ? a.cells : [], c = Array.from({ length: e.length }, (S, y) => (l[y] ?? "").toString()), d = Array.isArray(a == null ? void 0 : a.cell_styles) ? a.cell_styles : [], h = Array.from({ length: e.length }, (S, y) => J(d[y])), u = ((a == null ? void 0 : a.time) ?? "").toString(), g = N(u), f = ((a == null ? void 0 : a.start) ?? "").toString().trim(), b = ((a == null ? void 0 : a.end) ?? "").toString().trim(), x = {
         time: u,
         start: f || g.start || void 0,
-        end: v || g.end || void 0,
+        end: b || g.end || void 0,
         cells: c
       };
       return h.some((S) => !!S) && (x.cell_styles = h), x;
@@ -888,9 +888,9 @@ const Q = class Q extends H {
                     </tr>
                   `;
       }
-      const u = h, g = u.cells ?? [], f = u.cell_styles ?? [], v = !!u.start && !!u.end && this.isNowBetween(u.start, u.end), x = re(u, (t.days ?? []).length), y = !(!!t.free_only_column_highlight && x);
+      const u = h, g = u.cells ?? [], f = u.cell_styles ?? [], b = !!u.start && !!u.end && this.isNowBetween(u.start, u.end), x = re(u, (t.days ?? []).length), y = !(!!t.free_only_column_highlight && x);
       let $ = `--sp-hl:${o};`;
-      return y && t.highlight_current && v && ($ += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), y && v && t.highlight_current_time_text && l && ($ += `color:${l};`), p`
+      return y && t.highlight_current && b && ($ += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), y && b && t.highlight_current_time_text && l && ($ += `color:${l};`), p`
                   <tr>
                     <td class="time" style=${$}>${u.time}</td>
 
@@ -898,7 +898,7 @@ const Q = class Q extends H {
         const V = g[m] ?? "", B = f[m] ?? null, K = t.highlight_today && m === i ? "today" : "";
         let dt = `--sp-hl:${r};` + ot(B, s);
         const Ot = (V ?? "").toString().trim().length > 0;
-        return y && Ot && v && t.highlight_current_text && a && i >= 0 && m === i && (dt += `color:${a};`), p`<td class=${K} style=${dt}>${V}</td>`;
+        return y && Ot && b && t.highlight_current_text && a && i >= 0 && m === i && (dt += `color:${a};`), p`<td class=${K} style=${dt}>${V}</td>`;
       })}
                   </tr>
                 `;
@@ -910,7 +910,7 @@ const Q = class Q extends H {
     `;
   }
 };
-Q.styles = Rt`
+Q.styles = Tt`
     :host {
       display: block;
       width: 100%;
@@ -1010,23 +1010,23 @@ const X = class X extends H {
   /* ---------- Color helpers (Highlight colors) ---------- */
   rgbaFromHex(t, e) {
     const i = j(t);
-    return i ? `rgba(${i.r}, ${i.g}, ${i.b}, ${b(e)})` : `rgba(0,0,0,${b(e)})`;
+    return i ? `rgba(${i.r}, ${i.g}, ${i.b}, ${v(e)})` : `rgba(0,0,0,${v(e)})`;
   }
   parseColorToHexAlpha(t, e, i) {
     const s = (t ?? "").toString().trim();
     if (s.startsWith("#"))
-      return j(s) ? { hex: s, alpha: b(i) } : { hex: e, alpha: b(i) };
+      return j(s) ? { hex: s, alpha: v(i) } : { hex: e, alpha: v(i) };
     const r = s.match(/rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)/i);
     if (r) {
-      const a = Math.max(0, Math.min(255, Number(r[1]))), l = Math.max(0, Math.min(255, Number(r[2]))), c = Math.max(0, Math.min(255, Number(r[3]))), d = b(Number(r[4])), h = (u) => u.toString(16).padStart(2, "0");
+      const a = Math.max(0, Math.min(255, Number(r[1]))), l = Math.max(0, Math.min(255, Number(r[2]))), c = Math.max(0, Math.min(255, Number(r[3]))), d = v(Number(r[4])), h = (u) => u.toString(16).padStart(2, "0");
       return { hex: `#${h(a)}${h(l)}${h(c)}`, alpha: d };
     }
     const o = s.match(/rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
     if (o) {
       const a = Math.max(0, Math.min(255, Number(o[1]))), l = Math.max(0, Math.min(255, Number(o[2]))), c = Math.max(0, Math.min(255, Number(o[3]))), d = (h) => h.toString(16).padStart(2, "0");
-      return { hex: `#${d(a)}${d(l)}${d(c)}`, alpha: b(i) };
+      return { hex: `#${d(a)}${d(l)}${d(c)}`, alpha: v(i) };
     }
-    return { hex: e, alpha: b(i) };
+    return { hex: e, alpha: v(i) };
   }
   setHighlightRgba(t, e, i) {
     this._config && this.emit({ ...this._config, [t]: this.rgbaFromHex(e, i) });
@@ -1038,11 +1038,11 @@ const X = class X extends H {
   normalizeConfig(t) {
     const i = { ...Y.getStubConfig(), ...t }, s = Array.isArray(i.days) && i.days.length ? i.days.map((c) => (c ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], o = (Array.isArray(i.rows) ? i.rows : []).map((c) => {
       if (w(c)) return { break: !0, time: (c.time ?? "").toString(), label: (c.label ?? "Pause").toString() };
-      const d = Array.isArray(c == null ? void 0 : c.cells) ? c.cells : [], h = Array.from({ length: s.length }, (y, $) => (d[$] ?? "").toString()), u = Array.isArray(c == null ? void 0 : c.cell_styles) ? c.cell_styles : [], g = Array.from({ length: s.length }, (y, $) => J(u[$])), f = ((c == null ? void 0 : c.time) ?? "").toString(), v = N(f), x = ((c == null ? void 0 : c.start) ?? "").toString().trim(), S = ((c == null ? void 0 : c.end) ?? "").toString().trim();
+      const d = Array.isArray(c == null ? void 0 : c.cells) ? c.cells : [], h = Array.from({ length: s.length }, (y, $) => (d[$] ?? "").toString()), u = Array.isArray(c == null ? void 0 : c.cell_styles) ? c.cell_styles : [], g = Array.from({ length: s.length }, (y, $) => J(u[$])), f = ((c == null ? void 0 : c.time) ?? "").toString(), b = N(f), x = ((c == null ? void 0 : c.start) ?? "").toString().trim(), S = ((c == null ? void 0 : c.end) ?? "").toString().trim();
       return {
         time: f,
-        start: x || v.start || void 0,
-        end: S || v.end || void 0,
+        start: x || b.start || void 0,
+        end: S || b.end || void 0,
         cells: h,
         cell_styles: g
       };
@@ -1136,7 +1136,7 @@ const X = class X extends H {
     const s = this._config.rows.map((r, o) => {
       if (o !== t || w(r)) return r;
       const a = r, l = Array.isArray(a.cell_styles) ? [...a.cell_styles] : Array.from({ length: this._config.days.length }, () => null), d = { ...l[e] ? { ...l[e] } : {}, ...i };
-      return typeof d.bg_alpha == "number" && (d.bg_alpha = b(d.bg_alpha)), l[e] = J(d), { ...a, cell_styles: l };
+      return typeof d.bg_alpha == "number" && (d.bg_alpha = v(d.bg_alpha)), l[e] = J(d), { ...a, cell_styles: l };
     });
     this.emit({ ...this._config, rows: s });
   }
@@ -1222,10 +1222,6 @@ const X = class X extends H {
             <div class="previewTitle">Vorschau</div>
             <div class="previewHint">Klick auf ein Fach springt zur passenden Zelle im Editor.</div>
           </div>
-
-          <button class="btn" @click=${() => this._ui.showCellStyles = !this._ui.showCellStyles}>
-            ${this._ui.showCellStyles ? "Cell-Styles ausblenden" : "Cell-Styles anzeigen"}
-          </button>
         </div>
 
         <table class="previewTable">
@@ -1340,7 +1336,7 @@ const X = class X extends H {
     `;
   }
   colorRow(t, e, i, s, r, o) {
-    const a = Math.round(b(i.alpha) * 100);
+    const a = Math.round(v(i.alpha) * 100);
     return p`
       <div class="colorRow">
         <div>
@@ -1503,13 +1499,20 @@ const X = class X extends H {
     if (!this._config) return p``;
     const t = this._config, e = t.days ?? [];
     return p`
-      <div class="rowsTop">
-        <div class="rowsTitle">Stundenplan (Zeilen)</div>
-        <div class="btnBar">
-          <button class="btn" @click=${() => this.addLessonRow()}>+ Stunde</button>
-          <button class="btn" @click=${() => this.addBreakRow()}>+ Pause</button>
-        </div>
-      </div>
+	<div class="rowsTop">
+  		<div class="rowsTitle">Stundenplan (Zeilen)</div>
+
+  		<div class="btnBar">
+    			<div class="toggleInline">
+      				<div class="toggleText">Cell-Styles</div>
+      				${this.uiSwitch(!!this._ui.showCellStyles, (i) => this._ui.showCellStyles = i)}
+    		</div>
+
+		<button class="btn" @click=${() => this.addLessonRow()}>+ Stunde</button>
+    		<button class="btn" @click=${() => this.addBreakRow()}>+ Pause</button>
+  	</div>
+</div>
+
 
       <div class="sub" style="margin-bottom:10px;">
         Pro Zeile: Zeit + optional Start/Ende. Per Klick in der Vorschau springst du zur passenden Zelle.
@@ -1569,7 +1572,7 @@ const X = class X extends H {
                     <div class="cellsGrid">
                       ${e.map((c, d) => {
         var $, k;
-        const h = ((($ = l.cells) == null ? void 0 : $[d]) ?? "").toString(), u = ((k = l.cell_styles) == null ? void 0 : k[d]) ?? null, g = u != null && u.bg && u.bg.startsWith("#") ? u.bg : "#3b82f6", f = typeof (u == null ? void 0 : u.bg_alpha) == "number" ? b(u.bg_alpha) : 0.18, v = Math.round(f * 100), x = u != null && u.color && u.color.startsWith("#") ? u.color : "#ffffff", S = `sp-cell-${s}-${d}`, y = ot(u, "1px solid var(--divider-color)");
+        const h = ((($ = l.cells) == null ? void 0 : $[d]) ?? "").toString(), u = ((k = l.cell_styles) == null ? void 0 : k[d]) ?? null, g = u != null && u.bg && u.bg.startsWith("#") ? u.bg : "#3b82f6", f = typeof (u == null ? void 0 : u.bg_alpha) == "number" ? v(u.bg_alpha) : 0.18, b = Math.round(f * 100), x = u != null && u.color && u.color.startsWith("#") ? u.color : "#ffffff", S = `sp-cell-${s}-${d}`, y = ot(u, "1px solid var(--divider-color)");
         return p`
                           <div class="cell">
                             <div class="cellTop">
@@ -1589,8 +1592,8 @@ const X = class X extends H {
                                     <div class="styleLine">
                                       <div class="styleLbl">Transparenz</div>
                                       <div class="range">
-                                        <input type="range" min="0" max="100" .value=${String(v)} @input=${(m) => this.updateCellStyle(s, d, { bg_alpha: Number(m.target.value) / 100 })} />
-                                        <div class="pct">${v}%</div>
+                                        <input type="range" min="0" max="100" .value=${String(b)} @input=${(m) => this.updateCellStyle(s, d, { bg_alpha: Number(m.target.value) / 100 })} />
+                                        <div class="pct">${b}%</div>
                                       </div>
                                     </div>
 
@@ -1636,7 +1639,7 @@ const X = class X extends H {
 X.properties = {
   hass: {},
   _config: { state: !0 }
-}, X.styles = Rt`
+}, X.styles = Tt`
     :host {
       display: block;
       box-sizing: border-box;
@@ -1803,6 +1806,22 @@ X.properties = {
       align-items: center;
       justify-content: flex-end;
     }
+   .toggleInline {
+     display: flex;
+     align-items: center;
+     gap: 10px;
+     padding: 6px 10px;
+     border: 1px solid var(--divider-color);
+     border-radius: 10px;
+     background: var(--secondary-background-color);
+   }
+   .toggleText {
+     font-size: 12px;
+     font-weight: 700;
+     opacity: 0.85;
+     white-space: nowrap;
+   }
+
     .btn {
       border: 1px solid var(--divider-color);
       background: var(--secondary-background-color);

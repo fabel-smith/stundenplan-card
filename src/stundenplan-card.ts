@@ -1137,10 +1137,6 @@ export class StundenplanCardEditor extends LitElement {
             <div class="previewTitle">Vorschau</div>
             <div class="previewHint">Klick auf ein Fach springt zur passenden Zelle im Editor.</div>
           </div>
-
-          <button class="btn" @click=${() => (this._ui.showCellStyles = !this._ui.showCellStyles)}>
-            ${this._ui.showCellStyles ? "Cell-Styles ausblenden" : "Cell-Styles anzeigen"}
-          </button>
         </div>
 
         <table class="previewTable">
@@ -1448,13 +1444,20 @@ export class StundenplanCardEditor extends LitElement {
     const days = c.days ?? [];
 
     return html`
-      <div class="rowsTop">
-        <div class="rowsTitle">Stundenplan (Zeilen)</div>
-        <div class="btnBar">
-          <button class="btn" @click=${() => this.addLessonRow()}>+ Stunde</button>
-          <button class="btn" @click=${() => this.addBreakRow()}>+ Pause</button>
-        </div>
-      </div>
+	<div class="rowsTop">
+  		<div class="rowsTitle">Stundenplan (Zeilen)</div>
+
+  		<div class="btnBar">
+    			<div class="toggleInline">
+      				<div class="toggleText">Cell-Styles</div>
+      				${this.uiSwitch(!!this._ui.showCellStyles, (v) => (this._ui.showCellStyles = v))}
+    		</div>
+
+		<button class="btn" @click=${() => this.addLessonRow()}>+ Stunde</button>
+    		<button class="btn" @click=${() => this.addBreakRow()}>+ Pause</button>
+  	</div>
+</div>
+
 
       <div class="sub" style="margin-bottom:10px;">
         Pro Zeile: Zeit + optional Start/Ende. Per Klick in der Vorschau springst du zur passenden Zelle.
@@ -1765,6 +1768,22 @@ export class StundenplanCardEditor extends LitElement {
       align-items: center;
       justify-content: flex-end;
     }
+   .toggleInline {
+     display: flex;
+     align-items: center;
+     gap: 10px;
+     padding: 6px 10px;
+     border: 1px solid var(--divider-color);
+     border-radius: 10px;
+     background: var(--secondary-background-color);
+   }
+   .toggleText {
+     font-size: 12px;
+     font-weight: 700;
+     opacity: 0.85;
+     white-space: nowrap;
+   }
+
     .btn {
       border: 1px solid var(--divider-color);
       background: var(--secondary-background-color);
