@@ -226,11 +226,25 @@ export class StundenplanCard extends LitElement {
   public hass: any;
   private config?: Required<StundenplanConfig>;
   private _tick?: number;
+  private _splanData: any = null;
+
 
   connectedCallback(): void {
     super.connectedCallback();
+
+    // Stundenplan laden (einmal)
+    loadSplanAsJson("/splan/sdaten/splank.xml", "5a")
+      .then((data) => {
+        console.log("SPLAN DATA", data);
+        this._splanData = data;
+        this.requestUpdate();
+      })
+      .catch((err) => console.error("SPLAN ERROR", err));
+
+    // dein bestehender Timer
     this._tick = window.setInterval(() => this.requestUpdate(), 30_000);
   }
+
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
@@ -1253,7 +1267,7 @@ export class StundenplanCardEditor extends LitElement {
         <div class="optRow">
           <div>
             <div class="optTitle">Freistunden: nur Tag hervorheben</div>
-            <div class="sub">Unterdrückt „Aktuell“-Highlights, wenn die heutige Zelle in der aktuellen Stunde leer ist.</div>
+            <div class="sub">Unterdrückt „Aktuell“-Highlights, wenn die heutige Zelle in der aktuellen Stunde leer ist, oder "-" bzw. "---" eingetragen wird.</div>
           </div>
           ${this.uiSwitch(!!c.free_only_column_highlight, (v) => this.emit({ ...c, free_only_column_highlight: v }))}
         </div>
@@ -2057,6 +2071,37 @@ export class StundenplanCardEditor extends LitElement {
     }
   `;
 }
+
+async function loadSplanAsJson(splanUrl: string, klasse: string) {
+  const xmlText = await (await fetch(splanUrl, { cache: "no-store" })).text();
+  const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+
+  const klEl = Array.from(doc.querySelectorAll("Klassen > Kl"))
+    .find(k => (k.querySelector("Kurz")?.textContent ?? "").trim() === klasse);
+
+  if (!klEl) throw new Error(`Klasse "${klasse}" nicht gefunden`);
+
+  // Zeiten
+  const times = Array.from(klEl.querySelectorAll("Stunden > St")).map(st => ({
+    hour: parseInt((st.textContent ?? "0").trim(), 10),
+    start: st.getAttribute("StZeit") ?? "",
+    end: st.getAttribute("StZeitBis") ?? ""
+  }));
+
+  // Stunden (Basis)
+  const lessons = Array.from(klEl.querySelectorAll("Pl > Std")).map(std => ({
+    sw: (std.querySelector("PlSw")?.textContent ?? "").trim(),  // 01 / 02 / 0102
+    day: parseInt((std.querySelector("PlTg")?.textContent ?? "0").trim(), 10),
+    hour: parseInt((std.querySelector("PlSt")?.textContent ?? "0").trim(), 10),
+    subject: (std.querySelector("PlFa")?.textContent ?? "").replace(/\u00a0/g, " ").trim(),
+    teacher: (std.querySelector("PlLe")?.textContent ?? "").replace(/\u00a0/g, " ").trim(),
+    room: (std.querySelector("PlRa")?.textContent ?? "").replace(/\u00a0/g, " ").trim(),
+    week: ((std.querySelector("PlWo")?.textContent ?? "").replace(/\u00a0/g, " ").trim().toUpperCase()) // A/B/leer
+  }));
+
+  return { times, lessons };
+}
+
 
 /* ===================== Register ===================== */
 
