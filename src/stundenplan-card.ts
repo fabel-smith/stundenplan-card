@@ -227,7 +227,6 @@ type SplanJson = {
 // Tage aus Stundenplan24 sind üblicherweise 1..5 (Mo..Fr). Wir mappen Card-Spalten (cfg.days) auf 1..7 anhand Label.
 function mapCfgDayToSplanDay(label: string): number | null {
   const n = normalizeDayLabel(label);
-  // deutsch/engl
   if (["mo", "montag", "mon", "monday"].includes(n)) return 1;
   if (["di", "dienstag", "tue", "tues", "tuesday"].includes(n)) return 2;
   if (["mi", "mittwoch", "wed", "wednesday"].includes(n)) return 3;
@@ -244,18 +243,17 @@ async function loadSplanAsJson(splanUrl: string, klasse: string): Promise<SplanJ
   const xmlText = await (await fetch(url, { cache: "no-store" })).text();
   const doc = new DOMParser().parseFromString(xmlText, "text/xml");
 
-const klEl = Array.from(doc.querySelectorAll("Kl")).find(
-  (k) => (k.querySelector("Kurz")?.textContent ?? "").trim().toLowerCase() === (klasse ?? "").trim().toLowerCase()
-);
-
+  const klEl = Array.from(doc.querySelectorAll("Klassen > Kl")).find(
+    (k) => (k.querySelector("Kurz")?.textContent ?? "").trim().toLowerCase() === (klasse ?? "").trim().toLowerCase()
+  );
   if (!klEl) throw new Error(`Klasse "${klasse}" nicht gefunden`);
 
-  // Zeiten
+  // Zeiten (manche Pläne haben Lücken -> wir speichern trotzdem alle Stunden-Nummern, Zeiten ggf. leer)
   const times = Array.from(klEl.querySelectorAll("Stunden > St"))
     .map((st) => ({
       hour: parseInt((st.textContent ?? "0").trim(), 10),
-      start: st.getAttribute("StZeit") ?? "",
-      end: st.getAttribute("StZeitBis") ?? "",
+      start: (st.getAttribute("StZeit") ?? "").trim(),
+      end: (st.getAttribute("StZeitBis") ?? "").trim(),
     }))
     .filter((t) => Number.isFinite(t.hour))
     .sort((a, b) => a.hour - b.hour);
@@ -296,10 +294,8 @@ export class StundenplanCard extends LitElement {
     // Timer: Highlights + optional periodic reload
     this._tick = window.setInterval(() => {
       this.requestUpdate();
-      // wenn XML aktiv: alle 10 Minuten neu laden (sanft)
       if (this.config?.splan_xml_enabled) {
         const now = Date.now();
-        // simple throttling über modulo (kein state nötig)
         if (now % (10 * 60 * 1000) < 30_000) this.reloadSplanIfNeeded(false);
       }
     }, 30_000);
@@ -311,12 +307,9 @@ export class StundenplanCard extends LitElement {
     this._tick = undefined;
   }
 
-  // Wenn Config geändert wird (URL/Klasse), neu laden
   protected updated(changed: Map<string, any>): void {
     super.updated(changed);
-    if (changed.has("config")) {
-      this.reloadSplanIfNeeded(true);
-    }
+    if (changed.has("config")) this.reloadSplanIfNeeded(true);
   }
 
   private async reloadSplanIfNeeded(force: boolean) {
@@ -343,11 +336,9 @@ export class StundenplanCard extends LitElement {
       const data = await loadSplanAsJson(url, klasse);
       this._splanData = data;
       this._splanErr = null;
-      // console.log("SPLAN DATA", data);
     } catch (e: any) {
       this._splanData = null;
       this._splanErr = e?.message ? String(e.message) : String(e);
-      // console.error("SPLAN ERROR", e);
     } finally {
       this._splanLoading = false;
       this.requestUpdate();
@@ -388,7 +379,6 @@ export class StundenplanCard extends LitElement {
       source_entity_b: "",
       source_attribute_b: "",
 
-      // ✅ XML defaults
       splan_xml_enabled: false,
       splan_xml_url: "/local/splan/sdaten/splank.xml",
       splan_class: "5a",
@@ -690,26 +680,31 @@ export class StundenplanCard extends LitElement {
     return cfg.rows ?? [];
   }
 
-private getFallbackTimesFromManual(cfg: Required<StundenplanConfig>, hour: number): { start?: string; end?: string } {
-  const rows = cfg.rows ?? [];
-  for (const r of rows) {
-    if (isBreakRow(r)) continue;
-    const lr = r as LessonRow;
+  /**
+   * ✅ Fix für “aktuelle Stunde wird nicht erkannt” wenn XML-Stundenzeiten fehlen:
+   * - wir nehmen Zeiten aus manuellen cfg.rows (wenn vorhanden)
+   * - damit funktionieren isNowBetween() + Highlight auch bei Lücken im XML
+   */
+  private getFallbackTimesFromManual(cfg: Required<StundenplanConfig>, hour: number): { start?: string; end?: string } {
+    const rows = cfg.rows ?? [];
+    for (const r of rows) {
+      if (isBreakRow(r)) continue;
+      const lr = r as LessonRow;
 
-    const m = (lr.time ?? "").match(/^\s*(\d+)\s*\./); // "2." am Anfang
-    if (!m) continue;
+      const m = (lr.time ?? "").match(/^\s*(\d+)\s*\./); // "2." am Anfang
+      if (!m) continue;
 
-    const h = parseInt(m[1], 10);
-    if (h !== hour) continue;
+      const h = parseInt(m[1], 10);
+      if (h !== hour) continue;
 
-    const parsed = parseStartEndFromTime(lr.time);
-    return {
-      start: (lr.start ?? "").trim() || parsed.start,
-      end: (lr.end ?? "").trim() || parsed.end,
-    };
+      const parsed = parseStartEndFromTime(lr.time);
+      const start = (lr.start ?? "").toString().trim() || parsed.start;
+      const end = (lr.end ?? "").toString().trim() || parsed.end;
+
+      return { start: start || undefined, end: end || undefined };
+    }
+    return {};
   }
-  return {};
-}
 
   private getRowsFromSplanXml(cfg: Required<StundenplanConfig>): Row[] | null {
     if (!cfg.splan_xml_enabled) return null;
@@ -737,25 +732,25 @@ private getFallbackTimesFromManual(cfg: Required<StundenplanConfig>, hour: numbe
       new Set((this._splanData.lessons ?? []).map((l) => l.hour).filter((h) => Number.isFinite(h)))
     ).sort((a, b) => a - b);
 
-    const hours = times.length ? times.map((t) => t.hour) : hoursFromLessons;
+    const hours = (times.length ? times.map((t) => t.hour) : hoursFromLessons).filter((h) => Number.isFinite(h));
     if (!hours.length) return null;
 
     const rows: Row[] = hours.map((h) => {
+      const t = times.find((x) => x.hour === h);
 
-const t = times.find((x) => x.hour === h);
-let start = t?.start ?? "";
-let end = t?.end ?? "";
+      // 1) aus XML
+      let start = (t?.start ?? "").trim();
+      let end = (t?.end ?? "").trim();
 
-// ✅ Fallback: wenn XML keine Zeiten liefert, aus manuellen rows übernehmen
-if (!start || !end) {
-  const fb = this.getFallbackTimesFromManual(cfg, h);
-  start = start || fb.start || "";
-  end = end || fb.end || "";
-}
+      // 2) wenn XML Lücke: aus manueller Fallback-Zeile ziehen
+      if (!start || !end) {
+        const fb = this.getFallbackTimesFromManual(cfg, h);
+        start = start || (fb.start ?? "");
+        end = end || (fb.end ?? "");
+      }
 
-const timeLabelBase = `${h}.`;
-const timeLabel = start && end ? `${timeLabelBase} ${start}–${end}` : `${timeLabelBase}`;
-
+      const timeLabelBase = `${h}.`;
+      const timeLabel = start && end ? `${timeLabelBase} ${start}–${end}` : `${timeLabelBase}`;
 
       const cells = days.map((_, colIdx) => {
         const splanDay = dayMap[colIdx];
@@ -774,7 +769,6 @@ const timeLabel = start && end ? `${timeLabelBase} ${start}–${end}` : `${timeL
 
         if (!hits.length) return "";
 
-        // mehrere Einträge in einer Zelle zusammenfassen
         const parts = hits.map((l) => {
           const base = (l.subject ?? "").trim();
           const room = (l.room ?? "").trim();
@@ -787,7 +781,6 @@ const timeLabel = start && end ? `${timeLabelBase} ${start}–${end}` : `${timeL
           return extras.length ? `${base} (${extras.join(" · ")})` : base;
         });
 
-        // Duplikate entfernen
         const uniq = Array.from(new Set(parts.filter((p) => p.trim().length > 0)));
         return uniq.join(" / ");
       });
@@ -801,15 +794,15 @@ const timeLabel = start && end ? `${timeLabelBase} ${start}–${end}` : `${timeL
       return lr;
     });
 
-// Leere Zeilen entfernen (wenn in keiner Spalte Text steht)
-const filtered = rows.filter((rr) => {
-  if (isBreakRow(rr)) return true;
-  const lr = rr as LessonRow;
-  return (lr.cells ?? []).some((v) => (v ?? "").toString().trim().length > 0);
-});
+    // ✅ Zeilen ohne Inhalt NICHT anzeigen (dein Punkt 4)
+    const filtered = rows.filter((r) => {
+      if (isBreakRow(r)) return true;
+      const lr = r as LessonRow;
+      const cells = lr.cells ?? [];
+      return cells.some((c) => !isFreeCellValue(c));
+    });
 
-return filtered.length ? filtered : null;
-
+    return filtered.length ? filtered : null;
   }
 
   protected render(): TemplateResult {
@@ -827,32 +820,15 @@ return filtered.length ? filtered : null;
     const currentTextColor = (cfg.highlight_current_text_color ?? "").toString().trim();
     const currentTimeTextColor = (cfg.highlight_current_time_text_color ?? "").toString().trim();
 
-// Woche für Anzeige/Filter: wenn XML aktiv → splan_week hat Vorrang, sonst week_mode/parity
-const xmlActive = !!cfg.splan_xml_enabled;
-
-let activeWeek: "A" | "B" | null = null;
-if (xmlActive) {
-  if (cfg.splan_week === "A") activeWeek = "A";
-  else if (cfg.splan_week === "B") activeWeek = "B";
-  else {
-    // auto: wenn week_mode off → trotzdem Parität nutzen, damit A/B sichtbar ist
-    const cfgForAuto = cfg.week_mode === "off" ? ({ ...cfg, week_mode: "kw_parity" as const }) : cfg;
-    activeWeek = this.getActiveWeek(cfgForAuto);
-  }
-} else {
-  activeWeek = cfg.week_mode === "off" ? null : this.getActiveWeek(cfg);
-}
-
-// Badge anzeigen wenn: Wechselwochen aktiv ODER XML aktiv
-const showWeekBadge = (cfg.week_mode !== "off") || xmlActive;
-
+    const showWeekBadge = cfg.week_mode !== "off";
+    const activeWeek = showWeekBadge ? this.getActiveWeek(cfg) : null;
 
     const showXmlStatus = cfg.splan_xml_enabled;
 
     return html`
       <ha-card header=${cfg.title ?? ""}>
         <div class="card">
-          ${showWeekBadge ? html`<div class="weekBadge">Woche: <b>${activeWeek ?? "—"}</b></div>` : html``}
+          ${showWeekBadge ? html`<div class="weekBadge">Woche: <b>${activeWeek}</b></div>` : html``}
 
           ${showXmlStatus
             ? html`
@@ -938,7 +914,6 @@ const showWeekBadge = (cfg.week_mode !== "off") || xmlActive;
 
                       const hasValue = (val ?? "").toString().trim().length > 0;
 
-                      // "Aktuelles Fach" nur wenn erlaubt UND heutige Zelle nicht frei ist
                       if (
                         allowCurrent &&
                         hasValue &&
@@ -1089,7 +1064,7 @@ export class StundenplanCardEditor extends LitElement {
     this._config = this.normalizeConfig(this.clone(cfg));
 
     if (!wasInitialized) {
-      this._ui.rowOpen = {}; // Default: alle Zeilen geschlossen
+      this._ui.rowOpen = {};
     }
   }
 
@@ -1106,8 +1081,6 @@ export class StundenplanCardEditor extends LitElement {
     this._config = cfg;
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: cfg }, bubbles: true, composed: true }));
   }
-
-  /* ---------- Row open state: keep indices stable on insert/remove ---------- */
 
   private shiftRowOpenAfterInsert(insertIdx: number) {
     const next: Record<number, boolean> = {};
@@ -1128,8 +1101,6 @@ export class StundenplanCardEditor extends LitElement {
     }
     this._ui.rowOpen = next;
   }
-
-  /* ---------- Color helpers (Highlight colors) ---------- */
 
   private rgbaFromHex(hex: string, alpha: number): string {
     const rgb = hexToRgb(hex);
@@ -1177,8 +1148,6 @@ export class StundenplanCardEditor extends LitElement {
     if (!this._config) return;
     this.emit({ ...this._config, [key]: hex });
   }
-
-  /* ---------- Normalization ---------- */
 
   private normalizeConfig(cfg: StundenplanConfig): Required<StundenplanConfig> {
     const stub = StundenplanCard.getStubConfig();
@@ -1262,8 +1231,6 @@ export class StundenplanCardEditor extends LitElement {
     };
   }
 
-  /* ---------- Editor: Basic config ---------- */
-
   private setDaysFromString(value: string) {
     if (!this._config) return;
     const days = value
@@ -1288,8 +1255,6 @@ export class StundenplanCardEditor extends LitElement {
     });
     this._ui.rowOpen = next;
   }
-
-  /* ---------- Editor: Rows ---------- */
 
   private updateRowTime(idx: number, value: string) {
     if (!this._config) return;
@@ -1455,8 +1420,6 @@ export class StundenplanCardEditor extends LitElement {
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     (el as HTMLInputElement).focus?.();
   }
-
-  /* ---------- UI blocks ---------- */
 
   private uiSwitch(checked: boolean, onChange: (v: boolean) => void) {
     return html`
@@ -1707,147 +1670,84 @@ export class StundenplanCardEditor extends LitElement {
     if (!this._config) return html``;
 
     const c = this._config;
-    const xmlOn = !!c.splan_xml_enabled;
-
-    const disabledWrapStyle = (disabled: boolean) =>
-      disabled ? "opacity:0.55; filter:grayscale(0.1);" : "";
-
-    const disabledNote = (disabled: boolean) =>
-      disabled
-        ? html`<div class="sub" style="margin-top:8px;">
-            XML ist aktiv – die folgenden Quellen werden nur genutzt, wenn XML deaktiviert ist.
-          </div>`
-        : html``;
-
-    const xmlUrlMissing = xmlOn && !(c.splan_xml_url ?? "").toString().trim();
-    const xmlClassMissing = xmlOn && !(c.splan_class ?? "").toString().trim();
-    const xmlWarn = xmlUrlMissing || xmlClassMissing;
 
     return html`
       <div class="stack">
         <div class="sub">
-          Wähle, woher der Stundenplan kommt. Wenn <b>Stundenplan24 (XML)</b> aktiv ist, hat diese Quelle <b>Priorität</b>.
-          Andernfalls werden <b>Entity</b> oder <b>manuelle Zeilen</b> verwendet.
+          Datenquelle: XML (Stundenplan24) hat Priorität wenn aktiv. Sonst Entity (JSON) oder manueller Plan.
         </div>
 
-        <!-- ✅ Stundenplan24 XML -->
         <div class="panelMinor">
-          <div class="minorTitle">✅ Stundenplan24 (XML)</div>
+          <div class="minorTitle">✅ Stundenplan24 XML</div>
 
           <div class="optRow">
             <div>
-              <div class="optTitle">Stundenplan24 verwenden</div>
-              <div class="sub">Lädt den Plan automatisch aus deiner XML-Datei unter <span class="mono">/local/...</span>.</div>
+              <div class="optTitle">XML aktivieren</div>
+              <div class="sub">Lädt und rendert den Plan automatisch aus deiner XML.</div>
             </div>
             ${this.uiSwitch(!!c.splan_xml_enabled, (v) => this.emit({ ...c, splan_xml_enabled: v }))}
           </div>
 
-          ${xmlOn
-            ? html`
-                <div class="grid2">
-                  <div class="field">
-                    <label class="lbl">XML-URL</label>
-                    <input
-                      class="in"
-                      type="text"
-                      .value=${c.splan_xml_url ?? ""}
-                      placeholder="/local/splan/sdaten/splank.xml"
-                      @input=${(e: any) => this.emit({ ...c, splan_xml_url: e.target.value })}
-                    />
-                    <div class="sub">
-                      Wichtig: In Home Assistant immer <span class="mono">/local/...</span> verwenden (entspricht <span class="mono">/config/www/</span>).
-                    </div>
-                    ${xmlUrlMissing ? html`<div class="sub" style="color:var(--error-color,#ff5252);">XML-URL fehlt.</div>` : html``}
-                  </div>
+          <div class="grid2">
+            <div class="field">
+              <label class="lbl">XML URL</label>
+              <input
+                class="in"
+                type="text"
+                .value=${c.splan_xml_url ?? ""}
+                placeholder="/local/splan/sdaten/splank.xml"
+                @input=${(e: any) => this.emit({ ...c, splan_xml_url: e.target.value })}
+              />
+              <div class="sub">Wichtig: in HA immer <span class="mono">/local/...</span></div>
+            </div>
 
-                  <div class="field">
-                    <label class="lbl">Klasse (Kurz)</label>
-                    <input
-                      class="in"
-                      type="text"
-                      .value=${c.splan_class ?? ""}
-                      placeholder="z.B. 5b"
-                      @input=${(e: any) => this.emit({ ...c, splan_class: e.target.value })}
-                    />
-                    <div class="sub">
-                      Muss exakt so in der XML stehen, z.B. <span class="mono">&lt;Kurz&gt;5b&lt;/Kurz&gt;</span>.
-                    </div>
-                    ${xmlClassMissing ? html`<div class="sub" style="color:var(--error-color,#ff5252);">Klasse fehlt.</div>` : html``}
-                  </div>
-                </div>
-
-                <div class="grid2">
-                  <div class="field">
-                    <label class="lbl">Woche (XML)</label>
-                    <select class="in" .value=${c.splan_week ?? "auto"} @change=${(e: any) => this.emit({ ...c, splan_week: e.target.value })}>
-                      <option value="auto">auto (nutzt week_mode, sonst alle)</option>
-                      <option value="A">A</option>
-                      <option value="B">B</option>
-                    </select>
-                    <div class="sub">Wenn im XML keine Woche steht: gilt immer.</div>
-                  </div>
-
-                  <div class="field">
-                    <label class="lbl">Anzeige</label>
-
-                    <div class="optRow" style="padding:8px 10px;">
-                      <div>
-                        <div class="optTitle">Raum anzeigen</div>
-                        <div class="sub">z.B. Mathe (R101)</div>
-                      </div>
-                      ${this.uiSwitch(!!c.splan_show_room, (v) => this.emit({ ...c, splan_show_room: v }))}
-                    </div>
-
-                    <div class="optRow" style="padding:8px 10px; margin-top:8px;">
-                      <div>
-                        <div class="optTitle">Lehrer anzeigen</div>
-                        <div class="sub">z.B. Mathe (R101 · MU)</div>
-                      </div>
-                      ${this.uiSwitch(!!c.splan_show_teacher, (v) => this.emit({ ...c, splan_show_teacher: v }))}
-                    </div>
-                  </div>
-                </div>
-
-                ${xmlWarn
-                  ? html`<div class="sub" style="color:var(--error-color,#ff5252);">
-                      XML ist aktiv, aber es fehlen Pflichtfelder (URL/Klasse). Dadurch kann nicht geladen werden.
-                    </div>`
-                  : html``}
-              `
-            : html`<div class="sub">XML ist deaktiviert – es wird die Fallback-Quelle genutzt.</div>`}
-        </div>
-
-        <!-- 🔁 Fallback-Hinweis -->
-        <div class="panelMinor" style=${disabledWrapStyle(xmlOn)}>
-          <div class="minorTitle">🔁 Fallback (wenn XML deaktiviert ist)</div>
-
-          <div class="sub">
-            Wenn Stundenplan24 <b>aus</b> ist, nimmt die Karte Daten in dieser Reihenfolge:
-            <br />
-            1) <b>Wechselwochen A/B</b> (falls <span class="mono">week_mode</span> aktiv)
-            <br />
-            2) <b>Single Entity</b> (falls gesetzt)
-            <br />
-            3) <b>Manuelle Zeilen</b> (<span class="mono">rows</span>)
+            <div class="field">
+              <label class="lbl">Klasse (Kurz)</label>
+              <input class="in" type="text" .value=${c.splan_class ?? ""} placeholder="z.B. 5a" @input=${(e: any) => this.emit({ ...c, splan_class: e.target.value })} />
+            </div>
           </div>
 
-          ${disabledNote(xmlOn)}
+          <div class="grid2">
+            <div class="field">
+              <label class="lbl">Woche (XML)</label>
+              <select class="in" .value=${c.splan_week ?? "auto"} @change=${(e: any) => this.emit({ ...c, splan_week: e.target.value })}>
+                <option value="auto">auto (nutzt week_mode, sonst alle)</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+              </select>
+              <div class="sub">Wenn im XML keine Woche steht: gilt immer.</div>
+            </div>
+
+            <div class="field">
+              <label class="lbl">Anzeige</label>
+              <div class="optRow" style="padding:8px 10px;">
+                <div>
+                  <div class="optTitle">Raum anzeigen</div>
+                  <div class="sub">z.B. Mathe (R101)</div>
+                </div>
+                ${this.uiSwitch(!!c.splan_show_room, (v) => this.emit({ ...c, splan_show_room: v }))}
+              </div>
+              <div class="optRow" style="padding:8px 10px; margin-top:8px;">
+                <div>
+                  <div class="optTitle">Lehrer anzeigen</div>
+                  <div class="sub">z.B. Mathe (R101 · MU)</div>
+                </div>
+                ${this.uiSwitch(!!c.splan_show_teacher, (v) => this.emit({ ...c, splan_show_teacher: v }))}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- 📅 Wechselwochen -->
-        <div class="panelMinor" style=${disabledWrapStyle(xmlOn)}>
-          <div class="minorTitle">📅 Wechselwochen (A/B)</div>
+        <div class="panelMinor">
+          <div class="minorTitle">Wechselwochen (A/B)</div>
 
           <div class="field">
             <label class="lbl">week_mode</label>
-            <select class="in" .value=${c.week_mode ?? "off"} @change=${(e: any) => this.emit({ ...c, week_mode: e.target.value })} ?disabled=${xmlOn}>
+            <select class="in" .value=${c.week_mode ?? "off"} @change=${(e: any) => this.emit({ ...c, week_mode: e.target.value })}>
               <option value="off">off (deaktiviert)</option>
               <option value="kw_parity">kw_parity (gerade/ungerade ISO-KW)</option>
               <option value="week_map">week_map (Mapping-Entity, Fallback Parität)</option>
             </select>
-            <div class="sub">
-              Steuert A/B-Wochen. Wird auch für XML-Woche <span class="mono">auto</span> genutzt (wenn gesetzt).
-            </div>
           </div>
 
           <div class="optRow">
@@ -1861,12 +1761,12 @@ export class StundenplanCardEditor extends LitElement {
           <div class="grid2">
             <div class="field">
               <label class="lbl">week_map_entity (optional)</label>
-              <input class="in" type="text" .value=${c.week_map_entity ?? ""} placeholder="z.B. sensor.wechselwochen_map" @input=${(e: any) => this.emit({ ...c, week_map_entity: e.target.value })} ?disabled=${xmlOn} />
+              <input class="in" type="text" .value=${c.week_map_entity ?? ""} placeholder="z.B. sensor.wechselwochen_map" @input=${(e: any) => this.emit({ ...c, week_map_entity: e.target.value })} />
             </div>
 
             <div class="field">
               <label class="lbl">week_map_attribute</label>
-              <input class="in" type="text" .value=${c.week_map_attribute ?? ""} placeholder="z.B. map (leer = state)" @input=${(e: any) => this.emit({ ...c, week_map_attribute: e.target.value })} ?disabled=${xmlOn} />
+              <input class="in" type="text" .value=${c.week_map_attribute ?? ""} placeholder="z.B. map (leer = state)" @input=${(e: any) => this.emit({ ...c, week_map_attribute: e.target.value })} />
             </div>
           </div>
 
@@ -1879,53 +1779,46 @@ export class StundenplanCardEditor extends LitElement {
           <div class="grid2">
             <div class="field">
               <label class="lbl">source_entity_a</label>
-              <input class="in" type="text" .value=${c.source_entity_a ?? ""} placeholder="z.B. sensor.stundenplan_a" @input=${(e: any) => this.emit({ ...c, source_entity_a: e.target.value })} ?disabled=${xmlOn} />
+              <input class="in" type="text" .value=${c.source_entity_a ?? ""} placeholder="z.B. sensor.stundenplan_a" @input=${(e: any) => this.emit({ ...c, source_entity_a: e.target.value })} />
             </div>
             <div class="field">
               <label class="lbl">source_attribute_a</label>
-              <input class="in" type="text" .value=${c.source_attribute_a ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_a: e.target.value })} ?disabled=${xmlOn} />
+              <input class="in" type="text" .value=${c.source_attribute_a ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_a: e.target.value })} />
             </div>
-
             <div class="field">
               <label class="lbl">source_entity_b</label>
-              <input class="in" type="text" .value=${c.source_entity_b ?? ""} placeholder="z.B. sensor.stundenplan_b" @input=${(e: any) => this.emit({ ...c, source_entity_b: e.target.value })} ?disabled=${xmlOn} />
+              <input class="in" type="text" .value=${c.source_entity_b ?? ""} placeholder="z.B. sensor.stundenplan_b" @input=${(e: any) => this.emit({ ...c, source_entity_b: e.target.value })} />
             </div>
             <div class="field">
               <label class="lbl">source_attribute_b</label>
-              <input class="in" type="text" .value=${c.source_attribute_b ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_b: e.target.value })} ?disabled=${xmlOn} />
+              <input class="in" type="text" .value=${c.source_attribute_b ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_b: e.target.value })} />
             </div>
           </div>
-
-          ${disabledNote(xmlOn)}
         </div>
 
-        <!-- 🧩 Single Entity -->
-        <div class="panelMinor" style=${disabledWrapStyle(xmlOn)}>
-          <div class="minorTitle">🧩 Entity (Single / Legacy)</div>
+        <div class="panelMinor">
+          <div class="minorTitle">Single-Source (Legacy / einfach)</div>
 
           <div class="grid2">
             <div class="field">
               <label class="lbl">source_entity</label>
-              <input class="in" type="text" .value=${c.source_entity ?? ""} placeholder="z.B. sensor.stundenplan" @input=${(e: any) => this.emit({ ...c, source_entity: e.target.value })} ?disabled=${xmlOn} />
+              <input class="in" type="text" .value=${c.source_entity ?? ""} placeholder="z.B. sensor.stundenplan" @input=${(e: any) => this.emit({ ...c, source_entity: e.target.value })} />
             </div>
 
             <div class="field">
               <label class="lbl">source_attribute</label>
-              <input class="in" type="text" .value=${c.source_attribute ?? ""} placeholder="z.B. plan (leer = state)" @input=${(e: any) => this.emit({ ...c, source_attribute: e.target.value })} ?disabled=${xmlOn} />
+              <input class="in" type="text" .value=${c.source_attribute ?? ""} placeholder="z.B. plan (leer = state)" @input=${(e: any) => this.emit({ ...c, source_attribute: e.target.value })} />
             </div>
           </div>
 
           <div class="field">
             <label class="lbl">source_time_key</label>
-            <input class="in" type="text" .value=${c.source_time_key ?? "Stunde"} placeholder='Default: "Stunde"' @input=${(e: any) => this.emit({ ...c, source_time_key: e.target.value })} ?disabled=${xmlOn} />
+            <input class="in" type="text" .value=${c.source_time_key ?? "Stunde"} placeholder='Default: "Stunde"' @input=${(e: any) => this.emit({ ...c, source_time_key: e.target.value })} />
           </div>
-
-          ${disabledNote(xmlOn)}
         </div>
       </div>
     `;
   }
-
 
   private renderRows(): TemplateResult {
     if (!this._config) return html``;
@@ -1954,7 +1847,7 @@ export class StundenplanCardEditor extends LitElement {
       <div class="sub" style="margin-bottom:10px;">
         Pro Zeile: Zeit + optional Start/Ende. Per Klick in der Vorschau springst du zur passenden Zelle.
         <br />
-        Hinweis: Wenn XML aktiv ist, werden diese Zeilen nur als Fallback genutzt.
+        Hinweis: Wenn XML aktiv ist, werden diese Zeilen nur als Fallback genutzt (z.B. fehlende Zeiten).
       </div>
 
       ${c.rows.map((r, idx) => {
@@ -1964,11 +1857,7 @@ export class StundenplanCardEditor extends LitElement {
         const lr = r as LessonRow;
 
         return html`
-          <details
-            class="rowPanel"
-            ?open=${this._ui.rowOpen[idx] ?? false}
-            @toggle=${(e: any) => (this._ui.rowOpen[idx] = !!e.target.open)}
-          >
+          <details class="rowPanel" ?open=${this._ui.rowOpen[idx] ?? false} @toggle=${(e: any) => (this._ui.rowOpen[idx] = !!e.target.open)}>
             <summary>
               <div class="rowHead">
                 <div class="rowHeadTitle">${header || `Zeile ${idx + 1}`}</div>
@@ -2045,16 +1934,7 @@ export class StundenplanCardEditor extends LitElement {
                               <div class="styleLine">
                                 <div class="styleLbl">Transparenz</div>
                                 <div class="range">
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    .value=${String(alphaPct)}
-                                    @input=${(e: any) =>
-                                      this.updateCellStyle(idx, i, {
-                                        bg_alpha: Number(e.target.value) / 100,
-                                      })}
-                                  />
+                                  <input type="range" min="0" max="100" .value=${String(alphaPct)} @input=${(e: any) => this.updateCellStyle(idx, i, { bg_alpha: Number(e.target.value) / 100 })} />
                                   <div class="pct">${alphaPct}%</div>
                                 </div>
                               </div>
@@ -2087,15 +1967,10 @@ export class StundenplanCardEditor extends LitElement {
 
     return html`
       ${this.renderEditorPreview()}
-
       ${this.panel("Allgemein", this._ui.openGeneral, (v) => (this._ui.openGeneral = v), this.renderGeneral())}
-
       ${this.panel("Highlights", this._ui.openHighlight, (v) => (this._ui.openHighlight = v), this.renderHighlighting())}
-
       ${this.panel("Farben", this._ui.openColors, (v) => (this._ui.openColors = v), this.renderColors())}
-
       ${this.panel("Datenquellen", this._ui.openSources, (v) => (this._ui.openSources = v), this.renderSources())}
-
       ${this.panel("Zeilen & Fächer", this._ui.openRows, (v) => (this._ui.openRows = v), this.renderRows())}
     `;
   }
@@ -2107,7 +1982,6 @@ export class StundenplanCardEditor extends LitElement {
       padding: 0;
     }
 
-    /* ---------- Preview ---------- */
     .previewWrap {
       border: 1px solid var(--divider-color);
       border-radius: 14px;
@@ -2168,7 +2042,6 @@ export class StundenplanCardEditor extends LitElement {
       filter: brightness(1.06);
     }
 
-    /* ---------- Panels (Accordion) ---------- */
     .panel {
       border: 1px solid var(--divider-color);
       border-radius: 14px;
@@ -2199,7 +2072,6 @@ export class StundenplanCardEditor extends LitElement {
       padding: 12px;
     }
 
-    /* ---------- Layout helpers ---------- */
     .stack {
       display: grid;
       gap: 12px;
@@ -2240,7 +2112,6 @@ export class StundenplanCardEditor extends LitElement {
       margin: 2px 0;
     }
 
-    /* ---------- Inputs / Buttons ---------- */
     .in {
       width: 100%;
       box-sizing: border-box;
@@ -2302,7 +2173,6 @@ export class StundenplanCardEditor extends LitElement {
       padding: 10px;
     }
 
-    /* ---------- Switch (robust) ---------- */
     .switch {
       position: relative;
       display: inline-block;
@@ -2346,7 +2216,6 @@ export class StundenplanCardEditor extends LitElement {
       transform: translate(18px, -50%);
     }
 
-    /* ---------- Highlight option rows ---------- */
     .optRow {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -2364,7 +2233,6 @@ export class StundenplanCardEditor extends LitElement {
       margin-bottom: 2px;
     }
 
-    /* ---------- Colors ---------- */
     .colorRow {
       border: 1px solid var(--divider-color);
       border-radius: 12px;
@@ -2402,7 +2270,6 @@ export class StundenplanCardEditor extends LitElement {
       opacity: 0.75;
     }
 
-    /* ---------- Data sources minor panels ---------- */
     .panelMinor {
       border: 1px solid var(--divider-color);
       border-radius: 12px;
@@ -2417,7 +2284,6 @@ export class StundenplanCardEditor extends LitElement {
       opacity: 0.9;
     }
 
-    /* ---------- Rows ---------- */
     .rowsTop {
       display: flex;
       align-items: center;
