@@ -244,9 +244,9 @@ async function loadSplanAsJson(splanUrl: string, klasse: string): Promise<SplanJ
   const xmlText = await (await fetch(url, { cache: "no-store" })).text();
   const doc = new DOMParser().parseFromString(xmlText, "text/xml");
 
-  const klEl = Array.from(doc.querySelectorAll("Klassen > Kl")).find(
-    (k) => (k.querySelector("Kurz")?.textContent ?? "").trim().toLowerCase() === (klasse ?? "").trim().toLowerCase()
-  );
+const klEl = Array.from(doc.querySelectorAll("Kl")).find(
+  (k) => (k.querySelector("Kurz")?.textContent ?? "").trim().toLowerCase() === (klasse ?? "").trim().toLowerCase()
+);
 
   if (!klEl) throw new Error(`Klasse "${klasse}" nicht gefunden`);
 
@@ -1652,84 +1652,147 @@ export class StundenplanCardEditor extends LitElement {
     if (!this._config) return html``;
 
     const c = this._config;
+    const xmlOn = !!c.splan_xml_enabled;
+
+    const disabledWrapStyle = (disabled: boolean) =>
+      disabled ? "opacity:0.55; filter:grayscale(0.1);" : "";
+
+    const disabledNote = (disabled: boolean) =>
+      disabled
+        ? html`<div class="sub" style="margin-top:8px;">
+            XML ist aktiv – die folgenden Quellen werden nur genutzt, wenn XML deaktiviert ist.
+          </div>`
+        : html``;
+
+    const xmlUrlMissing = xmlOn && !(c.splan_xml_url ?? "").toString().trim();
+    const xmlClassMissing = xmlOn && !(c.splan_class ?? "").toString().trim();
+    const xmlWarn = xmlUrlMissing || xmlClassMissing;
 
     return html`
       <div class="stack">
         <div class="sub">
-          Datenquelle: XML (Stundenplan24) hat Priorität wenn aktiv. Sonst Entity (JSON) oder manueller Plan.
+          Wähle, woher der Stundenplan kommt. Wenn <b>Stundenplan24 (XML)</b> aktiv ist, hat diese Quelle <b>Priorität</b>.
+          Andernfalls werden <b>Entity</b> oder <b>manuelle Zeilen</b> verwendet.
         </div>
 
+        <!-- ✅ Stundenplan24 XML -->
         <div class="panelMinor">
-          <div class="minorTitle">✅ Stundenplan24 XML</div>
+          <div class="minorTitle">✅ Stundenplan24 (XML)</div>
 
           <div class="optRow">
             <div>
-              <div class="optTitle">XML aktivieren</div>
-              <div class="sub">Lädt und rendert den Plan automatisch aus deiner XML.</div>
+              <div class="optTitle">Stundenplan24 verwenden</div>
+              <div class="sub">Lädt den Plan automatisch aus deiner XML-Datei unter <span class="mono">/local/...</span>.</div>
             </div>
             ${this.uiSwitch(!!c.splan_xml_enabled, (v) => this.emit({ ...c, splan_xml_enabled: v }))}
           </div>
 
-          <div class="grid2">
-            <div class="field">
-              <label class="lbl">XML URL</label>
-              <input
-                class="in"
-                type="text"
-                .value=${c.splan_xml_url ?? ""}
-                placeholder="/local/splan/sdaten/splank.xml"
-                @input=${(e: any) => this.emit({ ...c, splan_xml_url: e.target.value })}
-              />
-              <div class="sub">Wichtig: in HA immer <span class="mono">/local/...</span></div>
-            </div>
+          ${xmlOn
+            ? html`
+                <div class="grid2">
+                  <div class="field">
+                    <label class="lbl">XML-URL</label>
+                    <input
+                      class="in"
+                      type="text"
+                      .value=${c.splan_xml_url ?? ""}
+                      placeholder="/local/splan/sdaten/splank.xml"
+                      @input=${(e: any) => this.emit({ ...c, splan_xml_url: e.target.value })}
+                    />
+                    <div class="sub">
+                      Wichtig: In Home Assistant immer <span class="mono">/local/...</span> verwenden (entspricht <span class="mono">/config/www/</span>).
+                    </div>
+                    ${xmlUrlMissing ? html`<div class="sub" style="color:var(--error-color,#ff5252);">XML-URL fehlt.</div>` : html``}
+                  </div>
 
-            <div class="field">
-              <label class="lbl">Klasse (Kurz)</label>
-              <input class="in" type="text" .value=${c.splan_class ?? ""} placeholder="z.B. 5a" @input=${(e: any) => this.emit({ ...c, splan_class: e.target.value })} />
-            </div>
-          </div>
-
-          <div class="grid2">
-            <div class="field">
-              <label class="lbl">Woche (XML)</label>
-              <select class="in" .value=${c.splan_week ?? "auto"} @change=${(e: any) => this.emit({ ...c, splan_week: e.target.value })}>
-                <option value="auto">auto (nutzt week_mode, sonst alle)</option>
-                <option value="A">A</option>
-                <option value="B">B</option>
-              </select>
-              <div class="sub">Wenn im XML keine Woche steht: gilt immer.</div>
-            </div>
-
-            <div class="field">
-              <label class="lbl">Anzeige</label>
-              <div class="optRow" style="padding:8px 10px;">
-                <div>
-                  <div class="optTitle">Raum anzeigen</div>
-                  <div class="sub">z.B. Mathe (R101)</div>
+                  <div class="field">
+                    <label class="lbl">Klasse (Kurz)</label>
+                    <input
+                      class="in"
+                      type="text"
+                      .value=${c.splan_class ?? ""}
+                      placeholder="z.B. 5b"
+                      @input=${(e: any) => this.emit({ ...c, splan_class: e.target.value })}
+                    />
+                    <div class="sub">
+                      Muss exakt so in der XML stehen, z.B. <span class="mono">&lt;Kurz&gt;5b&lt;/Kurz&gt;</span>.
+                    </div>
+                    ${xmlClassMissing ? html`<div class="sub" style="color:var(--error-color,#ff5252);">Klasse fehlt.</div>` : html``}
+                  </div>
                 </div>
-                ${this.uiSwitch(!!c.splan_show_room, (v) => this.emit({ ...c, splan_show_room: v }))}
-              </div>
-              <div class="optRow" style="padding:8px 10px; margin-top:8px;">
-                <div>
-                  <div class="optTitle">Lehrer anzeigen</div>
-                  <div class="sub">z.B. Mathe (R101 · MU)</div>
+
+                <div class="grid2">
+                  <div class="field">
+                    <label class="lbl">Woche (XML)</label>
+                    <select class="in" .value=${c.splan_week ?? "auto"} @change=${(e: any) => this.emit({ ...c, splan_week: e.target.value })}>
+                      <option value="auto">auto (nutzt week_mode, sonst alle)</option>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                    </select>
+                    <div class="sub">Wenn im XML keine Woche steht: gilt immer.</div>
+                  </div>
+
+                  <div class="field">
+                    <label class="lbl">Anzeige</label>
+
+                    <div class="optRow" style="padding:8px 10px;">
+                      <div>
+                        <div class="optTitle">Raum anzeigen</div>
+                        <div class="sub">z.B. Mathe (R101)</div>
+                      </div>
+                      ${this.uiSwitch(!!c.splan_show_room, (v) => this.emit({ ...c, splan_show_room: v }))}
+                    </div>
+
+                    <div class="optRow" style="padding:8px 10px; margin-top:8px;">
+                      <div>
+                        <div class="optTitle">Lehrer anzeigen</div>
+                        <div class="sub">z.B. Mathe (R101 · MU)</div>
+                      </div>
+                      ${this.uiSwitch(!!c.splan_show_teacher, (v) => this.emit({ ...c, splan_show_teacher: v }))}
+                    </div>
+                  </div>
                 </div>
-                ${this.uiSwitch(!!c.splan_show_teacher, (v) => this.emit({ ...c, splan_show_teacher: v }))}
-              </div>
-            </div>
-          </div>
+
+                ${xmlWarn
+                  ? html`<div class="sub" style="color:var(--error-color,#ff5252);">
+                      XML ist aktiv, aber es fehlen Pflichtfelder (URL/Klasse). Dadurch kann nicht geladen werden.
+                    </div>`
+                  : html``}
+              `
+            : html`<div class="sub">XML ist deaktiviert – es wird die Fallback-Quelle genutzt.</div>`}
         </div>
 
-        <div class="panelMinor">
-          <div class="minorTitle">Wechselwochen (A/B)</div>
+        <!-- 🔁 Fallback-Hinweis -->
+        <div class="panelMinor" style=${disabledWrapStyle(xmlOn)}>
+          <div class="minorTitle">🔁 Fallback (wenn XML deaktiviert ist)</div>
+
+          <div class="sub">
+            Wenn Stundenplan24 <b>aus</b> ist, nimmt die Karte Daten in dieser Reihenfolge:
+            <br />
+            1) <b>Wechselwochen A/B</b> (falls <span class="mono">week_mode</span> aktiv)
+            <br />
+            2) <b>Single Entity</b> (falls gesetzt)
+            <br />
+            3) <b>Manuelle Zeilen</b> (<span class="mono">rows</span>)
+          </div>
+
+          ${disabledNote(xmlOn)}
+        </div>
+
+        <!-- 📅 Wechselwochen -->
+        <div class="panelMinor" style=${disabledWrapStyle(xmlOn)}>
+          <div class="minorTitle">📅 Wechselwochen (A/B)</div>
 
           <div class="field">
             <label class="lbl">week_mode</label>
-            <select class="in" .value=${c.week_mode ?? "off"} @change=${(e: any) => this.emit({ ...c, week_mode: e.target.value })}>
+            <select class="in" .value=${c.week_mode ?? "off"} @change=${(e: any) => this.emit({ ...c, week_mode: e.target.value })} ?disabled=${xmlOn}>
               <option value="off">off (deaktiviert)</option>
               <option value="kw_parity">kw_parity (gerade/ungerade ISO-KW)</option>
               <option value="week_map">week_map (Mapping-Entity, Fallback Parität)</option>
             </select>
+            <div class="sub">
+              Steuert A/B-Wochen. Wird auch für XML-Woche <span class="mono">auto</span> genutzt (wenn gesetzt).
+            </div>
           </div>
 
           <div class="optRow">
@@ -1743,12 +1806,12 @@ export class StundenplanCardEditor extends LitElement {
           <div class="grid2">
             <div class="field">
               <label class="lbl">week_map_entity (optional)</label>
-              <input class="in" type="text" .value=${c.week_map_entity ?? ""} placeholder="z.B. sensor.wechselwochen_map" @input=${(e: any) => this.emit({ ...c, week_map_entity: e.target.value })} />
+              <input class="in" type="text" .value=${c.week_map_entity ?? ""} placeholder="z.B. sensor.wechselwochen_map" @input=${(e: any) => this.emit({ ...c, week_map_entity: e.target.value })} ?disabled=${xmlOn} />
             </div>
 
             <div class="field">
               <label class="lbl">week_map_attribute</label>
-              <input class="in" type="text" .value=${c.week_map_attribute ?? ""} placeholder="z.B. map (leer = state)" @input=${(e: any) => this.emit({ ...c, week_map_attribute: e.target.value })} />
+              <input class="in" type="text" .value=${c.week_map_attribute ?? ""} placeholder="z.B. map (leer = state)" @input=${(e: any) => this.emit({ ...c, week_map_attribute: e.target.value })} ?disabled=${xmlOn} />
             </div>
           </div>
 
@@ -1761,46 +1824,53 @@ export class StundenplanCardEditor extends LitElement {
           <div class="grid2">
             <div class="field">
               <label class="lbl">source_entity_a</label>
-              <input class="in" type="text" .value=${c.source_entity_a ?? ""} placeholder="z.B. sensor.stundenplan_a" @input=${(e: any) => this.emit({ ...c, source_entity_a: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_entity_a ?? ""} placeholder="z.B. sensor.stundenplan_a" @input=${(e: any) => this.emit({ ...c, source_entity_a: e.target.value })} ?disabled=${xmlOn} />
             </div>
             <div class="field">
               <label class="lbl">source_attribute_a</label>
-              <input class="in" type="text" .value=${c.source_attribute_a ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_a: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_attribute_a ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_a: e.target.value })} ?disabled=${xmlOn} />
             </div>
+
             <div class="field">
               <label class="lbl">source_entity_b</label>
-              <input class="in" type="text" .value=${c.source_entity_b ?? ""} placeholder="z.B. sensor.stundenplan_b" @input=${(e: any) => this.emit({ ...c, source_entity_b: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_entity_b ?? ""} placeholder="z.B. sensor.stundenplan_b" @input=${(e: any) => this.emit({ ...c, source_entity_b: e.target.value })} ?disabled=${xmlOn} />
             </div>
             <div class="field">
               <label class="lbl">source_attribute_b</label>
-              <input class="in" type="text" .value=${c.source_attribute_b ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_b: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_attribute_b ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_b: e.target.value })} ?disabled=${xmlOn} />
             </div>
           </div>
+
+          ${disabledNote(xmlOn)}
         </div>
 
-        <div class="panelMinor">
-          <div class="minorTitle">Single-Source (Legacy / einfach)</div>
+        <!-- 🧩 Single Entity -->
+        <div class="panelMinor" style=${disabledWrapStyle(xmlOn)}>
+          <div class="minorTitle">🧩 Entity (Single / Legacy)</div>
 
           <div class="grid2">
             <div class="field">
               <label class="lbl">source_entity</label>
-              <input class="in" type="text" .value=${c.source_entity ?? ""} placeholder="z.B. sensor.stundenplan" @input=${(e: any) => this.emit({ ...c, source_entity: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_entity ?? ""} placeholder="z.B. sensor.stundenplan" @input=${(e: any) => this.emit({ ...c, source_entity: e.target.value })} ?disabled=${xmlOn} />
             </div>
 
             <div class="field">
               <label class="lbl">source_attribute</label>
-              <input class="in" type="text" .value=${c.source_attribute ?? ""} placeholder="z.B. plan (leer = state)" @input=${(e: any) => this.emit({ ...c, source_attribute: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_attribute ?? ""} placeholder="z.B. plan (leer = state)" @input=${(e: any) => this.emit({ ...c, source_attribute: e.target.value })} ?disabled=${xmlOn} />
             </div>
           </div>
 
           <div class="field">
             <label class="lbl">source_time_key</label>
-            <input class="in" type="text" .value=${c.source_time_key ?? "Stunde"} placeholder='Default: "Stunde"' @input=${(e: any) => this.emit({ ...c, source_time_key: e.target.value })} />
+            <input class="in" type="text" .value=${c.source_time_key ?? "Stunde"} placeholder='Default: "Stunde"' @input=${(e: any) => this.emit({ ...c, source_time_key: e.target.value })} ?disabled=${xmlOn} />
           </div>
+
+          ${disabledNote(xmlOn)}
         </div>
       </div>
     `;
   }
+
 
   private renderRows(): TemplateResult {
     if (!this._config) return html``;
