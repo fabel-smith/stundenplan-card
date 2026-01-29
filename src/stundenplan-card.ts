@@ -92,6 +92,7 @@ type StundenplanConfig = {
   //   - oder Basis-Datei direkt: "/local/splan/sdaten/SPlanKl_Basis.xml"
   splan_xml_enabled?: boolean;
   splan_xml_url?: string;
+  splan_school_id?: string;
   splan_class?: string; // Kurz (z.B. "5a") oder Lehrer/Raum je nach plan_art
   splan_week?: SplanWeekMode; // auto|A|B
   splan_show_room?: boolean;
@@ -529,14 +530,20 @@ export class StundenplanCard extends LitElement {
     if (!cfg) return;
     if (!cfg.splan_xml_enabled) return;
 
-    const raw = (cfg.splan_xml_url ?? "").toString().trim();
+    const school = (cfg.splan_school_id ?? "").toString().trim();
+    let raw = (cfg.splan_xml_url ?? "").toString().trim();
+
+    if (!raw && school) {
+      raw = `https://www.stundenplan24.de/${school}/wplan/wdatenk`;
+    }
+
     const target = (cfg.splan_class ?? "").toString().trim();
 
     if (!raw || !target) {
       this._splanBasis = null;
       this._splanWeekLessons = null;
       this._splanSubLessonsByDay = new Map();
-      this._splanErr = "XML aktiv, aber URL oder Klasse fehlt.";
+      this._splanErr = "XML aktiv, aber URL/Schulnummer oder Klasse fehlt.";
       this.requestUpdate();
       return;
     }
@@ -656,6 +663,7 @@ export class StundenplanCard extends LitElement {
 
       splan_xml_enabled: false,
       splan_xml_url: "/local/splan/sdaten",
+      splan_school_id: "",
       splan_class: "5a",
       splan_week: "auto",
       splan_show_room: true,
@@ -808,6 +816,7 @@ export class StundenplanCard extends LitElement {
       // XML
       splan_xml_enabled: cfg.splan_xml_enabled ?? stub.splan_xml_enabled,
       splan_xml_url: (cfg.splan_xml_url ?? stub.splan_xml_url).toString(),
+      splan_school_id: (cfg.splan_school_id ?? "").toString(),
       splan_class: (cfg.splan_class ?? stub.splan_class).toString(),
       splan_week,
       splan_show_room: cfg.splan_show_room ?? stub.splan_show_room,
@@ -1563,6 +1572,7 @@ export class StundenplanCardEditor extends LitElement {
 
       splan_xml_enabled: merged.splan_xml_enabled ?? stub.splan_xml_enabled,
       splan_xml_url: (merged.splan_xml_url ?? stub.splan_xml_url).toString(),
+      splan_school_id: (merged.splan_school_id ?? "").toString(),     
       splan_class: (merged.splan_class ?? stub.splan_class).toString(),
       splan_week,
       splan_show_room: merged.splan_show_room ?? stub.splan_show_room,
@@ -2170,6 +2180,19 @@ export class StundenplanCardEditor extends LitElement {
               />
               <div class="sub">Wichtig: in HA immer <span class="mono">/local/...</span></div>
             </div>
+
+<div class="field">
+  <label class="lbl">Schulnummer (stundenplan24)</label>
+  <input
+    class="in"
+    type="text"
+    .value=${c.splan_school_id ?? ""}
+    placeholder="z.B. 10000000"
+    @input=${(e: any) => this.emit({ ...c, splan_school_id: e.target.value })}
+  />
+  <div class="sub">Wird genutzt, wenn die Karte die XML direkt von stundenplan24.de laden soll.</div>
+</div>
+
 
             <div class="field">
               <label class="lbl">Klasse (Kurz)</label>
