@@ -6,13 +6,20 @@ import { LitElement, html, css, TemplateResult } from "lit";
  * - Visueller Editor (Panels/Accordion via <details>)
  * - Highlight: today/current/breaks + Freistunden-Logik (nur Spalte)
  * - Farben + Cell-Styles
- * - Datenquelle:
- *    A) Manuell (rows)
- *    B) Entity (legacy / A/B-Wochen)
- *    C) ✅ Stundenplan24 XML aus /local/... (splank.xml) + Klassenfilter
+ *
+ * Datenquelle:
+ *   A) Manuell (rows)
+ *   B) Entity (legacy / A/B-Wochen)
+ *   C) ✅ Stundenplan24 XML (Basis + Wochenplan + optional Vertretung)
+ *
+ * Stundenplan24 (typische Export-Struktur):
+ *   - SPlanKl_Basis.xml                       (Schulwochen + Klassen)
+ *   - SPlanKl_SwXX.xml                        (Wochenplan für Schulwoche XX)
+ *   - WPlanKl_YYYYMMDD.xml                    (Vertretungsplan je Tag)
  *
  * WICHTIG:
  * - Für HA-Static Files immer /local/... verwenden (nicht /splan/...)
+ * - /local/... wird zu /config/www/... gemappt
  */
 
 type CellStyle = {
@@ -39,6 +46,7 @@ type BreakRow = {
 type Row = LessonRow | BreakRow;
 type WeekMode = "off" | "kw_parity" | "week_map";
 type SplanWeekMode = "auto" | "A" | "B";
+type SplanPlanArt = "class" | "teacher" | "room";
 
 type StundenplanConfig = {
   type: string;
@@ -78,13 +86,24 @@ type StundenplanConfig = {
   source_entity_b?: string;
   source_attribute_b?: string;
 
-  // ✅ Stundenplan24 XML Quelle (/local/....xml)
+  // ✅ Stundenplan24 XML Quelle
+  // splan_xml_url ist entweder:
+  //   - Verzeichnis: "/local/splan/sdaten" (ohne .xml)  -> Basis=.../SPlanKl_Basis.xml
+  //   - oder Basis-Datei direkt: "/local/splan/sdaten/SPlanKl_Basis.xml"
   splan_xml_enabled?: boolean;
-  splan_xml_url?: string; // z.B. "/local/splan/sdaten/splank.xml"
-  splan_class?: string; // z.B. "5a"
+  splan_xml_url?: string;
+  splan_class?: string; // Kurz (z.B. "5a") oder Lehrer/Raum je nach plan_art
   splan_week?: SplanWeekMode; // auto|A|B
   splan_show_room?: boolean;
   splan_show_teacher?: boolean;
+
+  // ✅ Vertretungsplan (optional)
+  splan_sub_enabled?: boolean; // default false
+  splan_sub_days?: number; // default 3 (heute + 2)
+  splan_sub_show_info?: boolean; // default true
+
+  // ✅ Planart (optional)
+  splan_plan_art?: SplanPlanArt; // default "class"
 
   rows?: Row[];
 };
@@ -217,14 +236,34 @@ function isFreeCellValue(v: any): boolean {
   return s === "-" || s === "–" || s === "---";
 }
 
-/* ===================== Stundenplan24 XML → JSON ===================== */
+/* ===================== Stundenplan24 XML ===================== */
 
-type SplanJson = {
-  times: { hour: number; start: string; end: string }[];
-  lessons: { sw: string; day: number; hour: number; subject: string; teacher: string; room: string; week: string }[];
+type SplanBasis = {
+  classes: string[];
+  weeks: { sw: string; from: string; to: string; wo?: "A" | "B" }[];
 };
 
-// Tage aus Stundenplan24 sind üblicherweise 1..5 (Mo..Fr). Wir mappen Card-Spalten (cfg.days) auf 1..7 anhand Label.
+type SplanWeekPlanLesson = {
+  day: number; // 1..7 (Mo=1)
+  hour: number;
+  subject: string;
+  teacher: string;
+  room: string;
+  week: "A" | "B" | ""; // PlWo kann leer sein
+};
+
+type SplanSubLesson = {
+  day: number;
+  hour: number;
+  subject?: string;
+  teacher?: string;
+  room?: string;
+  info?: string;
+  changed_subject?: boolean;
+  changed_teacher?: boolean;
+  changed_room?: boolean;
+};
+
 function mapCfgDayToSplanDay(label: string): number | null {
   const n = normalizeDayLabel(label);
   if (["mo", "montag", "mon", "monday"].includes(n)) return 1;
@@ -233,43 +272,213 @@ function mapCfgDayToSplanDay(label: string): number | null {
   if (["do", "donnerstag", "thu", "thurs", "thursday"].includes(n)) return 4;
   if (["fr", "freitag", "fri", "friday"].includes(n)) return 5;
   if (["sa", "samstag", "sat", "saturday"].includes(n)) return 6;
-  if (["so", "sonntag", "sun", "sunday"].includes(n)) return 7;
+  if (["so", "sonntag", "sun", "sunday", "sonntag"].includes(n)) return 7;
   return null;
 }
 
-async function loadSplanAsJson(splanUrl: string, klasse: string): Promise<SplanJson> {
-  // wichtig: /local/... + no-store + cachebuster, damit Browser nicht klemmt
-  const url = `${splanUrl}${splanUrl.includes("?") ? "&" : "?"}_ts=${Date.now()}`;
-  const xmlText = await (await fetch(url, { cache: "no-store" })).text();
-  const doc = new DOMParser().parseFromString(xmlText, "text/xml");
+function parseGermanDate(ddmmyyyy: string): Date | null {
+  const s = (ddmmyyyy ?? "").trim();
+  const m =
+    s.match(/^\s*(\d{1,2})\.(\d{1,2})\.(\d{4})\s*$/) ||
+    s.match(/^\s*(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})\s*$/);
+  if (!m) return null;
+  const d = Number(m[1]);
+  const mo = Number(m[2]);
+  const y = Number(m[3]);
+  if ([d, mo, y].some((x) => Number.isNaN(x))) return null;
+  return new Date(y, mo - 1, d, 12, 0, 0);
+}
 
-  const klEl = Array.from(doc.querySelectorAll("Klassen > Kl")).find(
-    (k) => (k.querySelector("Kurz")?.textContent ?? "").trim().toLowerCase() === (klasse ?? "").trim().toLowerCase()
-  );
-  if (!klEl) throw new Error(`Klasse "${klasse}" nicht gefunden`);
+function ymd(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}${m}${d}`;
+}
 
-  // Zeiten (manche Pläne haben Lücken -> wir speichern trotzdem alle Stunden-Nummern, Zeiten ggf. leer)
-  const times = Array.from(klEl.querySelectorAll("Stunden > St"))
-    .map((st) => ({
-      hour: parseInt((st.textContent ?? "0").trim(), 10),
-      start: (st.getAttribute("StZeit") ?? "").trim(),
-      end: (st.getAttribute("StZeitBis") ?? "").trim(),
-    }))
-    .filter((t) => Number.isFinite(t.hour))
-    .sort((a, b) => a.hour - b.hour);
+function normalizeBasePath(s: string): { basisUrl: string; baseDir: string } {
+  const raw = (s ?? "").toString().trim();
+  const noQuery = raw.split("?")[0];
+  const isXml = noQuery.toLowerCase().endsWith(".xml");
 
-  // Stunden (Basis)
-  const lessons = Array.from(klEl.querySelectorAll("Pl > Std")).map((std) => ({
-    sw: (std.querySelector("PlSw")?.textContent ?? "").trim(), // 01 / 02 / 0102
-    day: parseInt((std.querySelector("PlTg")?.textContent ?? "0").trim(), 10),
-    hour: parseInt((std.querySelector("PlSt")?.textContent ?? "0").trim(), 10),
-    subject: (std.querySelector("PlFa")?.textContent ?? "").replace(/\u00a0/g, " ").trim(),
-    teacher: (std.querySelector("PlLe")?.textContent ?? "").replace(/\u00a0/g, " ").trim(),
-    room: (std.querySelector("PlRa")?.textContent ?? "").replace(/\u00a0/g, " ").trim(),
-    week: (std.querySelector("PlWo")?.textContent ?? "").replace(/\u00a0/g, " ").trim().toUpperCase(), // A/B/leer
-  }));
+  if (isXml) {
+    const baseDir = raw.replace(/\/[^/]*$/u, "");
+    return { basisUrl: raw, baseDir };
+  }
 
-  return { times, lessons };
+  const baseDir = raw.replace(/\/+$/u, "");
+  const basisUrl = `${baseDir}/SPlanKl_Basis.xml`;
+  return { basisUrl, baseDir };
+}
+
+async function fetchTextNoStore(url: string): Promise<string> {
+  const u = `${url}${url.includes("?") ? "&" : "?"}_ts=${Date.now()}`;
+  const res = await fetch(u, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status} (${res.statusText}) bei ${url}`);
+  return await res.text();
+}
+
+function parseBasis(doc: Document): SplanBasis {
+  const classes = Array.from(doc.querySelectorAll("Klassen > Kl > Kurz"))
+    .map((n) => (n.textContent ?? "").trim())
+    .filter((x) => !!x);
+
+  const weeks = Array.from(doc.querySelectorAll("Schulwochen > Sw")).map((sw) => {
+    const nr = (sw.textContent ?? "").trim();
+    const from = (sw.getAttribute("SwDatumVon") ?? "").trim();
+    const to = (sw.getAttribute("SwDatumBis") ?? "").trim();
+    const wo = normalizeWeekLetter(sw.getAttribute("SwWo"));
+    return { sw: nr, from, to, wo: wo ?? undefined };
+  });
+
+  return { classes, weeks };
+}
+
+function findSchoolWeek(basis: SplanBasis, date: Date): { sw: string; wo?: "A" | "B" } | null {
+  const t = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0).getTime();
+  for (const w of basis.weeks) {
+    const d1 = parseGermanDate(w.from);
+    const d2 = parseGermanDate(w.to);
+    if (!d1 || !d2) continue;
+    const a = d1.getTime();
+    const b = d2.getTime();
+    if (t >= a && t <= b) return { sw: w.sw, wo: w.wo };
+  }
+  return null;
+}
+
+function pad2(n: string): string {
+  const s = (n ?? "").toString().trim();
+  if (!s) return s;
+  return s.length === 1 ? `0${s}` : s;
+}
+
+// Klassenfilter in Wochenplan: PlKl kann sein "5a", "5a-5c", "5a,5b", "5a/5b" etc.
+function matchPlKl(plkl: string, target: string): boolean {
+  const t = (target ?? "").trim().toLowerCase();
+  if (!t) return false;
+  const raw = (plkl ?? "").replace(/\u00a0/g, " ").trim().toLowerCase();
+  if (!raw) return false;
+
+  if (raw === t) return true;
+
+  const parts = raw
+    .split(/[,/;|\s]+/u)
+    .map((x) => x.trim())
+    .filter((x) => !!x);
+
+  for (const p of parts) {
+    if (p === t) return true;
+
+    const m = p.match(/^(\d+)([a-z])\s*-\s*(\d+)([a-z])$/i);
+    if (m) {
+      const g1 = Number(m[1]);
+      const a1 = m[2].toLowerCase().charCodeAt(0);
+      const g2 = Number(m[3]);
+      const a2 = m[4].toLowerCase().charCodeAt(0);
+
+      const mt = t.match(/^(\d+)([a-z])$/i);
+      if (!mt) continue;
+      const gt = Number(mt[1]);
+      const at = mt[2].toLowerCase().charCodeAt(0);
+
+      if (g1 === g2 && gt === g1) {
+        const lo = Math.min(a1, a2);
+        const hi = Math.max(a1, a2);
+        if (at >= lo && at <= hi) return true;
+      }
+    }
+  }
+
+  return raw.includes(t);
+}
+
+function textOf(node: Element | null, sel: string): string {
+  return (node?.querySelector(sel)?.textContent ?? "").replace(/\u00a0/g, " ").trim();
+}
+
+function intOf(node: Element | null, sel: string): number {
+  const v = Number((node?.querySelector(sel)?.textContent ?? "").trim());
+  return Number.isFinite(v) ? v : 0;
+}
+
+function parseWeekPlan(doc: Document, cfg: Required<StundenplanConfig>): SplanWeekPlanLesson[] {
+  const stdNodes = Array.from(doc.querySelectorAll("Pl > Std, Std"));
+
+  const planArt = (cfg.splan_plan_art ?? "class") as SplanPlanArt;
+  const target = (cfg.splan_class ?? "").trim();
+
+  const out: SplanWeekPlanLesson[] = [];
+
+  for (const std of stdNodes) {
+    const day = intOf(std, "PlTg");
+    const hour = intOf(std, "PlSt");
+    if (!day || !hour) continue;
+
+    const subject = textOf(std, "PlFa");
+    const teacher = textOf(std, "PlLe");
+    const room = textOf(std, "PlRa");
+    const week = (textOf(std, "PlWo") || "").toUpperCase() as any;
+    const w: "A" | "B" | "" = week === "A" || week === "B" ? week : "";
+
+    if (planArt === "class") {
+      const plkl = textOf(std, "PlKl");
+      if (plkl && target && !matchPlKl(plkl, target)) continue;
+    } else if (planArt === "teacher") {
+      if (target && teacher.toLowerCase() !== target.toLowerCase()) continue;
+    } else if (planArt === "room") {
+      if (target && room.toLowerCase() !== target.toLowerCase()) continue;
+    }
+
+    if (!subject && !teacher && !room) continue;
+
+    out.push({ day, hour, subject, teacher, room, week: w });
+  }
+
+  return out;
+}
+
+function parseSubPlan(doc: Document): SplanSubLesson[] {
+  const stdNodes = Array.from(doc.querySelectorAll("Std"));
+  const out: SplanSubLesson[] = [];
+
+  for (const std of stdNodes) {
+    const hour = Number((std.querySelector("St")?.textContent ?? "").trim());
+    if (!Number.isFinite(hour) || hour <= 0) continue;
+
+    const fa = std.querySelector("Fa");
+    const le = std.querySelector("Le");
+    const ra = std.querySelector("Ra");
+
+    const subject = (fa?.textContent ?? "").replace(/\u00a0/g, " ").trim() || undefined;
+    const teacher = (le?.textContent ?? "").replace(/\u00a0/g, " ").trim() || undefined;
+    const room = (ra?.textContent ?? "").replace(/\u00a0/g, " ").trim() || undefined;
+
+    const changed_subject = (fa?.getAttribute("FaAe") ?? "").toLowerCase().includes("geaendert");
+    const changed_teacher = (le?.getAttribute("LeAe") ?? "").toLowerCase().includes("geaendert");
+    const changed_room = (ra?.getAttribute("RaAe") ?? "").toLowerCase().includes("geaendert");
+
+    const info = (std.querySelector("If")?.textContent ?? "").replace(/\u00a0/g, " ").trim() || undefined;
+
+    out.push({
+      day: 0, // wird beim Merge gesetzt (Datei=Tag)
+      hour,
+      subject,
+      teacher,
+      room,
+      info,
+      changed_subject,
+      changed_teacher,
+      changed_room,
+    });
+  }
+
+  return out;
+}
+
+function dayFromDate(date: Date): number {
+  const d = date.getDay();
+  return d === 0 ? 7 : d;
 }
 
 /* ===================== Card ===================== */
@@ -283,7 +492,10 @@ export class StundenplanCard extends LitElement {
   private config?: Required<StundenplanConfig>;
   private _tick?: number;
 
-  private _splanData: SplanJson | null = null;
+  private _splanBasis: SplanBasis | null = null;
+  private _splanWeekLessons: SplanWeekPlanLesson[] | null = null;
+  private _splanSubLessonsByDay: Map<number, SplanSubLesson[]> = new Map();
+
   private _splanErr: string | null = null;
   private _splanLoading = false;
 
@@ -317,27 +529,90 @@ export class StundenplanCard extends LitElement {
     if (!cfg) return;
     if (!cfg.splan_xml_enabled) return;
 
-    const url = (cfg.splan_xml_url ?? "").toString().trim();
-    const klasse = (cfg.splan_class ?? "").toString().trim();
-    if (!url || !klasse) {
-      this._splanData = null;
+    const raw = (cfg.splan_xml_url ?? "").toString().trim();
+    const target = (cfg.splan_class ?? "").toString().trim();
+
+    if (!raw || !target) {
+      this._splanBasis = null;
+      this._splanWeekLessons = null;
+      this._splanSubLessonsByDay = new Map();
       this._splanErr = "XML aktiv, aber URL oder Klasse fehlt.";
       this.requestUpdate();
       return;
     }
 
     if (this._splanLoading) return;
-    if (!force && this._splanData && !this._splanErr) return;
+    if (!force && this._splanBasis && this._splanWeekLessons && !this._splanErr) return;
 
     this._splanLoading = true;
     this._splanErr = null;
 
     try {
-      const data = await loadSplanAsJson(url, klasse);
-      this._splanData = data;
+      const { basisUrl, baseDir } = normalizeBasePath(raw);
+
+      // 1) Basis laden
+      const basisXml = await fetchTextNoStore(basisUrl);
+      const basisDoc = new DOMParser().parseFromString(basisXml, "text/xml");
+      const basis = parseBasis(basisDoc);
+      this._splanBasis = basis;
+
+      // 2) aktuelle Schulwoche bestimmen
+      const swNow = findSchoolWeek(basis, new Date());
+      if (!swNow?.sw) throw new Error("Schulwoche (Sw) in Basis nicht für heutiges Datum gefunden.");
+
+      // 3) Wochenplan laden (SPlanKl_SwXX.xml)
+      const sw = swNow.sw.trim();
+      const candidates = [`${baseDir}/SPlanKl_Sw${sw}.xml`, `${baseDir}/SPlanKl_Sw${pad2(sw)}.xml`];
+
+      let weekXmlText: string | null = null;
+      let lastErr: any = null;
+
+      for (const u of candidates) {
+        try {
+          weekXmlText = await fetchTextNoStore(u);
+          break;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      if (!weekXmlText) {
+        throw new Error(
+          `Wochenplan-Datei nicht gefunden (versucht: ${candidates.join(", ")}). ${lastErr?.message ?? ""}`
+        );
+      }
+
+      const weekDoc = new DOMParser().parseFromString(weekXmlText, "text/xml");
+      this._splanWeekLessons = parseWeekPlan(weekDoc, cfg);
+
+      // 4) Vertretung (optional)
+      this._splanSubLessonsByDay = new Map();
+      if (cfg.splan_sub_enabled) {
+        const days = Math.max(1, Math.min(14, Number(cfg.splan_sub_days ?? 3)));
+        for (let i = 0; i < days; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() + i);
+          const dow = dayFromDate(d);
+
+          // i.d.R. nur Mo-Fr sinnvoll
+          if (dow === 6 || dow === 7) continue;
+
+          const file = `${baseDir}/WPlanKl_${ymd(d)}.xml`;
+          try {
+            const txt = await fetchTextNoStore(file);
+            const doc = new DOMParser().parseFromString(txt, "text/xml");
+            const subs = parseSubPlan(doc).map((x) => ({ ...x, day: dow }));
+            this._splanSubLessonsByDay.set(dow, subs);
+          } catch {
+            // ok wenn Datei nicht existiert
+          }
+        }
+      }
+
       this._splanErr = null;
     } catch (e: any) {
-      this._splanData = null;
+      this._splanBasis = null;
+      this._splanWeekLessons = null;
+      this._splanSubLessonsByDay = new Map();
       this._splanErr = e?.message ? String(e.message) : String(e);
     } finally {
       this._splanLoading = false;
@@ -380,11 +655,17 @@ export class StundenplanCard extends LitElement {
       source_attribute_b: "",
 
       splan_xml_enabled: false,
-      splan_xml_url: "/local/splan/sdaten/splank.xml",
+      splan_xml_url: "/local/splan/sdaten",
       splan_class: "5a",
       splan_week: "auto",
       splan_show_room: true,
       splan_show_teacher: false,
+
+      splan_sub_enabled: false,
+      splan_sub_days: 3,
+      splan_sub_show_info: true,
+
+      splan_plan_art: "class",
 
       rows: [
         {
@@ -438,13 +719,21 @@ export class StundenplanCard extends LitElement {
   }
 
   private normalizeConfig(cfg: StundenplanConfig): Required<StundenplanConfig> {
+    const stub = StundenplanCard.getStubConfig();
+
     const days =
-      Array.isArray(cfg.days) && cfg.days.length ? cfg.days.map((d) => (d ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"];
+      Array.isArray(cfg.days) && cfg.days.length
+        ? cfg.days.map((d) => (d ?? "").toString())
+        : ["Mo", "Di", "Mi", "Do", "Fr"];
 
     const rowsIn = Array.isArray(cfg.rows) ? cfg.rows : [];
     const rows: Row[] = rowsIn.map((r: any) => {
       if (isBreakRow(r)) {
-        return { break: true, time: (r.time ?? "").toString(), label: (r.label ?? "Pause").toString() };
+        return {
+          break: true,
+          time: (r.time ?? "").toString(),
+          label: (r.label ?? "Pause").toString(),
+        } as BreakRow;
       }
 
       const cellsIn = Array.isArray(r?.cells) ? r.cells : [];
@@ -465,57 +754,72 @@ export class StundenplanCard extends LitElement {
         end: endRaw || parsed.end || undefined,
         cells,
       };
-      if (cell_styles.some((x) => !!x)) out.cell_styles = cell_styles;
 
+      if (cell_styles.some((x) => !!x)) out.cell_styles = cell_styles;
       return out;
     });
 
-    const weekModeRaw = ((cfg.week_mode ?? "off") + "").toString().trim() as WeekMode;
+    const weekModeRaw = ((cfg.week_mode ?? stub.week_mode) + "").toString().trim() as WeekMode;
     const week_mode: WeekMode =
       weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
 
-    const splanWeekRaw = ((cfg.splan_week ?? "auto") + "").toString().trim().toLowerCase();
+    const splanWeekRaw = ((cfg.splan_week ?? stub.splan_week) + "").toString().trim().toLowerCase();
     const splan_week: SplanWeekMode = splanWeekRaw === "a" ? "A" : splanWeekRaw === "b" ? "B" : "auto";
 
+    const artRaw = ((cfg.splan_plan_art ?? stub.splan_plan_art) + "").toString().trim().toLowerCase();
+    const splan_plan_art: SplanPlanArt = artRaw === "teacher" ? "teacher" : artRaw === "room" ? "room" : "class";
+
+    const subDaysNum = Number(cfg.splan_sub_days ?? stub.splan_sub_days);
+    const splan_sub_days = Number.isFinite(subDaysNum) ? Math.max(1, Math.min(14, subDaysNum)) : stub.splan_sub_days;
+
     return {
-      type: (cfg.type ?? "custom:stundenplan-card").toString(),
-      title: (cfg.title ?? "Mein Stundenplan").toString(),
+      type: (cfg.type ?? stub.type).toString(),
+      title: (cfg.title ?? stub.title).toString(),
       days,
 
-      highlight_today: cfg.highlight_today ?? true,
-      highlight_current: cfg.highlight_current ?? false,
-      highlight_breaks: cfg.highlight_breaks ?? false,
-      free_only_column_highlight: cfg.free_only_column_highlight ?? true,
+      highlight_today: cfg.highlight_today ?? stub.highlight_today,
+      highlight_current: cfg.highlight_current ?? stub.highlight_current,
+      highlight_breaks: cfg.highlight_breaks ?? stub.highlight_breaks,
+      free_only_column_highlight: cfg.free_only_column_highlight ?? stub.free_only_column_highlight,
 
-      highlight_today_color: (cfg.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
-      highlight_current_color: (cfg.highlight_current_color ?? "rgba(76, 175, 80, 0.18)").toString(),
+      highlight_today_color: (cfg.highlight_today_color ?? stub.highlight_today_color).toString(),
+      highlight_current_color: (cfg.highlight_current_color ?? stub.highlight_current_color).toString(),
 
-      highlight_current_text: cfg.highlight_current_text ?? false,
-      highlight_current_text_color: (cfg.highlight_current_text_color ?? "#ff1744").toString(),
+      highlight_current_text: cfg.highlight_current_text ?? stub.highlight_current_text,
+      highlight_current_text_color: (cfg.highlight_current_text_color ?? stub.highlight_current_text_color).toString(),
 
-      highlight_current_time_text: cfg.highlight_current_time_text ?? false,
-      highlight_current_time_text_color: (cfg.highlight_current_time_text_color ?? "#ff9100").toString(),
+      highlight_current_time_text: cfg.highlight_current_time_text ?? stub.highlight_current_time_text,
+      highlight_current_time_text_color: (cfg.highlight_current_time_text_color ?? stub.highlight_current_time_text_color).toString(),
 
-      source_entity: (cfg.source_entity ?? "").toString(),
-      source_attribute: (cfg.source_attribute ?? "").toString(),
-      source_time_key: (cfg.source_time_key ?? "Stunde").toString(),
+      source_entity: (cfg.source_entity ?? stub.source_entity).toString(),
+      source_attribute: (cfg.source_attribute ?? stub.source_attribute).toString(),
+      source_time_key: (cfg.source_time_key ?? stub.source_time_key).toString(),
 
       week_mode,
-      week_a_is_even_kw: cfg.week_a_is_even_kw ?? true,
-      week_map_entity: (cfg.week_map_entity ?? "").toString(),
-      week_map_attribute: (cfg.week_map_attribute ?? "").toString(),
+      week_a_is_even_kw: cfg.week_a_is_even_kw ?? stub.week_a_is_even_kw,
+      week_map_entity: (cfg.week_map_entity ?? stub.week_map_entity).toString(),
+      week_map_attribute: (cfg.week_map_attribute ?? stub.week_map_attribute).toString(),
 
-      source_entity_a: (cfg.source_entity_a ?? "").toString(),
-      source_attribute_a: (cfg.source_attribute_a ?? "").toString(),
-      source_entity_b: (cfg.source_entity_b ?? "").toString(),
-      source_attribute_b: (cfg.source_attribute_b ?? "").toString(),
+      source_entity_a: (cfg.source_entity_a ?? stub.source_entity_a).toString(),
+      source_attribute_a: (cfg.source_attribute_a ?? stub.source_attribute_a).toString(),
+      source_entity_b: (cfg.source_entity_b ?? stub.source_entity_b).toString(),
+      source_attribute_b: (cfg.source_attribute_b ?? stub.source_attribute_b).toString(),
 
-      splan_xml_enabled: cfg.splan_xml_enabled ?? false,
-      splan_xml_url: (cfg.splan_xml_url ?? "/local/splan/sdaten/splank.xml").toString(),
-      splan_class: (cfg.splan_class ?? "5a").toString(),
+      // XML
+      splan_xml_enabled: cfg.splan_xml_enabled ?? stub.splan_xml_enabled,
+      splan_xml_url: (cfg.splan_xml_url ?? stub.splan_xml_url).toString(),
+      splan_class: (cfg.splan_class ?? stub.splan_class).toString(),
       splan_week,
-      splan_show_room: cfg.splan_show_room ?? true,
-      splan_show_teacher: cfg.splan_show_teacher ?? false,
+      splan_show_room: cfg.splan_show_room ?? stub.splan_show_room,
+      splan_show_teacher: cfg.splan_show_teacher ?? stub.splan_show_teacher,
+
+      // Vertretung
+      splan_sub_enabled: cfg.splan_sub_enabled ?? stub.splan_sub_enabled,
+      splan_sub_days,
+      splan_sub_show_info: cfg.splan_sub_show_info ?? stub.splan_sub_show_info,
+
+      // Planart
+      splan_plan_art,
 
       rows,
     };
@@ -580,7 +884,11 @@ export class StundenplanCard extends LitElement {
 
     const out: Row[] = data.map((obj: any) => {
       if (obj?.break === true) {
-        return { break: true, time: (obj.time ?? obj[timeKey] ?? "").toString(), label: (obj.label ?? "Pause").toString() };
+        return {
+          break: true,
+          time: (obj.time ?? obj[timeKey] ?? "").toString(),
+          label: (obj.label ?? "Pause").toString(),
+        };
       }
 
       const timeStr = (obj?.time ?? obj?.[timeKey] ?? "").toString();
@@ -681,9 +989,7 @@ export class StundenplanCard extends LitElement {
   }
 
   /**
-   * ✅ Fix für “aktuelle Stunde wird nicht erkannt” wenn XML-Stundenzeiten fehlen:
-   * - wir nehmen Zeiten aus manuellen cfg.rows (wenn vorhanden)
-   * - damit funktionieren isNowBetween() + Highlight auch bei Lücken im XML
+   * Fix: Fallback für Zeiten aus manuellen cfg.rows, wenn XML Stundenzeiten nicht liefert
    */
   private getFallbackTimesFromManual(cfg: Required<StundenplanConfig>, hour: number): { start?: string; end?: string } {
     const rows = cfg.rows ?? [];
@@ -691,7 +997,7 @@ export class StundenplanCard extends LitElement {
       if (isBreakRow(r)) continue;
       const lr = r as LessonRow;
 
-      const m = (lr.time ?? "").match(/^\s*(\d+)\s*\./); // "2." am Anfang
+      const m = (lr.time ?? "").match(/^\s*(\d+)\s*\./);
       if (!m) continue;
 
       const h = parseInt(m[1], 10);
@@ -706,49 +1012,137 @@ export class StundenplanCard extends LitElement {
     return {};
   }
 
+  private parseHourNumberFromTimeLabel(time: string | undefined): number | null {
+    const t = (time ?? "").toString();
+    const m = t.match(/^\s*(\d{1,2})\s*\./);
+    if (!m) return null;
+    const h = parseInt(m[1], 10);
+    return Number.isFinite(h) ? h : null;
+  }
+
+  private getManualHourTimeMap(cfg: Required<StundenplanConfig>): Map<number, { start?: string; end?: string }> {
+    const map = new Map<number, { start?: string; end?: string }>();
+    const rows = cfg.rows ?? [];
+    for (const r of rows) {
+      if (isBreakRow(r)) continue;
+      const lr = r as LessonRow;
+      const h = this.parseHourNumberFromTimeLabel(lr.time);
+      if (!h) continue;
+
+      const parsed = parseStartEndFromTime(lr.time);
+      const start = (lr.start ?? "").toString().trim() || parsed.start;
+      const end = (lr.end ?? "").toString().trim() || parsed.end;
+
+      if (start || end) map.set(h, { start: start || undefined, end: end || undefined });
+    }
+    return map;
+  }
+
+  private normalizeSequentialTimes(
+    hours: number[],
+    hourTimes: Map<number, { start?: string; end?: string }>
+  ): Map<number, { start?: string; end?: string }> {
+    // sorgt dafür: Stunde(n).start >= vorherige.end
+    const out = new Map(hourTimes);
+    let prevEndMin: number | null = null;
+
+    const toHHMM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+    for (const h of hours) {
+      const t = out.get(h);
+      if (!t) continue;
+
+      const sMin = this.toMinutes(t.start);
+      const eMin = this.toMinutes(t.end);
+
+      if (prevEndMin != null && sMin != null && sMin < prevEndMin) {
+        const newStartMin = prevEndMin;
+
+        let newEndMin: number | null = eMin;
+        const oldDur = sMin != null && eMin != null ? Math.max(0, eMin - sMin) : null;
+
+        if (newEndMin != null && newEndMin <= newStartMin) {
+          if (oldDur != null && oldDur > 0) newEndMin = newStartMin + oldDur;
+          else newEndMin = newStartMin + 45;
+        }
+
+        out.set(h, { start: toHHMM(newStartMin), end: newEndMin != null ? toHHMM(newEndMin) : t.end });
+      }
+
+      const e2 = out.get(h)?.end;
+      const e2Min = this.toMinutes(e2);
+      if (e2Min != null) prevEndMin = e2Min;
+    }
+
+    return out;
+  }
+
   private getRowsFromSplanXml(cfg: Required<StundenplanConfig>): Row[] | null {
     if (!cfg.splan_xml_enabled) return null;
-    if (!this._splanData) return null;
+    if (!this._splanWeekLessons || !this._splanWeekLessons.length) return null;
 
     const days = cfg.days ?? [];
-    const dayMap = days.map((d) => mapCfgDayToSplanDay(d)); // number|null
+    const dayMap = days.map((d) => mapCfgDayToSplanDay(d));
     const showRoom = !!cfg.splan_show_room;
     const showTeacher = !!cfg.splan_show_teacher;
 
-    // gewünschte Woche:
+    // aktive Woche bestimmen
     let activeWeek: "A" | "B" | null = null;
+
     if (cfg.splan_week === "A") activeWeek = "A";
     else if (cfg.splan_week === "B") activeWeek = "B";
     else {
-      // auto: wenn week_mode != off nutzen, sonst keine Filterung
-      if (cfg.week_mode !== "off") activeWeek = this.getActiveWeek(cfg);
+      const basisWeek = (() => {
+        if (!this._splanBasis) return null;
+        const sw = findSchoolWeek(this._splanBasis, new Date());
+        return sw?.wo ?? null;
+      })();
+
+      if (basisWeek) activeWeek = basisWeek;
+      else if (cfg.week_mode !== "off") activeWeek = this.getActiveWeek(cfg);
       else activeWeek = null;
     }
 
-    const times = (this._splanData.times ?? []).slice().sort((a, b) => a.hour - b.hour);
+    // ✅ Stundenliste: UNION aus XML-Stunden + manuellen Stunden (damit Stunde 6 nicht verschwindet)
+    const manualMap = this.getManualHourTimeMap(cfg);
+    const xmlHours = this._splanWeekLessons.map((l) => l.hour).filter((h) => Number.isFinite(h));
+    const manualHours = Array.from(manualMap.keys());
+    const hours = Array.from(new Set([...xmlHours, ...manualHours])).sort((a, b) => a - b);
 
-    // Fallback: wenn keine Zeiten, aus Lessons ableiten
-    const hoursFromLessons = Array.from(
-      new Set((this._splanData.lessons ?? []).map((l) => l.hour).filter((h) => Number.isFinite(h)))
-    ).sort((a, b) => a - b);
-
-    const hours = (times.length ? times.map((t) => t.hour) : hoursFromLessons).filter((h) => Number.isFinite(h));
     if (!hours.length) return null;
 
+    // ✅ Zeiten: manuell + Overlap-Normalisierung (fix: 1 endet nach 2 startet -> schieben)
+    const fixedTimes = this.normalizeSequentialTimes(hours, manualMap);
+
+    const todayDow = dayFromDate(new Date());
+
+    const formatLesson = (
+      subject: string,
+      room: string,
+      teacher: string,
+      info?: string,
+      marks?: { s?: boolean; r?: boolean; t?: boolean }
+    ) => {
+      const base = (subject ?? "").trim();
+      const rr = (room ?? "").trim();
+      const tt = (teacher ?? "").trim();
+
+      const extras: string[] = [];
+      if (showRoom && rr) extras.push(rr);
+      if (showTeacher && tt) extras.push(tt);
+
+      let s = extras.length ? `${base} (${extras.join(" · ")})` : base;
+
+      if (marks?.s || marks?.r || marks?.t) s = `🔁 ${s}`;
+      if (cfg.splan_sub_show_info && info) s = `${s}\n${info}`;
+
+      return s.trim();
+    };
+
     const rows: Row[] = hours.map((h) => {
-      const t = times.find((x) => x.hour === h);
-
-      // 1) aus XML
-      let start = (t?.start ?? "").trim();
-      let end = (t?.end ?? "").trim();
-
-      // 2) wenn XML Lücke: aus manueller Fallback-Zeile ziehen
-      if (!start || !end) {
-        const fb = this.getFallbackTimesFromManual(cfg, h);
-        start = start || (fb.start ?? "");
-        end = end || (fb.end ?? "");
-      }
-
+      const t = fixedTimes.get(h) ?? this.getFallbackTimesFromManual(cfg, h) ?? {};
+      const start = (t.start ?? "").trim();
+      const end = (t.end ?? "").trim();
       const timeLabelBase = `${h}.`;
       const timeLabel = start && end ? `${timeLabelBase} ${start}–${end}` : `${timeLabelBase}`;
 
@@ -756,50 +1150,56 @@ export class StundenplanCard extends LitElement {
         const splanDay = dayMap[colIdx];
         if (!splanDay) return "";
 
-        const hits = (this._splanData!.lessons ?? []).filter((l) => {
+        const hits = this._splanWeekLessons!.filter((l) => {
           if (l.hour !== h) return false;
           if (l.day !== splanDay) return false;
 
           const w = normalizeWeekLetter(l.week);
-          // wenn im XML keine Woche angegeben: gilt immer
           if (!w) return true;
           if (!activeWeek) return true;
           return w === activeWeek;
         });
 
-        if (!hits.length) return "";
+        const subsForDay = this._splanSubLessonsByDay.get(splanDay) ?? [];
+        const sub = subsForDay.find((x) => x.hour === h) ?? null;
 
-        const parts = hits.map((l) => {
-          const base = (l.subject ?? "").trim();
-          const room = (l.room ?? "").trim();
-          const teacher = (l.teacher ?? "").trim();
+        const parts: string[] = [];
 
-          const extras: string[] = [];
-          if (showRoom && room) extras.push(room);
-          if (showTeacher && teacher) extras.push(teacher);
-
-          return extras.length ? `${base} (${extras.join(" · ")})` : base;
-        });
+        // Vertretung nur für "heute" (wie in deinem Ansatz)
+        if (sub && splanDay === todayDow) {
+          parts.push(
+            formatLesson(
+              sub.subject ?? hits[0]?.subject ?? "",
+              sub.room ?? hits[0]?.room ?? "",
+              sub.teacher ?? hits[0]?.teacher ?? "",
+              sub.info,
+              { s: !!sub.changed_subject, r: !!sub.changed_room, t: !!sub.changed_teacher }
+            )
+          );
+        } else {
+          for (const l of hits) parts.push(formatLesson(l.subject, l.room, l.teacher));
+        }
 
         const uniq = Array.from(new Set(parts.filter((p) => p.trim().length > 0)));
         return uniq.join(" / ");
       });
 
-      const lr: LessonRow = {
+      return {
         time: timeLabel,
         start: start || undefined,
         end: end || undefined,
         cells,
-      };
-      return lr;
+      } as LessonRow;
     });
 
-    // ✅ Zeilen ohne Inhalt NICHT anzeigen (dein Punkt 4)
+    // ✅ Filter: Nur ausblenden, wenn wirklich "leer" UND keine manuelle Zeit existiert
     const filtered = rows.filter((r) => {
       if (isBreakRow(r)) return true;
       const lr = r as LessonRow;
-      const cells = lr.cells ?? [];
-      return cells.some((c) => !isFreeCellValue(c));
+      const h = this.parseHourNumberFromTimeLabel(lr.time);
+      const hasManualTime = !!(h && manualMap.has(h));
+      const hasContent = (lr.cells ?? []).some((c) => !isFreeCellValue(c));
+      return hasContent || hasManualTime;
     });
 
     return filtered.length ? filtered : null;
@@ -825,6 +1225,10 @@ export class StundenplanCard extends LitElement {
 
     const showXmlStatus = cfg.splan_xml_enabled;
 
+    const xmlTarget = (cfg.splan_class ?? "").trim();
+    const xmlWeek = cfg.splan_week === "auto" ? "auto" : cfg.splan_week;
+    const xmlArt = (cfg.splan_plan_art ?? "class").toString();
+
     return html`
       <ha-card header=${cfg.title ?? ""}>
         <div class="card">
@@ -835,8 +1239,10 @@ export class StundenplanCard extends LitElement {
                 <div class="xmlBadge">
                   <div class="xmlLine">
                     <b>XML</b>
-                    <span class="mono">${cfg.splan_class}</span>
-                    <span class="mono">${cfg.splan_week === "auto" ? "auto" : cfg.splan_week}</span>
+                    <span class="mono">${xmlArt}</span>
+                    <span class="mono">${xmlTarget}</span>
+                    <span class="mono">${xmlWeek}</span>
+                    ${cfg.splan_sub_enabled ? html`<span class="pill">Vertretung an</span>` : html``}
                     ${this._splanLoading ? html`<span class="pill">lädt…</span>` : html``}
                     ${this._splanErr ? html`<span class="pill err">Fehler</span>` : html``}
                   </div>
@@ -912,7 +1318,7 @@ export class StundenplanCard extends LitElement {
                       const cls = cfg.highlight_today && i === todayIdx ? "today" : "";
                       let style = `--sp-hl:${todayOverlay};` + styleToString(cellStyle, borderDefault);
 
-                      const hasValue = (val ?? "").toString().trim().length > 0;
+                      const hasValue = !isFreeCellValue(val);
 
                       if (
                         allowCurrent &&
@@ -926,7 +1332,7 @@ export class StundenplanCard extends LitElement {
                         style += `color:${currentTextColor};`;
                       }
 
-                      return html`<td class=${cls} style=${style}>${val}</td>`;
+                      return html`<td class=${cls} style=${style}><span class="cellText">${val}</span></td>`;
                     })}
                   </tr>
                 `;
@@ -1029,6 +1435,10 @@ export class StundenplanCard extends LitElement {
       opacity: 0.85;
       word-break: break-word;
     }
+    .cellText {
+      white-space: pre-line; /* wichtig für Vertretungs-Info \n */
+      display: inline-block;
+    }
   `;
 }
 
@@ -1043,7 +1453,6 @@ export class StundenplanCardEditor extends LitElement {
   public hass: any;
   private _config?: Required<StundenplanConfig>;
 
-  // Editor UX: defaults (Row-Panels default: closed)
   private _ui = {
     openGeneral: false,
     openHighlight: false,
@@ -1051,7 +1460,7 @@ export class StundenplanCardEditor extends LitElement {
     openSources: false,
     openRows: false,
     showCellStyles: true,
-    rowOpen: {} as Record<number, boolean>, // default: empty => all closed
+    rowOpen: {} as Record<number, boolean>,
   };
 
   public setConfig(cfg: StundenplanConfig): void {
@@ -1066,6 +1475,107 @@ export class StundenplanCardEditor extends LitElement {
     if (!wasInitialized) {
       this._ui.rowOpen = {};
     }
+  }
+
+  private normalizeConfig(cfg: StundenplanConfig): Required<StundenplanConfig> {
+    // Editor nutzt exakt dieselbe Normalisierung wie die Card, damit nichts "springt"
+    const stub = StundenplanCard.getStubConfig();
+    const merged: StundenplanConfig = { ...stub, ...cfg, type: (cfg.type ?? stub.type).toString() };
+
+    // reuse Card-normalize, ohne Zugriff auf private method:
+    const days =
+      Array.isArray(merged.days) && merged.days.length
+        ? merged.days.map((d) => (d ?? "").toString())
+        : ["Mo", "Di", "Mi", "Do", "Fr"];
+
+    const rowsIn = Array.isArray(merged.rows) ? merged.rows : [];
+    const rows: Row[] = rowsIn.map((r: any) => {
+      if (isBreakRow(r)) {
+        return { break: true, time: (r.time ?? "").toString(), label: (r.label ?? "Pause").toString() };
+      }
+      const cellsIn = Array.isArray(r?.cells) ? r.cells : [];
+      const cells = Array.from({ length: days.length }, (_, i) => (cellsIn[i] ?? "").toString());
+
+      const stylesIn = Array.isArray(r?.cell_styles) ? r.cell_styles : [];
+      const cell_styles = Array.from({ length: days.length }, (_, i) => normalizeCellStyle(stylesIn[i]));
+
+      const timeStr = (r?.time ?? "").toString();
+      const parsed = parseStartEndFromTime(timeStr);
+
+      const startRaw = (r?.start ?? "").toString().trim();
+      const endRaw = (r?.end ?? "").toString().trim();
+
+      const out: LessonRow = {
+        time: timeStr,
+        start: startRaw || parsed.start || undefined,
+        end: endRaw || parsed.end || undefined,
+        cells,
+      };
+      if (cell_styles.some((x) => !!x)) out.cell_styles = cell_styles;
+      return out;
+    });
+
+    const weekModeRaw = ((merged.week_mode ?? stub.week_mode) + "").toString().trim() as WeekMode;
+    const week_mode: WeekMode =
+      weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
+
+    const splanWeekRaw = ((merged.splan_week ?? stub.splan_week) + "").toString().trim().toLowerCase();
+    const splan_week: SplanWeekMode = splanWeekRaw === "a" ? "A" : splanWeekRaw === "b" ? "B" : "auto";
+
+    const artRaw = ((merged.splan_plan_art ?? stub.splan_plan_art) + "").toString().trim().toLowerCase();
+    const splan_plan_art: SplanPlanArt = artRaw === "teacher" ? "teacher" : artRaw === "room" ? "room" : "class";
+
+    const subDaysNum = Number(merged.splan_sub_days ?? stub.splan_sub_days);
+    const splan_sub_days = Number.isFinite(subDaysNum) ? Math.max(1, Math.min(14, subDaysNum)) : stub.splan_sub_days;
+
+    return {
+      type: (merged.type ?? stub.type).toString(),
+      title: (merged.title ?? stub.title).toString(),
+      days,
+
+      highlight_today: merged.highlight_today ?? stub.highlight_today,
+      highlight_current: merged.highlight_current ?? stub.highlight_current,
+      highlight_breaks: merged.highlight_breaks ?? stub.highlight_breaks,
+      free_only_column_highlight: merged.free_only_column_highlight ?? stub.free_only_column_highlight,
+
+      highlight_today_color: (merged.highlight_today_color ?? stub.highlight_today_color).toString(),
+      highlight_current_color: (merged.highlight_current_color ?? stub.highlight_current_color).toString(),
+
+      highlight_current_text: merged.highlight_current_text ?? stub.highlight_current_text,
+      highlight_current_text_color: (merged.highlight_current_text_color ?? stub.highlight_current_text_color).toString(),
+
+      highlight_current_time_text: merged.highlight_current_time_text ?? stub.highlight_current_time_text,
+      highlight_current_time_text_color: (merged.highlight_current_time_text_color ?? stub.highlight_current_time_text_color).toString(),
+
+      source_entity: (merged.source_entity ?? stub.source_entity).toString(),
+      source_attribute: (merged.source_attribute ?? stub.source_attribute).toString(),
+      source_time_key: (merged.source_time_key ?? stub.source_time_key).toString(),
+
+      week_mode,
+      week_a_is_even_kw: merged.week_a_is_even_kw ?? stub.week_a_is_even_kw,
+      week_map_entity: (merged.week_map_entity ?? stub.week_map_entity).toString(),
+      week_map_attribute: (merged.week_map_attribute ?? stub.week_map_attribute).toString(),
+
+      source_entity_a: (merged.source_entity_a ?? stub.source_entity_a).toString(),
+      source_attribute_a: (merged.source_attribute_a ?? stub.source_attribute_a).toString(),
+      source_entity_b: (merged.source_entity_b ?? stub.source_entity_b).toString(),
+      source_attribute_b: (merged.source_attribute_b ?? stub.source_attribute_b).toString(),
+
+      splan_xml_enabled: merged.splan_xml_enabled ?? stub.splan_xml_enabled,
+      splan_xml_url: (merged.splan_xml_url ?? stub.splan_xml_url).toString(),
+      splan_class: (merged.splan_class ?? stub.splan_class).toString(),
+      splan_week,
+      splan_show_room: merged.splan_show_room ?? stub.splan_show_room,
+      splan_show_teacher: merged.splan_show_teacher ?? stub.splan_show_teacher,
+
+      splan_sub_enabled: merged.splan_sub_enabled ?? stub.splan_sub_enabled,
+      splan_sub_days,
+      splan_sub_show_info: merged.splan_sub_show_info ?? stub.splan_sub_show_info,
+
+      splan_plan_art,
+
+      rows,
+    };
   }
 
   private clone<T>(obj: T): T {
@@ -1149,88 +1659,6 @@ export class StundenplanCardEditor extends LitElement {
     this.emit({ ...this._config, [key]: hex });
   }
 
-  private normalizeConfig(cfg: StundenplanConfig): Required<StundenplanConfig> {
-    const stub = StundenplanCard.getStubConfig();
-    const merged: StundenplanConfig = { ...stub, ...cfg };
-
-    const days =
-      Array.isArray(merged.days) && merged.days.length ? merged.days.map((d) => (d ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"];
-
-    const rowsIn = Array.isArray(merged.rows) ? merged.rows : [];
-    const rows: Row[] = rowsIn.map((r: any) => {
-      if (isBreakRow(r)) return { break: true, time: (r.time ?? "").toString(), label: (r.label ?? "Pause").toString() };
-
-      const cellsIn = Array.isArray(r?.cells) ? r.cells : [];
-      const cells = Array.from({ length: days.length }, (_, i) => (cellsIn[i] ?? "").toString());
-
-      const stylesIn = Array.isArray(r?.cell_styles) ? r.cell_styles : [];
-      const cell_styles = Array.from({ length: days.length }, (_, i) => normalizeCellStyle(stylesIn[i]));
-
-      const timeStr = (r?.time ?? "").toString();
-      const parsed = parseStartEndFromTime(timeStr);
-
-      const startRaw = (r?.start ?? "").toString().trim();
-      const endRaw = (r?.end ?? "").toString().trim();
-
-      return {
-        time: timeStr,
-        start: startRaw || parsed.start || undefined,
-        end: endRaw || parsed.end || undefined,
-        cells,
-        cell_styles,
-      } as LessonRow;
-    });
-
-    const weekModeRaw = ((merged.week_mode ?? "off") + "").toString().trim() as WeekMode;
-    const week_mode: WeekMode = weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
-
-    const splanWeekRaw = ((merged.splan_week ?? "auto") + "").toString().trim().toLowerCase();
-    const splan_week: SplanWeekMode = splanWeekRaw === "a" ? "A" : splanWeekRaw === "b" ? "B" : "auto";
-
-    return {
-      type: (merged.type ?? "custom:stundenplan-card").toString(),
-      title: (merged.title ?? "Mein Stundenplan").toString(),
-      days,
-
-      highlight_today: merged.highlight_today ?? true,
-      highlight_current: merged.highlight_current ?? false,
-      highlight_breaks: merged.highlight_breaks ?? false,
-      free_only_column_highlight: merged.free_only_column_highlight ?? true,
-
-      highlight_today_color: (merged.highlight_today_color ?? "rgba(0, 150, 255, 0.12)").toString(),
-      highlight_current_color: (merged.highlight_current_color ?? "rgba(76, 175, 80, 0.18)").toString(),
-
-      highlight_current_text: merged.highlight_current_text ?? false,
-      highlight_current_text_color: (merged.highlight_current_text_color ?? "#ff1744").toString(),
-
-      highlight_current_time_text: merged.highlight_current_time_text ?? false,
-      highlight_current_time_text_color: (merged.highlight_current_time_text_color ?? "#ff9100").toString(),
-
-      source_entity: (merged.source_entity ?? "").toString(),
-      source_attribute: (merged.source_attribute ?? "").toString(),
-      source_time_key: (merged.source_time_key ?? "Stunde").toString(),
-
-      week_mode,
-      week_a_is_even_kw: merged.week_a_is_even_kw ?? true,
-      week_map_entity: (merged.week_map_entity ?? "").toString(),
-      week_map_attribute: (merged.week_map_attribute ?? "").toString(),
-
-      source_entity_a: (merged.source_entity_a ?? "").toString(),
-      source_attribute_a: (merged.source_attribute_a ?? "").toString(),
-      source_entity_b: (merged.source_entity_b ?? "").toString(),
-      source_attribute_b: (merged.source_attribute_b ?? "").toString(),
-
-      splan_xml_enabled: merged.splan_xml_enabled ?? false,
-      splan_xml_url: (merged.splan_xml_url ?? "/local/splan/sdaten/splank.xml").toString(),
-      splan_class: (merged.splan_class ?? "5a").toString(),
-      splan_week,
-      splan_show_room: merged.splan_show_room ?? true,
-      splan_show_teacher: merged.splan_show_teacher ?? false,
-
-      rows,
-    };
-  }
-
   private setDaysFromString(value: string) {
     if (!this._config) return;
     const days = value
@@ -1286,13 +1714,17 @@ export class StundenplanCardEditor extends LitElement {
 
   private updateRowStart(idx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => (i !== idx || isBreakRow(r) ? r : ({ ...(r as LessonRow), start: value || undefined } as LessonRow)));
+    const rows = this._config.rows.map((r, i) =>
+      i !== idx || isBreakRow(r) ? r : ({ ...(r as LessonRow), start: value || undefined } as LessonRow)
+    );
     this.emit({ ...this._config, rows });
   }
 
   private updateRowEnd(idx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => (i !== idx || isBreakRow(r) ? r : ({ ...(r as LessonRow), end: value || undefined } as LessonRow)));
+    const rows = this._config.rows.map((r, i) =>
+      i !== idx || isBreakRow(r) ? r : ({ ...(r as LessonRow), end: value || undefined } as LessonRow)
+    );
     this.emit({ ...this._config, rows });
   }
 
@@ -1352,7 +1784,7 @@ export class StundenplanCardEditor extends LitElement {
 
   private updateBreakLabel(idx: number, value: string) {
     if (!this._config) return;
-    const rows = this._config.rows.map((r, i) => (i === idx ? { ...r, label: value } : r));
+    const rows = this._config.rows.map((r, i) => (i === idx ? { ...(r as any), label: value } : r));
     this.emit({ ...this._config, rows });
   }
 
@@ -1511,12 +1943,22 @@ export class StundenplanCardEditor extends LitElement {
       <div class="grid2">
         <div class="field">
           <label class="lbl">Titel</label>
-          <input class="in" type="text" .value=${this._config.title ?? ""} @input=${(e: any) => this.emit({ ...this._config!, title: e.target.value })} />
+          <input
+            class="in"
+            type="text"
+            .value=${this._config.title ?? ""}
+            @input=${(e: any) => this.emit({ ...this._config!, title: e.target.value })}
+          />
         </div>
 
         <div class="field">
           <label class="lbl">Tage (Komma getrennt)</label>
-          <input class="in" type="text" .value=${(this._config.days ?? []).join(", ")} @input=${(e: any) => this.setDaysFromString(e.target.value)} />
+          <input
+            class="in"
+            type="text"
+            .value=${(this._config.days ?? []).join(", ")}
+            @input=${(e: any) => this.setDaysFromString(e.target.value)}
+          />
           <div class="sub">Beispiel: Mo, Di, Mi, Do, Fr</div>
         </div>
       </div>
@@ -1557,7 +1999,10 @@ export class StundenplanCardEditor extends LitElement {
         <div class="optRow">
           <div>
             <div class="optTitle">Freistunden: nur Tag hervorheben</div>
-            <div class="sub">Unterdrückt „Aktuell“-Highlights, wenn die heutige Zelle in der aktuellen Stunde leer ist, oder "-" bzw. "---" eingetragen wird.</div>
+            <div class="sub">
+              Unterdrückt „Aktuell“-Highlights, wenn die heutige Zelle in der aktuellen Stunde leer ist, oder "-" bzw.
+              "---" eingetragen wird.
+            </div>
           </div>
           ${this.uiSwitch(!!c.free_only_column_highlight, (v) => this.emit({ ...c, free_only_column_highlight: v }))}
         </div>
@@ -1603,7 +2048,13 @@ export class StundenplanCardEditor extends LitElement {
         <div class="colorControls">
           <input class="col" type="color" .value=${hexAlpha.hex} @input=${(e: any) => onHex(e.target.value)} />
           <div class="range">
-            <input type="range" min="0" max="100" .value=${String(alphaPct)} @input=${(e: any) => onAlpha(Number(e.target.value) / 100)} />
+            <input
+              type="range"
+              min="0"
+              max="100"
+              .value=${String(alphaPct)}
+              @input=${(e: any) => onAlpha(Number(e.target.value) / 100)}
+            />
             <div class="pct">${alphaPct}%</div>
           </div>
         </div>
@@ -1645,22 +2096,43 @@ export class StundenplanCardEditor extends LitElement {
           <div class="field">
             <label class="lbl">Textfarbe: Aktuelles Fach</label>
             <div class="inRow">
-              <input class="col" type="color" .value=${(this._config.highlight_current_text_color ?? "#ff1744").toString()} @input=${(e: any) => this.setHighlightHexOnly("highlight_current_text_color", e.target.value)} />
-              <input class="in" type="text" .value=${this._config.highlight_current_text_color ?? "#ff1744"} @input=${(e: any) => this.emit({ ...this._config!, highlight_current_text_color: e.target.value })} />
+              <input
+                class="col"
+                type="color"
+                .value=${(this._config.highlight_current_text_color ?? "#ff1744").toString()}
+                @input=${(e: any) => this.setHighlightHexOnly("highlight_current_text_color", e.target.value)}
+              />
+              <input
+                class="in"
+                type="text"
+                .value=${this._config.highlight_current_text_color ?? "#ff1744"}
+                @input=${(e: any) => this.emit({ ...this._config!, highlight_current_text_color: e.target.value })}
+              />
             </div>
           </div>
 
           <div class="field">
             <label class="lbl">Textfarbe: Zeitspalte (aktuelle Stunde)</label>
             <div class="inRow">
-              <input class="col" type="color" .value=${(this._config.highlight_current_time_text_color ?? "#ff9100").toString()} @input=${(e: any) => this.setHighlightHexOnly("highlight_current_time_text_color", e.target.value)} />
-              <input class="in" type="text" .value=${this._config.highlight_current_time_text_color ?? "#ff9100"} @input=${(e: any) => this.emit({ ...this._config!, highlight_current_time_text_color: e.target.value })} />
+              <input
+                class="col"
+                type="color"
+                .value=${(this._config.highlight_current_time_text_color ?? "#ff9100").toString()}
+                @input=${(e: any) => this.setHighlightHexOnly("highlight_current_time_text_color", e.target.value)}
+              />
+              <input
+                class="in"
+                type="text"
+                .value=${this._config.highlight_current_time_text_color ?? "#ff9100"}
+                @input=${(e: any) => this.emit({ ...this._config!, highlight_current_time_text_color: e.target.value })}
+              />
             </div>
           </div>
         </div>
 
         <div class="sub">
-          Tipp: Du kannst auch <span class="mono">rgb()/rgba()</span> oder <span class="mono">var(--...)</span> Werte direkt in YAML setzen – der Editor hält es kompatibel.
+          Tipp: Du kannst auch <span class="mono">rgb()/rgba()</span> oder <span class="mono">var(--...)</span> Werte
+          direkt in YAML setzen – der Editor hält es kompatibel.
         </div>
       </div>
     `;
@@ -1673,9 +2145,7 @@ export class StundenplanCardEditor extends LitElement {
 
     return html`
       <div class="stack">
-        <div class="sub">
-          Datenquelle: XML (Stundenplan24) hat Priorität wenn aktiv. Sonst Entity (JSON) oder manueller Plan.
-        </div>
+        <div class="sub">Datenquelle: XML (Stundenplan24) hat Priorität wenn aktiv. Sonst Entity (JSON) oder manuell.</div>
 
         <div class="panelMinor">
           <div class="minorTitle">✅ Stundenplan24 XML</div>
@@ -1695,7 +2165,7 @@ export class StundenplanCardEditor extends LitElement {
                 class="in"
                 type="text"
                 .value=${c.splan_xml_url ?? ""}
-                placeholder="/local/splan/sdaten/splank.xml"
+                placeholder="/local/splan/sdaten"
                 @input=${(e: any) => this.emit({ ...c, splan_xml_url: e.target.value })}
               />
               <div class="sub">Wichtig: in HA immer <span class="mono">/local/...</span></div>
@@ -1703,7 +2173,13 @@ export class StundenplanCardEditor extends LitElement {
 
             <div class="field">
               <label class="lbl">Klasse (Kurz)</label>
-              <input class="in" type="text" .value=${c.splan_class ?? ""} placeholder="z.B. 5a" @input=${(e: any) => this.emit({ ...c, splan_class: e.target.value })} />
+              <input
+                class="in"
+                type="text"
+                .value=${c.splan_class ?? ""}
+                placeholder="z.B. 5a"
+                @input=${(e: any) => this.emit({ ...c, splan_class: e.target.value })}
+              />
             </div>
           </div>
 
@@ -1711,7 +2187,7 @@ export class StundenplanCardEditor extends LitElement {
             <div class="field">
               <label class="lbl">Woche (XML)</label>
               <select class="in" .value=${c.splan_week ?? "auto"} @change=${(e: any) => this.emit({ ...c, splan_week: e.target.value })}>
-                <option value="auto">auto (nutzt week_mode, sonst alle)</option>
+                <option value="auto">auto (Basis/Week-Mode, sonst alle)</option>
                 <option value="A">A</option>
                 <option value="B">B</option>
               </select>
@@ -1733,6 +2209,42 @@ export class StundenplanCardEditor extends LitElement {
                   <div class="sub">z.B. Mathe (R101 · MU)</div>
                 </div>
                 ${this.uiSwitch(!!c.splan_show_teacher, (v) => this.emit({ ...c, splan_show_teacher: v }))}
+              </div>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="optRow">
+            <div>
+              <div class="optTitle">Vertretungsplan aktivieren</div>
+              <div class="sub">Lädt WPlanKl_YYYYMMDD.xml (heute + X Tage). Anzeige nur für „heute“ in der Tabelle.</div>
+            </div>
+            ${this.uiSwitch(!!c.splan_sub_enabled, (v) => this.emit({ ...c, splan_sub_enabled: v }))}
+          </div>
+
+          <div class="grid2">
+            <div class="field">
+              <label class="lbl">Vertretung: Tage</label>
+              <input
+                class="in"
+                type="number"
+                min="1"
+                max="14"
+                .value=${String(c.splan_sub_days ?? 3)}
+                @input=${(e: any) => this.emit({ ...c, splan_sub_days: Number(e.target.value) })}
+              />
+              <div class="sub">1..14 (Default 3)</div>
+            </div>
+
+            <div class="field">
+              <label class="lbl">Info anzeigen</label>
+              <div class="optRow" style="padding:8px 10px;">
+                <div>
+                  <div class="optTitle">Zusatztext (If)</div>
+                  <div class="sub">Zeilenumbruch wird unterstützt.</div>
+                </div>
+                ${this.uiSwitch(!!c.splan_sub_show_info, (v) => this.emit({ ...c, splan_sub_show_info: v }))}
               </div>
             </div>
           </div>
@@ -1770,28 +2282,26 @@ export class StundenplanCardEditor extends LitElement {
             </div>
           </div>
 
-          <div class="sub">
-            Mapping-Format: <span class="mono">{"2026":{"1":"A","2":"B"}}</span> oder <span class="mono">{"1":"A","2":"B"}</span>
-          </div>
+          <div class="sub">Mapping: <span class="mono">{"2026":{"1":"A","2":"B"}}</span> oder <span class="mono">{"1":"A","2":"B"}</span></div>
 
           <div class="divider"></div>
 
           <div class="grid2">
             <div class="field">
               <label class="lbl">source_entity_a</label>
-              <input class="in" type="text" .value=${c.source_entity_a ?? ""} placeholder="z.B. sensor.stundenplan_a" @input=${(e: any) => this.emit({ ...c, source_entity_a: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_entity_a ?? ""} @input=${(e: any) => this.emit({ ...c, source_entity_a: e.target.value })} />
             </div>
             <div class="field">
               <label class="lbl">source_attribute_a</label>
-              <input class="in" type="text" .value=${c.source_attribute_a ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_a: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_attribute_a ?? ""} @input=${(e: any) => this.emit({ ...c, source_attribute_a: e.target.value })} />
             </div>
             <div class="field">
               <label class="lbl">source_entity_b</label>
-              <input class="in" type="text" .value=${c.source_entity_b ?? ""} placeholder="z.B. sensor.stundenplan_b" @input=${(e: any) => this.emit({ ...c, source_entity_b: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_entity_b ?? ""} @input=${(e: any) => this.emit({ ...c, source_entity_b: e.target.value })} />
             </div>
             <div class="field">
               <label class="lbl">source_attribute_b</label>
-              <input class="in" type="text" .value=${c.source_attribute_b ?? ""} placeholder="z.B. plan" @input=${(e: any) => this.emit({ ...c, source_attribute_b: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_attribute_b ?? ""} @input=${(e: any) => this.emit({ ...c, source_attribute_b: e.target.value })} />
             </div>
           </div>
         </div>
@@ -1802,18 +2312,18 @@ export class StundenplanCardEditor extends LitElement {
           <div class="grid2">
             <div class="field">
               <label class="lbl">source_entity</label>
-              <input class="in" type="text" .value=${c.source_entity ?? ""} placeholder="z.B. sensor.stundenplan" @input=${(e: any) => this.emit({ ...c, source_entity: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_entity ?? ""} @input=${(e: any) => this.emit({ ...c, source_entity: e.target.value })} />
             </div>
 
             <div class="field">
               <label class="lbl">source_attribute</label>
-              <input class="in" type="text" .value=${c.source_attribute ?? ""} placeholder="z.B. plan (leer = state)" @input=${(e: any) => this.emit({ ...c, source_attribute: e.target.value })} />
+              <input class="in" type="text" .value=${c.source_attribute ?? ""} @input=${(e: any) => this.emit({ ...c, source_attribute: e.target.value })} />
             </div>
           </div>
 
           <div class="field">
             <label class="lbl">source_time_key</label>
-            <input class="in" type="text" .value=${c.source_time_key ?? "Stunde"} placeholder='Default: "Stunde"' @input=${(e: any) => this.emit({ ...c, source_time_key: e.target.value })} />
+            <input class="in" type="text" .value=${c.source_time_key ?? "Stunde"} @input=${(e: any) => this.emit({ ...c, source_time_key: e.target.value })} />
           </div>
         </div>
       </div>
@@ -1850,7 +2360,7 @@ export class StundenplanCardEditor extends LitElement {
         Hinweis: Wenn XML aktiv ist, werden diese Zeilen nur als Fallback genutzt (z.B. fehlende Zeiten).
       </div>
 
-      ${c.rows.map((r, idx) => {
+      ${(c.rows ?? []).map((r, idx) => {
         const isBreak = isBreakRow(r);
         const header = isBreak ? `Pause · ${(r as any).time ?? ""}` : `Stunde · ${(r as any).time ?? ""}`;
         const label = isBreak ? ((r as BreakRow).label ?? "Pause") : "";
