@@ -690,6 +690,27 @@ export class StundenplanCard extends LitElement {
     return cfg.rows ?? [];
   }
 
+private getFallbackTimesFromManual(cfg: Required<StundenplanConfig>, hour: number): { start?: string; end?: string } {
+  const rows = cfg.rows ?? [];
+  for (const r of rows) {
+    if (isBreakRow(r)) continue;
+    const lr = r as LessonRow;
+
+    const m = (lr.time ?? "").match(/^\s*(\d+)\s*\./); // "2." am Anfang
+    if (!m) continue;
+
+    const h = parseInt(m[1], 10);
+    if (h !== hour) continue;
+
+    const parsed = parseStartEndFromTime(lr.time);
+    return {
+      start: (lr.start ?? "").trim() || parsed.start,
+      end: (lr.end ?? "").trim() || parsed.end,
+    };
+  }
+  return {};
+}
+
   private getRowsFromSplanXml(cfg: Required<StundenplanConfig>): Row[] | null {
     if (!cfg.splan_xml_enabled) return null;
     if (!this._splanData) return null;
@@ -720,12 +741,21 @@ export class StundenplanCard extends LitElement {
     if (!hours.length) return null;
 
     const rows: Row[] = hours.map((h) => {
-      const t = times.find((x) => x.hour === h);
-      const start = t?.start ?? "";
-      const end = t?.end ?? "";
 
-      const timeLabelBase = `${h}.`;
-      const timeLabel = start && end ? `${timeLabelBase} ${start}–${end}` : `${timeLabelBase}`;
+const t = times.find((x) => x.hour === h);
+let start = t?.start ?? "";
+let end = t?.end ?? "";
+
+// ✅ Fallback: wenn XML keine Zeiten liefert, aus manuellen rows übernehmen
+if (!start || !end) {
+  const fb = this.getFallbackTimesFromManual(cfg, h);
+  start = start || fb.start || "";
+  end = end || fb.end || "";
+}
+
+const timeLabelBase = `${h}.`;
+const timeLabel = start && end ? `${timeLabelBase} ${start}–${end}` : `${timeLabelBase}`;
+
 
       const cells = days.map((_, colIdx) => {
         const splanDay = dayMap[colIdx];
