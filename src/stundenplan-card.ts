@@ -771,7 +771,15 @@ export class StundenplanCard extends LitElement {
       return lr;
     });
 
-    return rows;
+// Leere Zeilen entfernen (wenn in keiner Spalte Text steht)
+const filtered = rows.filter((rr) => {
+  if (isBreakRow(rr)) return true;
+  const lr = rr as LessonRow;
+  return (lr.cells ?? []).some((v) => (v ?? "").toString().trim().length > 0);
+});
+
+return filtered.length ? filtered : null;
+
   }
 
   protected render(): TemplateResult {
@@ -789,15 +797,32 @@ export class StundenplanCard extends LitElement {
     const currentTextColor = (cfg.highlight_current_text_color ?? "").toString().trim();
     const currentTimeTextColor = (cfg.highlight_current_time_text_color ?? "").toString().trim();
 
-    const showWeekBadge = cfg.week_mode !== "off";
-    const activeWeek = showWeekBadge ? this.getActiveWeek(cfg) : null;
+// Woche für Anzeige/Filter: wenn XML aktiv → splan_week hat Vorrang, sonst week_mode/parity
+const xmlActive = !!cfg.splan_xml_enabled;
+
+let activeWeek: "A" | "B" | null = null;
+if (xmlActive) {
+  if (cfg.splan_week === "A") activeWeek = "A";
+  else if (cfg.splan_week === "B") activeWeek = "B";
+  else {
+    // auto: wenn week_mode off → trotzdem Parität nutzen, damit A/B sichtbar ist
+    const cfgForAuto = cfg.week_mode === "off" ? ({ ...cfg, week_mode: "kw_parity" as const }) : cfg;
+    activeWeek = this.getActiveWeek(cfgForAuto);
+  }
+} else {
+  activeWeek = cfg.week_mode === "off" ? null : this.getActiveWeek(cfg);
+}
+
+// Badge anzeigen wenn: Wechselwochen aktiv ODER XML aktiv
+const showWeekBadge = (cfg.week_mode !== "off") || xmlActive;
+
 
     const showXmlStatus = cfg.splan_xml_enabled;
 
     return html`
       <ha-card header=${cfg.title ?? ""}>
         <div class="card">
-          ${showWeekBadge ? html`<div class="weekBadge">Woche: <b>${activeWeek}</b></div>` : html``}
+          ${showWeekBadge ? html`<div class="weekBadge">Woche: <b>${activeWeek ?? "—"}</b></div>` : html``}
 
           ${showXmlStatus
             ? html`
