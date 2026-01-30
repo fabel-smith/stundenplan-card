@@ -106,6 +106,11 @@ type StundenplanConfig = {
   // ✅ Planart (optional)
   splan_plan_art?: SplanPlanArt; // default "class"
 
+  // ✅ Filter gegen "zu viele Kurse" (mobdaten / Entity-Strings)
+  filter_main_only?: boolean;        // default true: nur Einträge ohne führende Zahl
+  filter_allow_prefixes?: string[];  // optional: z.B. ["10eth", "08pmit"]
+  filter_exclude?: string[];         // optional: Regex oder Text (wird entfernt)
+
   rows?: Row[];
 };
 
@@ -247,9 +252,6 @@ function isFreeCellValue(v: any): boolean {
   return false;
 }
 
-
-/* ===================== Stundenplan24 XML ===================== */
-
 /* ===================== Stundenplan24: mobil/week.json ===================== */
 
 type MobilWeekJson = {
@@ -310,7 +312,6 @@ function normalizeFachForCell(fach: string | undefined, info: string | undefined
 
   return i ? `${f}\n${i}` : f;
 }
-
 
 type SplanBasis = {
   classes: string[];
@@ -727,7 +728,6 @@ export class StundenplanCard extends LitElement {
     }
   }
 
-
   static getStubConfig(): Required<StundenplanConfig> {
     return {
       type: "custom:stundenplan-card",
@@ -775,6 +775,11 @@ export class StundenplanCard extends LitElement {
       splan_sub_show_info: true,
 
       splan_plan_art: "class",
+
+      // ✅ Filter defaults
+      filter_main_only: true,
+      filter_allow_prefixes: [],
+      filter_exclude: [],
 
       rows: [
         {
@@ -930,6 +935,11 @@ export class StundenplanCard extends LitElement {
 
       // Planart
       splan_plan_art,
+
+      // ✅ Filter
+      filter_main_only: cfg.filter_main_only ?? true,
+      filter_allow_prefixes: Array.isArray(cfg.filter_allow_prefixes) ? cfg.filter_allow_prefixes.map(String) : [],
+      filter_exclude: Array.isArray(cfg.filter_exclude) ? cfg.filter_exclude.map(String) : [],
 
       rows,
     };
@@ -1156,7 +1166,8 @@ export class StundenplanCard extends LitElement {
     const out = new Map(hourTimes);
     let prevEndMin: number | null = null;
 
-    const toHHMM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+    const toHHMM = (m: number) =>
+      `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 
     for (const h of hours) {
       const t = out.get(h);
@@ -1185,6 +1196,45 @@ export class StundenplanCard extends LitElement {
     }
 
     return out;
+  }
+
+  // ✅ NEU: Textfilter gegen "zu viele Kurse"
+  private filterCellText(cell: string, cfg: Required<StundenplanConfig>): string {
+    const raw = (cell ?? "").toString().trim();
+    if (!raw) return "";
+
+    const parts = raw
+      .split("/")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0 && s !== "---" && s !== "—");
+
+    // optional exclude list (regex or substring)
+    const excl = (cfg.filter_exclude ?? []).map((x) => x.trim()).filter(Boolean);
+    const isExcluded = (p: string) =>
+      excl.some((e) => {
+        try {
+          return new RegExp(e, "i").test(p);
+        } catch {
+          return p.toLowerCase().includes(e.toLowerCase());
+        }
+      });
+
+    const remaining = parts.filter((p) => !isExcluded(p));
+
+    // main-only (no leading digits) e.g. "MA (126)" yes, "27EN1 (213)" no
+    const mainOnly = cfg.filter_main_only !== false ? remaining.filter((p) => !/^\d/.test(p)) : remaining;
+
+    // allow prefixes for digit-based groups (optional)
+    const allow = (cfg.filter_allow_prefixes ?? []).map((x) => x.toLowerCase()).filter(Boolean);
+    const allowed = remaining.filter((p) => {
+      const m = p.match(/^(\d+[a-z]+)/i); // e.g. 27EN, 10ETH, 08PMIT
+      if (!m) return false;
+      const key = m[1].toLowerCase();
+      return allow.some((a) => key.startsWith(a));
+    });
+
+    const finalParts = Array.from(new Set([...mainOnly, ...allowed]));
+    return finalParts.join(" / ");
   }
 
   private getRowsFromSplanXml(cfg: Required<StundenplanConfig>): Row[] | null {
@@ -1411,11 +1461,13 @@ export class StundenplanCard extends LitElement {
         return uniq.join(" / ");
       });
 
+      const filteredCells = cells.map((c) => this.filterCellText(c, cfg));
+
       return {
         time: timeLabel,
         start: start || undefined,
         end: end || undefined,
-        cells,
+        cells: filteredCells,
       } as LessonRow;
     });
 
@@ -1430,7 +1482,6 @@ export class StundenplanCard extends LitElement {
 
     return filtered.length ? filtered : null;
   }
-
 
   protected render(): TemplateResult {
     if (!this.config) return html``;
@@ -1495,7 +1546,8 @@ export class StundenplanCard extends LitElement {
                   const parsed = parseStartEndFromTime(r.time);
                   const isCurrentBreak = !!parsed.start && !!parsed.end && this.isNowBetween(parsed.start, parsed.end);
 
-                  const doHighlightBreak = !!cfg.highlight_current && !!cfg.highlight_breaks && isCurrentBreak;
+                  const doHighlightBreak = !!cfg.highlight_breaks && isCurrentBreak;
+
 
                   let breakTimeStyle = `--sp-hl:${currentOverlay};`;
                   let breakCellStyle = "";
@@ -1505,9 +1557,10 @@ export class StundenplanCard extends LitElement {
                     breakCellStyle += `--sp-hl:${currentOverlay}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`;
                   }
 
-                  if (isCurrentBreak && cfg.highlight_current_time_text && currentTimeTextColor) {
-                    breakTimeStyle += `color:${currentTimeTextColor};`;
+                  if (doHighlightBreak && cfg.highlight_current_time_text && currentTimeTextColor) {
+                  breakTimeStyle += `color:${currentTimeTextColor};`;
                   }
+
 
                   return html`
                     <tr class="break">
@@ -1518,13 +1571,17 @@ export class StundenplanCard extends LitElement {
                 }
 
                 const row = r as LessonRow;
-                const cells = row.cells ?? [];
+                const cellsRaw = row.cells ?? [];
                 const styles = row.cell_styles ?? [];
+
+                // ✅ filtered view (für Anzeige + Logik)
+                const cells = cellsRaw.map((c) => this.filterCellText(c, cfg));
 
                 const isCurrentTime = !!row.start && !!row.end && this.isNowBetween(row.start, row.end);
 
                 // Freistunden-Logik: bezieht sich auf HEUTIGE ZELLE in der aktuellen Stunde
-                const todayVal = todayIdx >= 0 ? (cells[todayIdx] ?? "") : "";
+                const todayValRaw = todayIdx >= 0 ? (cellsRaw[todayIdx] ?? "") : "";
+                const todayVal = todayIdx >= 0 ? this.filterCellText(todayValRaw, cfg) : "";
                 const todayCellIsFree = todayIdx >= 0 ? isFreeCellValue(todayVal) : false;
 
                 const suppressCurrent = !!cfg.free_only_column_highlight && todayCellIsFree;
@@ -1669,6 +1726,7 @@ export class StundenplanCard extends LitElement {
   `;
 }
 
+
 /* ===================== Editor ===================== */
 
 export class StundenplanCardEditor extends LitElement {
@@ -1799,6 +1857,11 @@ export class StundenplanCardEditor extends LitElement {
       splan_sub_enabled: merged.splan_sub_enabled ?? stub.splan_sub_enabled,
       splan_sub_days,
       splan_sub_show_info: merged.splan_sub_show_info ?? stub.splan_sub_show_info,
+
+      // ✅ Filter (Editor muss es mitführen)
+      filter_main_only: merged.filter_main_only ?? true,
+      filter_allow_prefixes: Array.isArray(merged.filter_allow_prefixes) ? merged.filter_allow_prefixes.map(String) : [],
+      filter_exclude: Array.isArray(merged.filter_exclude) ? merged.filter_exclude.map(String) : [],
 
       splan_plan_art,
 
