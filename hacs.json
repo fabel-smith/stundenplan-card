@@ -2,7 +2,7 @@
   "name": "Stundenplan Card",
   "content_in_root": false,
   "render_readme": true,
-  "domains": [],
+  "filename": "stundenplan-card.js",
   "country": "DE",
   "homeassistant": "2023.6.0"
 }

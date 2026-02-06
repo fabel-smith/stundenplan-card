@@ -1,6 +1,6 @@
 {
   "name": "stundenplan-card",
-  "version": "v2.8.2",
+  "version": "v2.9.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,10 +8,9 @@
     "dev": "vite build --watch"
   },
   "devDependencies": {
+    "esbuild": "^0.27.2",
+    "lit": "^3.3.2",
     "typescript": "^5.5.4",
-    "vite": "^5.4.0"
-  },
-  "dependencies": {
-    "lit": "^3.3.2"
+    "vite": "^7.3.1"
   }
 }
