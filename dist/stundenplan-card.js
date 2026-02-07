@@ -2055,84 +2055,137 @@ const ht = class ht extends Z {
           </div>
         </div>
 
-        <div class="panelMinor">
-          <div class="minorTitle">Wechselwochen (A/B)</div>
 
-          <div class="field">
-            <label class="lbl">week_mode</label>
-            <select class="in" .value=${t.week_mode ?? "off"} @change=${(e) => this.emit({ ...t, week_mode: e.target.value })}>
-              <option value="off">off (deaktiviert)</option>
-              <option value="kw_parity">kw_parity (gerade/ungerade ISO-KW)</option>
-              <option value="week_map">week_map (Mapping-Entity, Fallback Parität)</option>
-            </select>
-          </div>
+<div class="panelMinor">
+  <div class="minorTitle">Single-Source (Legacy / einfach)</div>
 
-          <div class="optRow">
-            <div>
-              <div class="optTitle">A-Woche = gerade Kalenderwoche</div>
-              <div class="sub">Wenn deaktiviert: A-Woche = ungerade KW.</div>
-            </div>
-            ${this.uiSwitch(!!t.week_a_is_even_kw, (e) => this.emit({ ...t, week_a_is_even_kw: e }))}
-          </div>
+  <div class="grid2">
+    <div class="field">
+      <label class="lbl">source_entity</label>
+      <input
+        class="in"
+        type="text"
+        .value=${t.source_entity ?? ""}
+        @input=${(e) => this.emit({ ...t, source_entity: e.target.value })}
+      />
+    </div>
 
-          <div class="grid2">
-            <div class="field">
-              <label class="lbl">week_map_entity (optional)</label>
-              <input class="in" type="text" .value=${t.week_map_entity ?? ""} placeholder="z.B. sensor.wechselwochen_map" @input=${(e) => this.emit({ ...t, week_map_entity: e.target.value })} />
-            </div>
+    <div class="field">
+      <label class="lbl">source_attribute</label>
+      <input
+        class="in"
+        type="text"
+        .value=${t.source_attribute ?? ""}
+        @input=${(e) => this.emit({ ...t, source_attribute: e.target.value })}
+      />
+    </div>
+  </div>
 
-            <div class="field">
-              <label class="lbl">week_map_attribute</label>
-              <input class="in" type="text" .value=${t.week_map_attribute ?? ""} placeholder="z.B. map (leer = state)" @input=${(e) => this.emit({ ...t, week_map_attribute: e.target.value })} />
-            </div>
-          </div>
+  <div class="field">
+    <label class="lbl">source_time_key</label>
+    <input
+      class="in"
+      type="text"
+      .value=${t.source_time_key ?? "Stunde"}
+      @input=${(e) => this.emit({ ...t, source_time_key: e.target.value })}
+    />
+  </div>
+</div>
 
-          <div class="sub">Mapping: <span class="mono">{"2026":{"1":"A","2":"B"}}</span> oder <span class="mono">{"1":"A","2":"B"}</span></div>
+<div class="panelMinor">
+  <div class="minorTitle">Wechselwochen (A/B)</div>
 
-          <div class="divider"></div>
+  <div class="field">
+    <label class="lbl">week_mode</label>
+    <select
+      class="in"
+      .value=${t.week_mode ?? "off"}
+      @change=${(e) => this.emit({ ...t, week_mode: e.target.value })}
+    >
+      <option value="off">off (deaktiviert)</option>
+      <option value="kw_parity">kw_parity (gerade/ungerade ISO-KW)</option>
+      <option value="week_map">week_map (Mapping-Entity, Fallback Parität)</option>
+    </select>
+  </div>
 
-          <div class="grid2">
-            <div class="field">
-              <label class="lbl">source_entity_a</label>
-              <input class="in" type="text" .value=${t.source_entity_a ?? ""} @input=${(e) => this.emit({ ...t, source_entity_a: e.target.value })} />
-            </div>
-            <div class="field">
-              <label class="lbl">source_attribute_a</label>
-              <input class="in" type="text" .value=${t.source_attribute_a ?? ""} @input=${(e) => this.emit({ ...t, source_attribute_a: e.target.value })} />
-            </div>
-            <div class="field">
-              <label class="lbl">source_entity_b</label>
-              <input class="in" type="text" .value=${t.source_entity_b ?? ""} @input=${(e) => this.emit({ ...t, source_entity_b: e.target.value })} />
-            </div>
-            <div class="field">
-              <label class="lbl">source_attribute_b</label>
-              <input class="in" type="text" .value=${t.source_attribute_b ?? ""} @input=${(e) => this.emit({ ...t, source_attribute_b: e.target.value })} />
-            </div>
-          </div>
-        </div>
+  <div class="optRow">
+    <div>
+      <div class="optTitle">A-Woche = gerade Kalenderwoche</div>
+      <div class="sub">Wenn deaktiviert: A-Woche = ungerade KW.</div>
+    </div>
+    ${this.uiSwitch(!!t.week_a_is_even_kw, (e) => this.emit({ ...t, week_a_is_even_kw: e }))}
+  </div>
 
-        <div class="panelMinor">
-          <div class="minorTitle">Single-Source (Legacy / einfach)</div>
+  <div class="grid2">
+    <div class="field">
+      <label class="lbl">week_map_entity (optional)</label>
+      <input
+        class="in"
+        type="text"
+        .value=${t.week_map_entity ?? ""}
+        placeholder="z.B. sensor.wechselwochen_map"
+        @input=${(e) => this.emit({ ...t, week_map_entity: e.target.value })}
+      />
+    </div>
 
-          <div class="grid2">
-            <div class="field">
-              <label class="lbl">source_entity</label>
-              <input class="in" type="text" .value=${t.source_entity ?? ""} @input=${(e) => this.emit({ ...t, source_entity: e.target.value })} />
-            </div>
+    <div class="field">
+      <label class="lbl">week_map_attribute</label>
+      <input
+        class="in"
+        type="text"
+        .value=${t.week_map_attribute ?? ""}
+        placeholder="z.B. map (leer = state)"
+        @input=${(e) => this.emit({ ...t, week_map_attribute: e.target.value })}
+      />
+    </div>
+  </div>
 
-            <div class="field">
-              <label class="lbl">source_attribute</label>
-              <input class="in" type="text" .value=${t.source_attribute ?? ""} @input=${(e) => this.emit({ ...t, source_attribute: e.target.value })} />
-            </div>
-          </div>
+  <div class="sub">
+    Mapping: <span class="mono">{"2026":{"1":"A","2":"B"}}</span> oder <span class="mono">{"1":"A","2":"B"}</span>
+  </div>
 
-          <div class="field">
-            <label class="lbl">source_time_key</label>
-            <input class="in" type="text" .value=${t.source_time_key ?? "Stunde"} @input=${(e) => this.emit({ ...t, source_time_key: e.target.value })} />
-          </div>
-        </div>
-      </div>
-    `;
+  <div class="divider"></div>
+
+  <div class="grid2">
+    <div class="field">
+      <label class="lbl">source_entity_a</label>
+      <input
+        class="in"
+        type="text"
+        .value=${t.source_entity_a ?? ""}
+        @input=${(e) => this.emit({ ...t, source_entity_a: e.target.value })}
+      />
+    </div>
+    <div class="field">
+      <label class="lbl">source_attribute_a</label>
+      <input
+        class="in"
+        type="text"
+        .value=${t.source_attribute_a ?? ""}
+        @input=${(e) => this.emit({ ...t, source_attribute_a: e.target.value })}
+      />
+    </div>
+    <div class="field">
+      <label class="lbl">source_entity_b</label>
+      <input
+        class="in"
+        type="text"
+        .value=${t.source_entity_b ?? ""}
+        @input=${(e) => this.emit({ ...t, source_entity_b: e.target.value })}
+      />
+    </div>
+    <div class="field">
+      <label class="lbl">source_attribute_b</label>
+      <input
+        class="in"
+        type="text"
+        .value=${t.source_attribute_b ?? ""}
+        @input=${(e) => this.emit({ ...t, source_attribute_b: e.target.value })}
+      />
+    </div>
+  </div>
+</div>
+`;
   }
   renderRows() {
     if (!this._config) return p``;
