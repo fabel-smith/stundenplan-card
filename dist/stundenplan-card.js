@@ -1958,9 +1958,7 @@ const ht = class ht extends Z {
     if (!this._config) return p``;
     const t = this._config;
     return p`
-     <div class="sub">
-       Datenquelle: Stundenplan24-Sensor (rows_ha) oder Legacy-Entity.
-     </div>
+
 
 
 <div class="panelMinor">

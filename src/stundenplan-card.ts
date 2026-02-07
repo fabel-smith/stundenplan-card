@@ -2505,9 +2505,7 @@ private renderSplan24(): TemplateResult {
     const c = this._config;
 
     return html`
-     <div class="sub">
-       Datenquelle: Stundenplan24-Sensor (rows_ha) oder Legacy-Entity.
-     </div>
+
 
 
 <div class="panelMinor">
