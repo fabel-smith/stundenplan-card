@@ -2464,10 +2464,12 @@ private renderSplan24(): TemplateResult {
   if (!this._config) return html``;
   const c = this._config;
 
+  // Alle passenden Stundenplan24-Sensoren sammeln
   const all = Object.keys(this.hass?.states ?? {})
     .filter((eid) => eid.startsWith("sensor.stundenplan_woche_"))
     .sort((a, b) => a.localeCompare(b));
 
+  // Optional: eigene Suche (ohne ha-entity-picker)
   const q = (this._ui.splan24Query ?? "").toString().trim().toLowerCase();
 
   const filtered = !q
@@ -2483,19 +2485,19 @@ private renderSplan24(): TemplateResult {
       <div class="panelMinor">
         <div class="minorTitle">Stundenplan24 Sensor</div>
 
+        <!-- Suchfeld kannst du auch komplett entfernen, wenn du willst -->
         <div class="field">
           <label class="lbl">Suche</label>
           <input
             class="in"
             type="text"
             .value=${this._ui.splan24Query ?? ""}
-            placeholder="z.B. 09c oder 'Lina'…"
+            placeholder="z.B. 09c"
             @input=${(e: any) => {
               this._ui.splan24Query = e.target.value;
               this.requestUpdate();
             }}
           />
-          <div class="sub">Filtert nach Entity-ID und friendly_name.</div>
         </div>
 
         <div class="field">
@@ -2510,18 +2512,17 @@ private renderSplan24(): TemplateResult {
             ${filtered.map((eid) => {
               const st = this.hass?.states?.[eid];
               const fn = (st?.attributes?.friendly_name ?? "").toString().trim();
-              const label = fn ? `${eid} — ${fn}` : eid;
+              const label = fn ? `${fn} (${eid})` : eid;
               return html`<option value=${eid}>${label}</option>`;
             })}
           </select>
 
           ${filtered.length === 0
-            ? html`<div class="sub" style="margin-top:6px;">Kein Treffer für „${this._ui.splan24Query}“.</div>`
+            ? html`<div class="sub" style="margin-top:6px;">Kein Treffer.</div>`
             : html`<div class="sub" style="margin-top:6px;">${filtered.length} Treffer.</div>`}
 
           <div class="sub" style="margin-top:6px;">
-            Wähle deinen Stundenplan-Sensor (z.B. <span class="mono">sensor.stundenplan_woche_09c</span>).
-            Die Karte übernimmt automatisch alle Einstellungen.
+            Auswahl setzt automatisch <span class="mono">source_entity</span> / <span class="mono">source_attribute</span>.
           </div>
         </div>
       </div>
