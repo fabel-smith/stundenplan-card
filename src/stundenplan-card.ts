@@ -2464,41 +2464,14 @@ private renderSplan24(): TemplateResult {
   if (!this._config) return html``;
   const c = this._config;
 
-  // Alle passenden Stundenplan24-Sensoren sammeln
   const all = Object.keys(this.hass?.states ?? {})
     .filter((eid) => eid.startsWith("sensor.stundenplan_woche_"))
     .sort((a, b) => a.localeCompare(b));
-
-  // Optional: eigene Suche (ohne ha-entity-picker)
-  const q = (this._ui.splan24Query ?? "").toString().trim().toLowerCase();
-
-  const filtered = !q
-    ? all
-    : all.filter((eid) => {
-        const st = this.hass?.states?.[eid];
-        const name = (st?.attributes?.friendly_name ?? "").toString().toLowerCase();
-        return eid.toLowerCase().includes(q) || name.includes(q);
-      });
 
   return html`
     <div class="stack">
       <div class="panelMinor">
         <div class="minorTitle">Stundenplan24 Sensor</div>
-
-        <!-- Suchfeld kannst du auch komplett entfernen, wenn du willst -->
-        <div class="field">
-          <label class="lbl">Suche</label>
-          <input
-            class="in"
-            type="text"
-            .value=${this._ui.splan24Query ?? ""}
-            placeholder="z.B. 09c"
-            @input=${(e: any) => {
-              this._ui.splan24Query = e.target.value;
-              this.requestUpdate();
-            }}
-          />
-        </div>
 
         <div class="field">
           <label class="lbl">Stundenplan24 Woche</label>
@@ -2506,20 +2479,16 @@ private renderSplan24(): TemplateResult {
             class="in"
             .value=${c.splan24_entity ?? ""}
             @change=${(e: any) => this.setSplan24Entity(e.target.value)}
-            ?disabled=${filtered.length === 0}
+            ?disabled=${all.length === 0}
           >
             <option value="">– auswählen –</option>
-            ${filtered.map((eid) => {
+            ${all.map((eid) => {
               const st = this.hass?.states?.[eid];
               const fn = (st?.attributes?.friendly_name ?? "").toString().trim();
               const label = fn ? `${fn} (${eid})` : eid;
               return html`<option value=${eid}>${label}</option>`;
             })}
           </select>
-
-          ${filtered.length === 0
-            ? html`<div class="sub" style="margin-top:6px;">Kein Treffer.</div>`
-            : html`<div class="sub" style="margin-top:6px;">${filtered.length} Treffer.</div>`}
 
           <div class="sub" style="margin-top:6px;">
             Auswahl setzt automatisch <span class="mono">source_entity</span> / <span class="mono">source_attribute</span>.
