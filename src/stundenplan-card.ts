@@ -86,6 +86,10 @@ type StundenplanConfig = {
   source_entity_b?: string;
   source_attribute_b?: string;
 
+  // ✅ Komfort: Stundenplan24-Entity-Picker (Editor setzt daraus automatisch die Legacy-Quelle)
+  splan24_entity?: string;      // z.B. sensor.stundenplan_woche_09c
+  splan24_attribute?: string;   // default "rows_ha"
+
   // ✅ Stundenplan24 XML Quelle
   // splan_xml_url ist entweder:
   //   - Verzeichnis: "/local/splan/sdaten" (ohne .xml)  -> Basis=.../SPlanKl_Basis.xml
@@ -346,7 +350,7 @@ function mapCfgDayToSplanDay(label: string): number | null {
   if (["do", "donnerstag", "thu", "thurs", "thursday"].includes(n)) return 4;
   if (["fr", "freitag", "fri", "friday"].includes(n)) return 5;
   if (["sa", "samstag", "sat", "saturday"].includes(n)) return 6;
-  if (["so", "sonntag", "sun", "sunday", "sonntag"].includes(n)) return 7;
+  if (["so", "sonntag", "sun", "sunday"].includes(n)) return 7;
   return null;
 }
 
@@ -754,6 +758,9 @@ export class StundenplanCard extends LitElement {
       source_attribute: "",
       source_time_key: "Stunde",
 
+      splan24_entity: "",
+      splan24_attribute: "rows_ha",
+
       week_mode: "off",
       week_a_is_even_kw: true,
       week_map_entity: "",
@@ -764,7 +771,6 @@ export class StundenplanCard extends LitElement {
       source_entity_b: "",
       source_attribute_b: "",
 
-      // XML-Schalter im Editor entfernt → Default: aktiv, sobald URL + Klasse gesetzt sind
       splan_xml_enabled: true,
       splan_xml_url: "/local/splan/sdaten",
       splan_class: "5a",
@@ -910,6 +916,9 @@ export class StundenplanCard extends LitElement {
       source_entity: (cfg.source_entity ?? stub.source_entity).toString(),
       source_attribute: (cfg.source_attribute ?? stub.source_attribute).toString(),
       source_time_key: (cfg.source_time_key ?? stub.source_time_key).toString(),
+
+      splan24_entity: (cfg.splan24_entity ?? "").toString(),
+      splan24_attribute: (cfg.splan24_attribute ?? "rows_ha").toString(),
 
       week_mode,
       week_a_is_even_kw: cfg.week_a_is_even_kw ?? stub.week_a_is_even_kw,
@@ -1745,6 +1754,7 @@ export class StundenplanCardEditor extends LitElement {
     openColors: false,
     openSources: false,
     openRows: false,
+    openSplan24: false,
     showCellStyles: true,
     rowOpen: {} as Record<number, boolean>,
   };
@@ -1837,6 +1847,9 @@ export class StundenplanCardEditor extends LitElement {
       source_attribute: (merged.source_attribute ?? stub.source_attribute).toString(),
       source_time_key: (merged.source_time_key ?? stub.source_time_key).toString(),
 
+      splan24_entity: (merged.splan24_entity ?? "").toString(),
+      splan24_attribute: (merged.splan24_attribute ?? "rows_ha").toString(),
+
       week_mode,
       week_a_is_even_kw: merged.week_a_is_even_kw ?? stub.week_a_is_even_kw,
       week_map_entity: (merged.week_map_entity ?? stub.week_map_entity).toString(),
@@ -1882,6 +1895,22 @@ export class StundenplanCardEditor extends LitElement {
   private emit(cfg: any) {
     this._config = cfg;
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config: cfg }, bubbles: true, composed: true }));
+  }
+
+  private setSplan24Entity(entityId: string) {
+    if (!this._config) return;
+
+    const ent = (entityId ?? "").toString().trim();
+    const attr = "rows_ha";
+
+    this.emit({
+      ...this._config,
+      splan24_entity: ent,
+      splan24_attribute: attr,
+      source_entity: ent,
+      source_attribute: attr,
+      source_time_key: "time",
+    });
   }
 
   private shiftRowOpenAfterInsert(insertIdx: number) {
@@ -2430,6 +2459,33 @@ export class StundenplanCardEditor extends LitElement {
     `;
   }
 
+ private renderSplan24(): TemplateResult {
+  if (!this._config) return html``;
+  const c = this._config;
+
+  return html`
+    <div class="stack">
+      <div class="panelMinor">
+        <div class="minorTitle">Stundenplan24 Sensor</div>
+
+        <ha-entity-picker
+          .hass=${this.hass}
+          .value=${c.splan24_entity ?? ""}
+          .includeDomains=${["sensor"]}
+          .entityFilter=${(e: any) => (e?.entity_id ?? "").startsWith("sensor.stundenplan_woche_")}
+          label="Stundenplan24 Woche"
+          @value-changed=${(ev: any) => this.setSplan24Entity(ev.detail.value)}
+        ></ha-entity-picker>
+
+        <div class="sub">
+          Wähle deinen Stundenplan-Sensor (z.B. sensor.stundenplan_woche_09c).
+          Die Karte übernimmt automatisch alle Einstellungen.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
   private renderSources(): TemplateResult {
     if (!this._config) return html``;
 
@@ -2763,6 +2819,7 @@ export class StundenplanCardEditor extends LitElement {
       ${this.panel("Allgemein", this._ui.openGeneral, (v) => (this._ui.openGeneral = v), this.renderGeneral())}
       ${this.panel("Highlights", this._ui.openHighlight, (v) => (this._ui.openHighlight = v), this.renderHighlighting())}
       ${this.panel("Farben", this._ui.openColors, (v) => (this._ui.openColors = v), this.renderColors())}
+      ${this.panel("Stundenplan24", this._ui.openSplan24, (v) => (this._ui.openSplan24 = v), this.renderSplan24())}	
       ${this.panel("Datenquellen", this._ui.openSources, (v) => (this._ui.openSources = v), this.renderSources())}
       ${this.panel("Zeilen & Fächer", this._ui.openRows, (v) => (this._ui.openRows = v), this.renderRows())}
     `;
