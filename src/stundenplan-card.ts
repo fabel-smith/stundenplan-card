@@ -1118,6 +1118,34 @@ export class StundenplanCard extends LitElement {
     return cfg.rows ?? [];
   }
 
+
+  private getActiveSourceEntityId(cfg: Required<StundenplanConfig>, activeWeek: "A" | "B" | null): string | null {
+    // Wechselwochen: nimm die aktuell relevante Entity, sonst legacy/source_entity
+    if (cfg.week_mode !== "off") {
+      if (activeWeek === "A") return (cfg.source_entity_a ?? cfg.source_entity ?? "").toString().trim() || null;
+      if (activeWeek === "B") return (cfg.source_entity_b ?? cfg.source_entity ?? "").toString().trim() || null;
+      return (cfg.source_entity ?? "").toString().trim() || null;
+    }
+    return (cfg.source_entity ?? "").toString().trim() || null;
+  }
+
+  private formatHaDateTime(v: any): string {
+    // HA liefert ISO Strings; in manchen Fällen kommt schon ein Date-Objekt
+    try {
+      const d = v instanceof Date ? v : new Date(v);
+      if (!isFinite(d.getTime())) return "";
+      return new Intl.DateTimeFormat("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(d);
+    } catch {
+      return "";
+    }
+  }
+
   /**
    * Fix: Fallback für Zeiten aus manuellen cfg.rows, wenn XML Stundenzeiten nicht liefert
    */
@@ -1493,47 +1521,6 @@ export class StundenplanCard extends LitElement {
     return filtered.length ? filtered : null;
   }
 
-
-  private formatDateTimeDE(d: Date): string {
-    try {
-      return d.toLocaleString("de-DE", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      const pad = (n: number) => String(n).padStart(2, "0");
-      return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    }
-  }
-
-  /** Liefert einen "Stand"-Zeitpunkt aus der konfigurierten Entity (last_updated/last_changed). */
-  private getLastStandText(cfg: Required<StundenplanConfig>): string | null {
-    const entId = (cfg.source_entity ?? "").toString().trim();
-    if (!entId) return null;
-    const st = this.hass?.states?.[entId];
-    const iso = st?.last_updated ?? st?.last_changed;
-    if (!iso) return null;
-
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return null;
-
-    return this.formatDateTimeDE(d);
-  }
-
-  private renderNoDataBanner(cfg: Required<StundenplanConfig>): TemplateResult {
-    const last = this.getLastStandText(cfg);
-    const msg = "Ferien – Stundenplan24 liefert erst ab 23.02.2026 Daten.";
-    return html`
-      <div class="infoBanner">
-        <div class="infoTitle">${msg}</div>
-        ${last ? html`<div class="infoSub">Letzter Stand: ${last}</div>` : html``}
-      </div>
-    `;
-  }
-
   protected render(): TemplateResult {
     if (!this.config) return html``;
 
@@ -1558,29 +1545,47 @@ export class StundenplanCard extends LitElement {
     const xmlWeek = cfg.splan_week === "auto" ? "auto" : cfg.splan_week;
     const xmlArt = (cfg.splan_plan_art ?? "class").toString();
 
+    // --- Ferien / keine Daten Hinweis (Stundenplan24) ---
+    const activeSourceEntity = this.getActiveSourceEntityId(cfg, activeWeek);
+    const st = activeSourceEntity ? this.hass?.states?.[activeSourceEntity] : undefined;
+    const isEntityUnavailable = !!st && (st.state === "unavailable" || st.state === "unknown");
+    const showNoDataBanner = isEntityUnavailable || rows.length === 0;
+    const noDataValidFromText = (cfg.no_data_valid_from ?? "23.02.2026").toString();
+    const lastStandText = st ? this.formatHaDateTime(st.last_updated || st.last_changed) : "";
+
     return html`
       <ha-card header=${cfg.title ?? ""}>
         <div class="card">
           ${showWeekBadge ? html`<div class="weekBadge">Woche: <b>${activeWeek}</b></div>` : html``}
 
           ${showXmlStatus
-            ? html`
-                <div class="xmlBadge">
-                  <div class="xmlLine">
-                    <b>XML</b>
-                    <span class="mono">${xmlArt}</span>
-                    <span class="mono">${xmlTarget}</span>
-                    <span class="mono">${xmlWeek}</span>
-                    ${cfg.splan_sub_enabled ? html`<span class="pill">Vertretung an</span>` : html``}
-                    ${this._splanLoading ? html`<span class="pill">lädt…</span>` : html``}
-                    ${this._splanErr ? html`<span class="pill err">Fehler</span>` : html``}
-                  </div>
-                  ${this._splanErr ? html`<div class="xmlErr">${this._splanErr}</div>` : html``}
-                </div>
-              `
-            : html``}
+  ? html`
+      <div class="xmlBadge">
+        <div class="xmlLine">
+          <b>XML</b>
+          <span class="mono">${xmlArt}</span>
+          <span class="mono">${xmlTarget}</span>
+          <span class="mono">${xmlWeek}</span>
+          ${cfg.splan_sub_enabled ? html`<span class="pill">Vertretung an</span>` : html``}
+          ${this._splanLoading ? html`<span class="pill">lädt…</span>` : html``}
+          ${this._splanErr ? html`<span class="pill err">Fehler</span>` : html``}
+        </div>
+        ${this._splanErr ? html`<div class="xmlErr">${this._splanErr}</div>` : html``}
+      </div>
+    `
+  : html``}
 
-          ${rows.length === 0 ? this.renderNoDataBanner(cfg) : html``}
+${showNoDataBanner
+  ? html`
+      <div class="noDataBanner">
+        <div class="noDataTitle">
+          Ferien – Stundenplan24 liefert erst ab ${noDataValidFromText} Daten.
+        </div>
+        ${lastStandText ? html`<div class="noDataSub">Letzter Stand: ${lastStandText}</div>` : html``}
+      </div>
+    `
+  : html``}
+: html``}
 
           <table>
             <thead>
@@ -1738,24 +1743,24 @@ export class StundenplanCard extends LitElement {
       color: var(--error-color, #ff5252);
       word-break: break-word;
     }
-
-    .infoBanner {
-      margin: 0 0 10px 0;
+    .noDataBanner {
+      margin-top: 10px;
       padding: 10px 12px;
       border: 1px solid var(--divider-color);
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.03);
+      border-radius: 10px;
+      background: rgba(255, 193, 7, 0.08);
     }
-    .infoTitle {
-      font-weight: 700;
+    .noDataTitle {
+      font-weight: 600;
       font-size: 13px;
-      line-height: 1.35;
+      line-height: 1.25;
     }
-    .infoSub {
+    .noDataSub {
       margin-top: 4px;
       font-size: 12px;
-      opacity: 0.8;
+      opacity: 0.85;
     }
+
     table {
       width: 100%;
       border-collapse: collapse;
