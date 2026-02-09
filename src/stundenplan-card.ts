@@ -51,9 +51,10 @@ type SplanPlanArt = "class" | "teacher" | "room";
 type StundenplanConfig = {
   type: string;
   title?: string;
-  /** Optional: Datum, ab wann Stundenplan24 wieder Daten liefert (Ferien-Hinweis). */
-  no_data_valid_from?: string;
   days?: string[];
+
+  // Hinweis bei fehlenden Daten (Ferien)
+  no_data_valid_from?: string;
 
   highlight_today?: boolean;
   highlight_current?: boolean;
@@ -740,7 +741,6 @@ export class StundenplanCard extends LitElement {
     return {
       type: "custom:stundenplan-card",
       title: "Mein Stundenplan",
-      no_data_valid_from: "23.02.2026",
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
 
       highlight_today: true,
@@ -1119,34 +1119,6 @@ export class StundenplanCard extends LitElement {
 
     // 4) fallback manual
     return cfg.rows ?? [];
-  }
-
-
-  private getActiveSourceEntityId(cfg: Required<StundenplanConfig>, activeWeek: "A" | "B" | null): string | null {
-    // Wechselwochen: nimm die aktuell relevante Entity, sonst legacy/source_entity
-    if (cfg.week_mode !== "off") {
-      if (activeWeek === "A") return (cfg.source_entity_a ?? cfg.source_entity ?? "").toString().trim() || null;
-      if (activeWeek === "B") return (cfg.source_entity_b ?? cfg.source_entity ?? "").toString().trim() || null;
-      return (cfg.source_entity ?? "").toString().trim() || null;
-    }
-    return (cfg.source_entity ?? "").toString().trim() || null;
-  }
-
-  private formatHaDateTime(v: any): string {
-    // HA liefert ISO Strings; in manchen Fällen kommt schon ein Date-Objekt
-    try {
-      const d = v instanceof Date ? v : new Date(v);
-      if (!isFinite(d.getTime())) return "";
-      return new Intl.DateTimeFormat("de-DE", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(d);
-    } catch {
-      return "";
-    }
   }
 
   /**
@@ -1549,12 +1521,14 @@ export class StundenplanCard extends LitElement {
     const xmlArt = (cfg.splan_plan_art ?? "class").toString();
 
     // --- Ferien / keine Daten Hinweis (Stundenplan24) ---
-    const activeSourceEntity = this.getActiveSourceEntityId(cfg, activeWeek);
-    const st = activeSourceEntity ? this.hass?.states?.[activeSourceEntity] : undefined;
+    const entityId =
+      cfg.source_entity ??
+      (activeWeek === "A" ? cfg.source_entity_a : activeWeek === "B" ? cfg.source_entity_b : undefined);
+    const st = entityId ? this.hass?.states?.[entityId] : undefined;
     const isEntityUnavailable = !!st && (st.state === "unavailable" || st.state === "unknown");
     const showNoDataBanner = isEntityUnavailable || rows.length === 0;
-    const noDataValidFromText = (cfg.no_data_valid_from ?? "23.02.2026").toString();
-    const lastStandText = st ? this.formatHaDateTime(st.last_updated || st.last_changed) : "";
+    const noDataValidFromText = (cfg.no_data_valid_from ?? "23.02.2026").toString().trim();
+    const lastStandText = st ? this.formatHaDateTime((st as any).last_updated || (st as any).last_changed) : "";
 
     return html`
       <ha-card header=${cfg.title ?? ""}>
@@ -1562,32 +1536,32 @@ export class StundenplanCard extends LitElement {
           ${showWeekBadge ? html`<div class="weekBadge">Woche: <b>${activeWeek}</b></div>` : html``}
 
           ${showXmlStatus
-  ? html`
-      <div class="xmlBadge">
-        <div class="xmlLine">
-          <b>XML</b>
-          <span class="mono">${xmlArt}</span>
-          <span class="mono">${xmlTarget}</span>
-          <span class="mono">${xmlWeek}</span>
-          ${cfg.splan_sub_enabled ? html`<span class="pill">Vertretung an</span>` : html``}
-          ${this._splanLoading ? html`<span class="pill">lädt…</span>` : html``}
-          ${this._splanErr ? html`<span class="pill err">Fehler</span>` : html``}
-        </div>
-        ${this._splanErr ? html`<div class="xmlErr">${this._splanErr}</div>` : html``}
-      </div>
-    `
-  : html``}
+            ? html`
+                <div class="xmlBadge">
+                  <div class="xmlLine">
+                    <b>XML</b>
+                    <span class="mono">${xmlArt}</span>
+                    <span class="mono">${xmlTarget}</span>
+                    <span class="mono">${xmlWeek}</span>
+                    ${cfg.splan_sub_enabled ? html`<span class="pill">Vertretung an</span>` : html``}
+                    ${this._splanLoading ? html`<span class="pill">lädt…</span>` : html``}
+                    ${this._splanErr ? html`<span class="pill err">Fehler</span>` : html``}
+                  </div>
+                  ${this._splanErr ? html`<div class="xmlErr">${this._splanErr}</div>` : html``}
+                </div>
+              `
+            : html``}
 
-${showNoDataBanner
-  ? html`
-      <div class="noDataBanner">
-        <div class="noDataTitle">
-          Ferien – Stundenplan24 liefert erst ab ${noDataValidFromText} Daten.
-        </div>
-        ${lastStandText ? html`<div class="noDataSub">Letzter Stand: ${lastStandText}</div>` : html``}
-      </div>
-    `
-  : html``}
+          ${showNoDataBanner
+            ? html`
+                <div class="noDataBanner">
+                  <div class="noDataTitle">
+                    Ferien – Stundenplan24 liefert erst ab ${noDataValidFromText} Daten.
+                  </div>
+                  ${lastStandText ? html`<div class="noDataSub">Letzter Stand: ${lastStandText}</div>` : html``}
+                </div>
+              `
+            : html``}
 
           <table>
             <thead>
@@ -1745,24 +1719,24 @@ ${showNoDataBanner
       color: var(--error-color, #ff5252);
       word-break: break-word;
     }
+
     .noDataBanner {
-      margin-top: 10px;
+      margin: 0 0 10px 0;
       padding: 10px 12px;
       border: 1px solid var(--divider-color);
-      border-radius: 10px;
-      background: rgba(255, 193, 7, 0.08);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.02);
     }
     .noDataTitle {
       font-weight: 600;
-      font-size: 13px;
-      line-height: 1.25;
+      font-size: 14px;
+      line-height: 1.3;
     }
     .noDataSub {
       margin-top: 4px;
       font-size: 12px;
-      opacity: 0.85;
+      opacity: 0.8;
     }
-
     table {
       width: 100%;
       border-collapse: collapse;
