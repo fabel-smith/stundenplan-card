@@ -51,6 +51,8 @@ type SplanPlanArt = "class" | "teacher" | "room";
 type StundenplanConfig = {
   type: string;
   title?: string;
+  /** Optional: Datum, ab wann Stundenplan24 wieder Daten liefert (Ferien-Hinweis). */
+  no_data_valid_from?: string;
   days?: string[];
 
   highlight_today?: boolean;
@@ -738,6 +740,7 @@ export class StundenplanCard extends LitElement {
     return {
       type: "custom:stundenplan-card",
       title: "Mein Stundenplan",
+      no_data_valid_from: "23.02.2026",
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
 
       highlight_today: true,
@@ -1585,7 +1588,6 @@ ${showNoDataBanner
       </div>
     `
   : html``}
-: html``}
 
           <table>
             <thead>

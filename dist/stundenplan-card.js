@@ -814,6 +814,7 @@ const et = class et extends K {
     return {
       type: "custom:stundenplan-card",
       title: "Mein Stundenplan",
+      no_data_valid_from: "23.02.2026",
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       highlight_today: !0,
       highlight_current: !0,
@@ -1296,7 +1297,6 @@ ${w ? p`
         ${S ? p`<div class="noDataSub">Letzter Stand: ${S}</div>` : p``}
       </div>
     ` : p``}
-: html``}
 
           <table>
             <thead>
