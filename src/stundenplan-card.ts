@@ -1493,6 +1493,47 @@ export class StundenplanCard extends LitElement {
     return filtered.length ? filtered : null;
   }
 
+
+  private formatDateTimeDE(d: Date): string {
+    try {
+      return d.toLocaleString("de-DE", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+  }
+
+  /** Liefert einen "Stand"-Zeitpunkt aus der konfigurierten Entity (last_updated/last_changed). */
+  private getLastStandText(cfg: Required<StundenplanConfig>): string | null {
+    const entId = (cfg.source_entity ?? "").toString().trim();
+    if (!entId) return null;
+    const st = this.hass?.states?.[entId];
+    const iso = st?.last_updated ?? st?.last_changed;
+    if (!iso) return null;
+
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return null;
+
+    return this.formatDateTimeDE(d);
+  }
+
+  private renderNoDataBanner(cfg: Required<StundenplanConfig>): TemplateResult {
+    const last = this.getLastStandText(cfg);
+    const msg = "Ferien – Stundenplan24 liefert erst ab 23.02.2026 Daten.";
+    return html`
+      <div class="infoBanner">
+        <div class="infoTitle">${msg}</div>
+        ${last ? html`<div class="infoSub">Letzter Stand: ${last}</div>` : html``}
+      </div>
+    `;
+  }
+
   protected render(): TemplateResult {
     if (!this.config) return html``;
 
@@ -1538,6 +1579,8 @@ export class StundenplanCard extends LitElement {
                 </div>
               `
             : html``}
+
+          ${rows.length === 0 ? this.renderNoDataBanner(cfg) : html``}
 
           <table>
             <thead>
@@ -1694,6 +1737,24 @@ export class StundenplanCard extends LitElement {
       opacity: 0.8;
       color: var(--error-color, #ff5252);
       word-break: break-word;
+    }
+
+    .infoBanner {
+      margin: 0 0 10px 0;
+      padding: 10px 12px;
+      border: 1px solid var(--divider-color);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .infoTitle {
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .infoSub {
+      margin-top: 4px;
+      font-size: 12px;
+      opacity: 0.8;
     }
     table {
       width: 100%;
