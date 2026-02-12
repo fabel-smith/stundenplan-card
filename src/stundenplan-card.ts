@@ -53,9 +53,6 @@ type StundenplanConfig = {
   title?: string;
   days?: string[];
 
-  // Hinweis bei fehlenden Daten (Ferien)
-  no_data_valid_from?: string;
-
   highlight_today?: boolean;
   highlight_current?: boolean;
   highlight_breaks?: boolean;
@@ -91,7 +88,7 @@ type StundenplanConfig = {
 
   // ✅ Komfort: Stundenplan24-Entity-Picker (Editor setzt daraus automatisch die Legacy-Quelle)
   splan24_entity?: string;      // z.B. sensor.stundenplan_woche_09c
-  splan24_attribute?: string;   // default "rows_ha"
+  splan24_attribute?: string;   // default "rows"
 
   // ✅ Stundenplan24 XML Quelle
   // splan_xml_url ist entweder:
@@ -762,7 +759,7 @@ export class StundenplanCard extends LitElement {
       source_time_key: "Stunde",
 
       splan24_entity: "",
-      splan24_attribute: "rows_ha",
+      splan24_attribute: "rows",
 
       week_mode: "off",
       week_a_is_even_kw: true,
@@ -774,7 +771,7 @@ export class StundenplanCard extends LitElement {
       source_entity_b: "",
       source_attribute_b: "",
 
-      splan_xml_enabled: true,
+      splan_xml_enabled: false,
       splan_xml_url: "/local/splan/sdaten",
       splan_class: "5a",
       splan_week: "auto",
@@ -921,7 +918,7 @@ export class StundenplanCard extends LitElement {
       source_time_key: (cfg.source_time_key ?? stub.source_time_key).toString(),
 
       splan24_entity: (cfg.splan24_entity ?? "").toString(),
-      splan24_attribute: (cfg.splan24_attribute ?? "rows_ha").toString(),
+      splan24_attribute: (cfg.splan24_attribute ?? "rows").toString(),
 
       week_mode,
       week_a_is_even_kw: cfg.week_a_is_even_kw ?? stub.week_a_is_even_kw,
@@ -1040,7 +1037,17 @@ export class StundenplanCard extends LitElement {
   }
 
   private getRowsFromEntity(cfg: Required<StundenplanConfig>, entityId: string, attributeName: string): Row[] | null {
-    const data = this.readEntityJson(entityId, attributeName);
+    // Primär: konfiguriertes Attribut (z.B. "rows").
+    let data = this.readEntityJson(entityId, attributeName);
+
+    // Fallbacks (für ältere Versionen / alternative Sensor-Attribute)
+    if (data == null) {
+      const attr = (attributeName ?? "").toString().trim();
+      if (attr === "rows") data = this.readEntityJson(entityId, "rows_json");
+      if (data == null && attr === "rows_ha") data = this.readEntityJson(entityId, "rows");
+      if (data == null && attr === "rows_ha") data = this.readEntityJson(entityId, "rows_json");
+    }
+
     if (!Array.isArray(data)) return null;
     return this.buildRowsFromArray(cfg, data);
   }
@@ -1520,16 +1527,6 @@ export class StundenplanCard extends LitElement {
     const xmlWeek = cfg.splan_week === "auto" ? "auto" : cfg.splan_week;
     const xmlArt = (cfg.splan_plan_art ?? "class").toString();
 
-    // --- Ferien / keine Daten Hinweis (Stundenplan24) ---
-    const entityId =
-      cfg.source_entity ??
-      (activeWeek === "A" ? cfg.source_entity_a : activeWeek === "B" ? cfg.source_entity_b : undefined);
-    const st = entityId ? this.hass?.states?.[entityId] : undefined;
-    const isEntityUnavailable = !!st && (st.state === "unavailable" || st.state === "unknown");
-    const showNoDataBanner = isEntityUnavailable || rows.length === 0;
-    const noDataValidFromText = (cfg.no_data_valid_from ?? "23.02.2026").toString().trim();
-    const lastStandText = st ? this.formatHaDateTime((st as any).last_updated || (st as any).last_changed) : "";
-
     return html`
       <ha-card header=${cfg.title ?? ""}>
         <div class="card">
@@ -1548,17 +1545,6 @@ export class StundenplanCard extends LitElement {
                     ${this._splanErr ? html`<span class="pill err">Fehler</span>` : html``}
                   </div>
                   ${this._splanErr ? html`<div class="xmlErr">${this._splanErr}</div>` : html``}
-                </div>
-              `
-            : html``}
-
-          ${showNoDataBanner
-            ? html`
-                <div class="noDataBanner">
-                  <div class="noDataTitle">
-                    Ferien – Stundenplan24 liefert erst ab ${noDataValidFromText} Daten.
-                  </div>
-                  ${lastStandText ? html`<div class="noDataSub">Letzter Stand: ${lastStandText}</div>` : html``}
                 </div>
               `
             : html``}
@@ -1719,24 +1705,6 @@ export class StundenplanCard extends LitElement {
       color: var(--error-color, #ff5252);
       word-break: break-word;
     }
-
-    .noDataBanner {
-      margin: 0 0 10px 0;
-      padding: 10px 12px;
-      border: 1px solid var(--divider-color);
-      border-radius: 12px;
-      background: rgba(255, 255, 255, 0.02);
-    }
-    .noDataTitle {
-      font-weight: 600;
-      font-size: 14px;
-      line-height: 1.3;
-    }
-    .noDataSub {
-      margin-top: 4px;
-      font-size: 12px;
-      opacity: 0.8;
-    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -1891,7 +1859,7 @@ export class StundenplanCardEditor extends LitElement {
       source_time_key: (merged.source_time_key ?? stub.source_time_key).toString(),
 
       splan24_entity: (merged.splan24_entity ?? "").toString(),
-      splan24_attribute: (merged.splan24_attribute ?? "rows_ha").toString(),
+      splan24_attribute: (merged.splan24_attribute ?? "rows").toString(),
 
       week_mode,
       week_a_is_even_kw: merged.week_a_is_even_kw ?? stub.week_a_is_even_kw,
@@ -1944,7 +1912,7 @@ export class StundenplanCardEditor extends LitElement {
     if (!this._config) return;
 
     const ent = (entityId ?? "").toString().trim();
-    const attr = "rows_ha";
+    const attr = "rows";
 
     this.emit({
       ...this._config,
