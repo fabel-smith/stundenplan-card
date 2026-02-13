@@ -76,9 +76,13 @@ type StundenplanConfig = {
   source_attribute?: string;
   source_time_key?: string;
 
-  // ✅ Woche per Entity steuern (z.B. number.05b_woche_offset)
-  week_offset_entity?: string;       // state = number (0=aktuell, 1=nächste, -1=letzte)
-  week_offset_attribute?: string;    // optional, falls Offset im Attribut steht
+  // ✅ Woche-Offset (0 = diese Woche, 1 = nächste, -1 = letzte)
+  week_offset_entity?: string;       // z.B. number.05b_woche_offset
+  week_offset_attribute?: string;    // optional (meist leer)
+  week_offset_step?: number;         // default 1
+  week_offset_min?: number;          // optional override
+  week_offset_max?: number;          // optional override
+
 
   // Wechselwochen (für Entity & auch als "Auto" für XML)
   week_mode?: WeekMode;
@@ -579,8 +583,8 @@ export class StundenplanCard extends LitElement {
 @state() private accessor _rowsCache: Row[] = [];
 
 
-
   private _tick?: number;
+  private _lastWeekOffset: number | null = null;
   private _splanBasis: SplanBasis | null = null;
   private _splanWeekLessons: SplanWeekPlanLesson[] | null = null;
   private _splanSubLessonsByDay: Map<number, SplanSubLesson[]> = new Map();
@@ -595,6 +599,8 @@ export class StundenplanCard extends LitElement {
       const v = (e ?? "").toString().trim();
       if (v) out.add(v);
     };
+
+    add(cfg.week_offset_entity);
 
     // Single legacy
     add(cfg.source_entity);
@@ -611,6 +617,37 @@ export class StundenplanCard extends LitElement {
 
     return Array.from(out);
   }
+
+private getWeekOffsetValue(cfg: Required<StundenplanConfig>): number | null {
+  const ent = (cfg.week_offset_entity ?? "").trim();
+  if (!ent || !this.hass?.states?.[ent]) return null;
+
+  const st = this.hass.states[ent];
+  const attr = (cfg.week_offset_attribute ?? "").trim();
+  const raw = attr ? st.attributes?.[attr] : st.state;
+
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+private async setWeekOffset(cfg: Required<StundenplanConfig>, next: number) {
+  const ent = (cfg.week_offset_entity ?? "").trim();
+  if (!ent) return;
+
+  const st = this.hass?.states?.[ent];
+  const minA = st?.attributes?.min;
+  const maxA = st?.attributes?.max;
+
+  const min = Number.isFinite(Number(cfg.week_offset_min)) ? Number(cfg.week_offset_min) : Number(minA);
+  const max = Number.isFinite(Number(cfg.week_offset_max)) ? Number(cfg.week_offset_max) : Number(maxA);
+
+  let v = next;
+  if (Number.isFinite(min)) v = Math.max(min, v);
+  if (Number.isFinite(max)) v = Math.min(max, v);
+
+  await this.hass.callService("number", "set_value", { entity_id: ent, value: v });
+}
+
 
   private getEntitySig(entityId: string): string {
     const st = this.hass?.states?.[entityId];
@@ -696,13 +733,13 @@ export class StundenplanCard extends LitElement {
 
   if (changed.has("hass")) {
     if (this.config) {
-      const off = this.getWeekOffset(this.config);
-      if (off !== this._lastWeekOffset) {
+const off = this.getWeekOffsetValue(this.config); // kann null sein
+if (off !== this._lastWeekOffset) {
         this._lastWeekOffset = off;
         this.reloadSplanIfNeeded(true); // damit XML/Subplan auf neue Woche geht
       }
     }
-    this.recomputeRows();
+    this.recomputeRowsIfWatchedChanged();
   }
 
 
@@ -764,7 +801,8 @@ export class StundenplanCard extends LitElement {
       this._splanBasis = basis;
 
       // 2) aktuelle Schulwoche bestimmen
-      const swNow = findSchoolWeek(basis, new Date());
+      const baseDate = this.getBaseDate(cfg);
+      const swNow = findSchoolWeek(basis, baseDate);
       if (!swNow?.sw) throw new Error("Schulwoche (Sw) in Basis nicht für heutiges Datum gefunden.");
 
       // 3) Wochenplan laden (SPlanKl_SwXX.xml)
@@ -796,8 +834,9 @@ export class StundenplanCard extends LitElement {
       if (cfg.splan_sub_enabled) {
         const days = Math.max(1, Math.min(14, Number(cfg.splan_sub_days ?? 3)));
         for (let i = 0; i < days; i++) {
-          const d = new Date();
+          const d = new Date(this.getBaseDate(cfg));
           d.setDate(d.getDate() + i);
+
           const dow = dayFromDate(d);
 
           // i.d.R. nur Mo-Fr sinnvoll
@@ -860,6 +899,9 @@ export class StundenplanCard extends LitElement {
       week_map_attribute: "",
       week_offset_entity: "",
       week_offset_attribute: "",
+      week_offset_step: 1,
+      week_offset_min: undefined as any,
+      week_offset_max: undefined as any,
 
       source_entity_a: "",
       source_attribute_a: "",
@@ -867,8 +909,8 @@ export class StundenplanCard extends LitElement {
       source_attribute_b: "",
 
       splan_xml_enabled: false,
-      splan_xml_url: "/local/splan/sdaten",
-      splan_class: "5a",
+      splan_xml_url: "",
+      splan_class: "",
       splan_week: "auto",
       splan_show_room: true,
       splan_show_teacher: false,
@@ -956,7 +998,7 @@ export class StundenplanCard extends LitElement {
           break: true,
           time: (r.time ?? "").toString(),
           label: (r.label ?? "Pause").toString(),
-        } as BreakRow;
+         } as BreakRow;
       }
 
       const cellsIn = Array.isArray(r?.cells) ? r.cells : [];
@@ -1032,7 +1074,7 @@ export class StundenplanCard extends LitElement {
       source_attribute_b: (cfg.source_attribute_b ?? stub.source_attribute_b).toString(),
 
       // XML
-      splan_xml_enabled: cfg.splan_xml_enabled ?? true,
+      splan_xml_enabled: cfg.splan_xml_enabled ?? stub.splan_xml_enabled,
       splan_xml_url: (cfg.splan_xml_url ?? stub.splan_xml_url).toString(),
       splan_class: (cfg.splan_class ?? stub.splan_class).toString(),
       splan_week,
@@ -1051,6 +1093,13 @@ export class StundenplanCard extends LitElement {
       filter_main_only: cfg.filter_main_only ?? true,
       filter_allow_prefixes: Array.isArray(cfg.filter_allow_prefixes) ? cfg.filter_allow_prefixes.map(String) : [],
       filter_exclude: Array.isArray(cfg.filter_exclude) ? cfg.filter_exclude.map(String) : [],
+
+      week_offset_entity: (cfg.week_offset_entity ?? "").toString(),
+      week_offset_attribute: (cfg.week_offset_attribute ?? "").toString(),
+      week_offset_step: Number.isFinite(Number(cfg.week_offset_step)) ? Number(cfg.week_offset_step) : 1,
+      week_offset_min: cfg.week_offset_min as any,
+      week_offset_max: cfg.week_offset_max as any,
+
 
       rows,
     };
@@ -1144,9 +1193,9 @@ export class StundenplanCard extends LitElement {
     // Fallbacks (für ältere Versionen / alternative Sensor-Attribute)
     if (data == null) {
       const attr = (attributeName ?? "").toString().trim();
-      if (attr === "rows") data = this.readEntityJson(entityId, "rows_json");
-      if (data == null && attr === "rows_ha") data = this.readEntityJson(entityId, "rows");
-      if (data == null && attr === "rows_ha") data = this.readEntityJson(entityId, "rows_json");
+      if (data == null) data = this.readEntityJson(entityId, "rows");
+      if (data == null) data = this.readEntityJson(entityId, "rows_json");
+      if (data == null) data = this.readEntityJson(entityId, "rows_ha");
     }
 
     if (!Array.isArray(data)) return null;
@@ -1367,18 +1416,23 @@ private recomputeRows() {
     return finalParts.join(" / ");
   }
 
-  private getWeekOffset(cfg: Required<StundenplanConfig>): number {
-    const ent = (cfg.week_offset_entity ?? "").trim();
-    if (!ent) return 0;
+private getWeekOffset(cfg: Required<StundenplanConfig>): number {
+  const ent = (cfg.week_offset_entity ?? "").toString().trim();
+  if (!ent) return 0;
 
-    const attr = (cfg.week_offset_attribute ?? "").trim();
-    const st = this.hass?.states?.[ent];
-    if (!st) return 0;
+  const attr = (cfg.week_offset_attribute ?? "").toString().trim();
+  if (!this.hass?.states?.[ent]) return 0;
 
-    const raw = attr ? st.attributes?.[attr] : st.state;
-    const n = Number(raw);
-    return Number.isFinite(n) ? Math.trunc(n) : 0;
-  }
+  const st = this.hass.states[ent];
+  const raw = attr ? st.attributes?.[attr] : st.state;
+
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0;
+
+  // sinnvoll begrenzen, damit nichts eskaliert
+  return Math.max(-52, Math.min(52, Math.trunc(n)));
+}
+
 
   private getBaseDate(cfg: Required<StundenplanConfig>): Date {
     const off = this.getWeekOffset(cfg);
@@ -1672,9 +1726,21 @@ private recomputeRows() {
     const xmlWeek = cfg.splan_week === "auto" ? "auto" : cfg.splan_week;
     const xmlArt = (cfg.splan_plan_art ?? "class").toString();
 
-    return html`
-      <ha-card header=${cfg.title ?? ""}>
-        <div class="card">
+  const off = this.getWeekOffsetValue(cfg);
+  const canOffset = (cfg.week_offset_entity ?? "").trim().length > 0;
+  const step = Number(cfg.week_offset_step ?? 1) || 1;
+
+  return html`
+    <ha-card header=${cfg.title ?? ""}>
+      <div class="card">
+        ${canOffset ? html`
+          <div class="offsetBar">
+            <button class="btnMini" @click=${() => off != null && this.setWeekOffset(cfg, off - step)}>&lt;</button>
+            <div class="offsetVal">${off ?? "?"}</div>
+            <button class="btnMini" @click=${() => off != null && this.setWeekOffset(cfg, off + step)}>&gt;</button>
+          </div>
+        ` : html``}
+
           ${showWeekBadge ? html`<div class="weekBadge">Woche: <b>${activeWeek}</b></div>` : html``}
 
           ${showXmlStatus
@@ -1701,28 +1767,20 @@ private recomputeRows() {
     ${cfg.days.map((d, i) => {
       const cls = cfg.highlight_today && i === todayIdx ? "today" : "";
 
-      // Datum zur Spalte berechnen (basierend auf "dieser Woche")
-      const base = new Date();
-      base.setHours(12, 0, 0, 0);
+// ✅ Woche um Offset verschieben
+const baseDate = this.getBaseDate(cfg);
+const mon = this.mondayOfWeek(baseDate);
 
-      // Montag der Woche bestimmen
-      const mon = new Date(base);
-      const dow = mon.getDay(); // So=0..Sa=6
-      const diffToMon = (dow === 0 ? -6 : 1 - dow);
-      mon.setDate(mon.getDate() + diffToMon);
+// Spaltentag (Mo=1..So=7) aus deinem Label ("Mo", "Di", ...)
+const splanDay = mapCfgDayToSplanDay(d);
 
-      // Spaltentag (Mo=1..So=7) aus deinem Label ("Mo", "Di", ...)
-      const splanDay = mapCfgDayToSplanDay(d);
+let ddmm = "";
+if (splanDay) {
+  const dt = new Date(mon);
+  dt.setDate(mon.getDate() + (splanDay - 1));
+  ddmm = this.fmtDDMM(dt);
+}
 
-      let ddmm = "";
-      if (splanDay) {
-        const dt = new Date(mon);
-        dt.setDate(mon.getDate() + (splanDay - 1));
-
-        const dd = String(dt.getDate()).padStart(2, "0");
-        const mm = String(dt.getMonth() + 1).padStart(2, "0");
-        ddmm = `${dd}.${mm}.`;
-      }
 
       return html`
         <th class=${cls} style=${`--sp-hl:${todayOverlay};`}>
@@ -1835,6 +1893,34 @@ private recomputeRows() {
       max-width: 100%;
       box-sizing: border-box;
     }
+.offsetBar{
+  position:absolute;
+  right:12px;
+  top:12px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+  padding:6px 8px;
+  border:1px solid var(--divider-color);
+  border-radius:12px;
+  background: var(--secondary-background-color);
+}
+.btnMini{
+  border:1px solid var(--divider-color);
+  background: var(--card-background-color);
+  color: var(--primary-text-color);
+  border-radius:10px;
+  padding:6px 10px;
+  cursor:pointer;
+}
+.btnMini:hover{ filter: brightness(1.06); }
+.offsetVal{
+  min-width:34px;
+  text-align:center;
+  font-weight:700;
+}
+.card{ position:relative; }
+
     .card {
       padding: 12px;
     }
@@ -2069,6 +2155,12 @@ export class StundenplanCardEditor extends LitElement {
       filter_main_only: merged.filter_main_only ?? true,
       filter_allow_prefixes: Array.isArray(merged.filter_allow_prefixes) ? merged.filter_allow_prefixes.map(String) : [],
       filter_exclude: Array.isArray(merged.filter_exclude) ? merged.filter_exclude.map(String) : [],
+
+      week_offset_entity: (merged.week_offset_entity ?? "").toString(),
+      week_offset_attribute: (merged.week_offset_attribute ?? "").toString(),
+      week_offset_step: Number.isFinite(Number(merged.week_offset_step)) ? Number(merged.week_offset_step) : 1,
+      week_offset_min: merged.week_offset_min as any,
+      week_offset_max: merged.week_offset_max as any,
 
       splan_plan_art,
 
@@ -2698,6 +2790,26 @@ private renderSplan24(): TemplateResult {
 
     return html`
 
+<div class="panelMinor">
+  <div class="minorTitle">Blättern (Woche Offset)</div>
+
+  <div class="grid2">
+    <div class="field">
+      <label class="lbl">week_offset_entity</label>
+      <input class="in" type="text"
+        .value=${c.week_offset_entity ?? ""}
+        placeholder="z.B. number.05b_woche_offset"
+        @input=${(e:any)=>this.emit({...c, week_offset_entity:e.target.value})}/>
+    </div>
+
+    <div class="field">
+      <label class="lbl">Schrittweite</label>
+      <input class="in" type="number"
+        .value=${String(c.week_offset_step ?? 1)}
+        @input=${(e:any)=>this.emit({...c, week_offset_step:Number(e.target.value)})}/>
+    </div>
+  </div>
+</div>
 
 
 <div class="panelMinor">
