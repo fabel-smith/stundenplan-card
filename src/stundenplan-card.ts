@@ -76,6 +76,10 @@ type StundenplanConfig = {
   source_attribute?: string;
   source_time_key?: string;
 
+  // ✅ Woche per Entity steuern (z.B. number.05b_woche_offset)
+  week_offset_entity?: string;       // state = number (0=aktuell, 1=nächste, -1=letzte)
+  week_offset_attribute?: string;    // optional, falls Offset im Attribut steht
+
   // Wechselwochen (für Entity & auch als "Auto" für XML)
   week_mode?: WeekMode;
   week_a_is_even_kw?: boolean;
@@ -690,9 +694,17 @@ export class StundenplanCard extends LitElement {
       return;
     }
 
-    if (changed.has("hass")) {
-      this.recomputeRowsIfWatchedChanged();
+  if (changed.has("hass")) {
+    if (this.config) {
+      const off = this.getWeekOffset(this.config);
+      if (off !== this._lastWeekOffset) {
+        this._lastWeekOffset = off;
+        this.reloadSplanIfNeeded(true); // damit XML/Subplan auf neue Woche geht
+      }
     }
+    this.recomputeRows();
+  }
+
 
   }
 
@@ -846,6 +858,8 @@ export class StundenplanCard extends LitElement {
       week_a_is_even_kw: true,
       week_map_entity: "",
       week_map_attribute: "",
+      week_offset_entity: "",
+      week_offset_attribute: "",
 
       source_entity_a: "",
       source_attribute_a: "",
@@ -1353,6 +1367,41 @@ private recomputeRows() {
     return finalParts.join(" / ");
   }
 
+  private getWeekOffset(cfg: Required<StundenplanConfig>): number {
+    const ent = (cfg.week_offset_entity ?? "").trim();
+    if (!ent) return 0;
+
+    const attr = (cfg.week_offset_attribute ?? "").trim();
+    const st = this.hass?.states?.[ent];
+    if (!st) return 0;
+
+    const raw = attr ? st.attributes?.[attr] : st.state;
+    const n = Number(raw);
+    return Number.isFinite(n) ? Math.trunc(n) : 0;
+  }
+
+  private getBaseDate(cfg: Required<StundenplanConfig>): Date {
+    const off = this.getWeekOffset(cfg);
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() + off * 7);
+    return d;
+  }
+
+  private mondayOfWeek(date: Date): Date {
+    const d = new Date(date);
+    const dow = d.getDay() === 0 ? 7 : d.getDay(); // Mo=1..So=7
+    d.setDate(d.getDate() - (dow - 1));
+    d.setHours(12, 0, 0, 0);
+    return d;
+  }
+
+  private fmtDDMM(date: Date): string {
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    return `${dd}.${mm}.`;
+  }
+
   private getRowsFromSplanXml(cfg: Required<StundenplanConfig>): Row[] | null {
     if (!this.isSplanXmlActive(cfg)) return null;
 
@@ -1646,15 +1695,45 @@ private recomputeRows() {
             : html``}
 
           <table>
-            <thead>
-              <tr>
-                <th class="time">Stunde</th>
-                ${cfg.days.map((d, i) => {
-                  const cls = cfg.highlight_today && i === todayIdx ? "today" : "";
-                  return html`<th class=${cls} style=${`--sp-hl:${todayOverlay};`}>${d}</th>`;
-                })}
-              </tr>
-            </thead>
+<thead>
+  <tr>
+    <th class="time">Stunde</th>
+    ${cfg.days.map((d, i) => {
+      const cls = cfg.highlight_today && i === todayIdx ? "today" : "";
+
+      // Datum zur Spalte berechnen (basierend auf "dieser Woche")
+      const base = new Date();
+      base.setHours(12, 0, 0, 0);
+
+      // Montag der Woche bestimmen
+      const mon = new Date(base);
+      const dow = mon.getDay(); // So=0..Sa=6
+      const diffToMon = (dow === 0 ? -6 : 1 - dow);
+      mon.setDate(mon.getDate() + diffToMon);
+
+      // Spaltentag (Mo=1..So=7) aus deinem Label ("Mo", "Di", ...)
+      const splanDay = mapCfgDayToSplanDay(d);
+
+      let ddmm = "";
+      if (splanDay) {
+        const dt = new Date(mon);
+        dt.setDate(mon.getDate() + (splanDay - 1));
+
+        const dd = String(dt.getDate()).padStart(2, "0");
+        const mm = String(dt.getMonth() + 1).padStart(2, "0");
+        ddmm = `${dd}.${mm}.`;
+      }
+
+      return html`
+        <th class=${cls} style=${`--sp-hl:${todayOverlay};`}>
+          <div>${d}</div>
+          <div class="thDate">${ddmm}</div>
+        </th>
+      `;
+    })}
+  </tr>
+</thead>
+
 
             <tbody>
               ${rows.map((r) => {
@@ -1817,6 +1896,13 @@ private recomputeRows() {
       background: var(--secondary-background-color);
       font-weight: 700;
     }
+.thDate {
+  font-size: 11px;
+  opacity: 0.75;
+  margin-top: 2px;
+  font-weight: 600;
+}
+
     .time {
       font-weight: 700;
       white-space: nowrap;
