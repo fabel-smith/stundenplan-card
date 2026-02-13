@@ -568,11 +568,12 @@ export class StundenplanCard extends LitElement {
     return { columns: "full" };
   }
 
-  @property({ attribute: false }) public hass: any;
-  @state() private config?: Required<StundenplanConfig>;
-  @state() private _splanErr: string | null = null;
-  @state() private _splanLoading = false;
-  @state() private _rowsCache: Row[] = [];
+@property({ attribute: false }) public accessor hass: any;
+@state() private accessor config?: Required<StundenplanConfig>;
+@state() private accessor _splanErr: string | null = null;
+@state() private accessor _splanLoading = false;
+@state() private accessor _rowsCache: Row[] = [];
+
 
 
   private _tick?: number;
