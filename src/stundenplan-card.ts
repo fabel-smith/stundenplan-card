@@ -1,4 +1,6 @@
 import { LitElement, html, css, TemplateResult } from "lit";
+import { property, state } from "lit/decorators.js";
+
 
 /**
  * Stundenplan Card (Home Assistant)
@@ -566,19 +568,87 @@ export class StundenplanCard extends LitElement {
     return { columns: "full" };
   }
 
-  public hass: any;
-  private config?: Required<StundenplanConfig>;
-  private _tick?: number;
+  @property({ attribute: false }) public hass: any;
+  @state() private config?: Required<StundenplanConfig>;
+  @state() private _splanErr: string | null = null;
+  @state() private _splanLoading = false;
+  @state() private _rowsCache: Row[] = [];
 
+
+  private _tick?: number;
   private _splanBasis: SplanBasis | null = null;
   private _splanWeekLessons: SplanWeekPlanLesson[] | null = null;
   private _splanSubLessonsByDay: Map<number, SplanSubLesson[]> = new Map();
 
+  // --- Recompute Guard ---
+  private _lastWatchSig: string | null = null;
+
+  private getWatchedEntities(cfg: Required<StundenplanConfig>): string[] {
+    const out = new Set<string>();
+
+    const add = (e?: string) => {
+      const v = (e ?? "").toString().trim();
+      if (v) out.add(v);
+    };
+
+    // Single legacy
+    add(cfg.source_entity);
+
+    // A/B
+    add(cfg.source_entity_a);
+    add(cfg.source_entity_b);
+
+    // Week map
+    add(cfg.week_map_entity);
+
+    // Stundenplan24 Picker (ist meistens identisch mit source_entity, aber egal)
+    add(cfg.splan24_entity);
+
+    return Array.from(out);
+  }
+
+  private getEntitySig(entityId: string): string {
+    const st = this.hass?.states?.[entityId];
+    if (!st) return `${entityId}:<missing>`;
+
+    // Wichtig: nicht das gesamte rows-Array JSON-stringifyen (teuer)
+    // Stattdessen: last_updated/last_changed + state + "Größe" der wichtigen Attribute
+    const lu = (st.last_updated ?? "");
+    const lc = (st.last_changed ?? "");
+    const state = (st.state ?? "");
+
+    const attrs = st.attributes ?? {};
+    const rows = attrs.rows ?? attrs.rows_json ?? attrs.rows_ha;
+    const rowsLen =
+      Array.isArray(rows) ? rows.length : (typeof rows === "string" ? rows.length : 0);
+
+    const wk = attrs.week ?? attrs.kw ?? ""; // optional, falls vorhanden
+
+    return `${entityId}|${lu}|${lc}|${state}|rowsLen=${rowsLen}|wk=${wk}`;
+  }
+
+  private computeWatchSig(cfg: Required<StundenplanConfig>): string {
+    const ents = this.getWatchedEntities(cfg);
+    const parts = ents.map((e) => this.getEntitySig(e));
+    // Auch die aktive Woche reinnehmen, weil sie die Auswahl A/B beeinflusst
+    const week = cfg.week_mode !== "off" ? this.getActiveWeek(cfg) : "off";
+    return `week=${week}::` + parts.join("::");
+  }
+
+  private recomputeRowsIfWatchedChanged(): void {
+    if (!this.config) return;
+
+    const sig = this.computeWatchSig(this.config);
+    if (sig === this._lastWatchSig) return;
+
+    this._lastWatchSig = sig;
+    this.recomputeRows();
+  }
+
+
   // ✅ mobil/week.json Support
   private _splanMobilWeek: MobilWeekJson | null = null;
 
-  private _splanErr: string | null = null;
-  private _splanLoading = false;
 
   /**
    * XML gilt als "aktiv", sobald eine Quelle (URL) und ein Ziel (Klasse/Lehrer/Raum) gesetzt sind.
@@ -612,8 +682,19 @@ export class StundenplanCard extends LitElement {
 
   protected updated(changed: Map<string, any>): void {
     super.updated(changed);
-    if (changed.has("config")) this.reloadSplanIfNeeded(true);
+
+    if (changed.has("config")) {
+      this.reloadSplanIfNeeded(true);
+      this.recomputeRows();
+      return;
+    }
+
+    if (changed.has("hass")) {
+      this.recomputeRowsIfWatchedChanged();
+    }
+
   }
+
 
   private async reloadSplanIfNeeded(force: boolean) {
     const cfg = this.config;
@@ -720,7 +801,6 @@ export class StundenplanCard extends LitElement {
           }
         }
       }
-
       this._splanErr = null;
     } catch (e: any) {
       this._splanBasis = null;
@@ -730,7 +810,7 @@ export class StundenplanCard extends LitElement {
       this._splanErr = e?.message ? String(e.message) : String(e);
     } finally {
       this._splanLoading = false;
-      this.requestUpdate();
+      this.recomputeRows();
     }
   }
 
@@ -825,15 +905,21 @@ export class StundenplanCard extends LitElement {
 
     if (!(type === "custom:stundenplan-card" || type === "stundenplan-card")) {
       this.config = this.normalizeConfig(stub);
+      this.reloadSplanIfNeeded(true);
+      this.recomputeRows();
       return;
     }
 
-    this.config = this.normalizeConfig({
-      ...stub,
-      ...cfg,
-      type,
-    });
+    this.config = this.normalizeConfig({ ...stub, ...cfg, type });
+
+    // XML/JSON ggf. laden, dann Rows sofort berechnen
+    this.reloadSplanIfNeeded(true);
+    this.recomputeRows();
+
+    // Signatur resetten, damit hass-Update danach sauber weiterarbeitet
+    this._lastWatchSig = null;
   }
+
 
   public getCardSize(): number {
     const rows = this.config?.rows?.length ?? 3;
@@ -1127,6 +1213,15 @@ export class StundenplanCard extends LitElement {
     // 4) fallback manual
     return cfg.rows ?? [];
   }
+
+private recomputeRows() {
+  if (!this.config) {
+    this._rowsCache = [];
+    return;
+  }
+  this._rowsCache = this.getRowsResolved(this.config);
+}
+
 
   /**
    * Fix: Fallback für Zeiten aus manuellen cfg.rows, wenn XML Stundenzeiten nicht liefert
@@ -1507,7 +1602,7 @@ export class StundenplanCard extends LitElement {
     if (!this.config) return html``;
 
     const cfg = this.config;
-    const rows = this.getRowsResolved(cfg);
+    const rows = this._rowsCache;
 
     const todayIdx = this.getTodayIndex(cfg.days ?? []);
     const borderDefault = "1px solid var(--divider-color)";
@@ -1778,7 +1873,7 @@ export class StundenplanCardEditor extends LitElement {
 
     const wasInitialized = !!this._config;
     this._config = this.normalizeConfig(this.clone(cfg));
-
+    
     if (!wasInitialized) {
       this._ui.rowOpen = {};
     }
