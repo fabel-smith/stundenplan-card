@@ -1498,78 +1498,42 @@ const ut = class ut extends U {
   }
   setSourceType(t) {
     if (!this._config) return;
-    const e = t === "entity" || t === "json" || t === "manual" || t === "legacy" ? t : "manual";
-    const s = { ...this._config, source_type: e };
-
-    // NOTE: JSON bleibt intern aus Kompatibilitätsgründen unterstützt (alte Karten),
-    // wird aber im UI nur noch angezeigt, wenn eine bestehende Karte bereits json nutzt.
-    if (e === "json" && s.json_url == null) s.json_url = "";
-
+    const e = t === "entity" || t === "json" || t === "manual" || t === "legacy" ? t : "manual", s = { ...this._config, source_type: e };
+    if (e === "json" && s.json_url == null && (s.json_url = ""));
     if (e === "entity") {
-      // Stundenplan24 (Integration): eigenes Feld, aber für bestehende Logik zusätzlich in source_entity spiegeln
-      const integrationEntity = (s.integration_entity ?? "").toString().trim() || (s.source_entity ?? "").toString().trim();
-      s.integration_entity = integrationEntity;
-      s.source_entity = integrationEntity;
-
-      // Attribute/Time-Key sind für Integration fest verdrahtet, aber NICHT als "Wert" für Legacy missbrauchen.
+      s.source_entity == null && (s.source_entity = "");
+      // Stundenplan24-Integration: Attribute/Time-Key sind fest verdrahtet
       s.source_attribute = "rows_table";
       s.source_time_key = "time";
     }
-
     if (e === "legacy") {
-      // Legacy: separates Feld, plus Spiegelung in source_* damit die Runtime unverändert bleibt
-      const legacyEntity = (s.legacy_entity ?? "").toString().trim() || (s.source_entity ?? "").toString().trim();
-      s.legacy_entity = legacyEntity;
-      s.source_entity = legacyEntity;
-
-      // Attribut/Time-Key: bevorzugt legacy_*; wenn source_* noch Integration-Defaults sind, auf Plan/Stunde zurücksetzen
-      const curAttr = (s.source_attribute ?? "").toString().trim();
-      const curTime = (s.source_time_key ?? "").toString().trim();
-
-      const legacyAttr = (s.legacy_attribute ?? "").toString().trim() || ((curAttr && curAttr !== "rows_table") ? curAttr : "");
-      const legacyTime = (s.legacy_time_key ?? "").toString().trim() || ((curTime && curTime !== "time") ? curTime : "");
-
-      s.legacy_attribute = legacyAttr || "plan";
-      s.legacy_time_key = legacyTime || "Stunde";
-
-      s.source_attribute = s.legacy_attribute;
-      s.source_time_key = s.legacy_time_key;
+      s.source_entity == null && (s.source_entity = "");
+      s.source_attribute = (s.source_attribute ?? "").toString().trim() || "plan";
+      s.source_time_key = (s.source_time_key ?? "").toString().trim() || "Stunde";
     }
-
-    // manual: nichts spezielles
     this.emit(s);
   }
   setSourceEntity(t) {
     if (!this._config) return;
     const e = (t ?? "").toString().trim();
     const st = (this._config.source_type ?? "entity").toString();
-
     if (st === "legacy") {
-      // Legacy: in legacy_entity + source_entity spiegeln
+      // Legacy: nur Entity setzen, Attribut/Time-Key beibehalten
       this.emit({
         ...this._config,
         source_type: "legacy",
-        legacy_entity: e,
         source_entity: e
       });
       return;
     }
-
-    if (st === "entity") {
-      // Stundenplan24 (Integration): in integration_entity + source_entity spiegeln
-      this.emit({
-        ...this._config,
-        source_type: "entity",
-        integration_entity: e,
-        source_entity: e,
-        source_attribute: "rows_table",
-        source_time_key: "time"
-      });
-      return;
-    }
-
-    // fallback: setze nur source_entity
-    this.emit({ ...this._config, source_entity: e });
+    // Stundenplan24-Integration
+    this.emit({
+      ...this._config,
+      source_type: "entity",
+      source_entity: e,
+      source_attribute: "rows_table",
+      source_time_key: "time"
+    });
   }
   setJsonUrl(t) {
     this._config && this.emit({
@@ -1796,7 +1760,7 @@ const ut = class ut extends U {
             </div>
 
             ${["entity","legacy"].includes(t.source_type ?? "manual") ? d`
-                  ${this.isHaEntityPickerAvailable() ? d`
+                  ${((t.source_type ?? "manual") === "entity") && this.isHaEntityPickerAvailable() ? d`
                         ${(() => {
         const st = (t.source_type ?? "manual");
         const all = Object.keys(this.hass?.states ?? {});
@@ -1806,28 +1770,21 @@ const ut = class ut extends U {
       })()}
                         <ha-entity-picker
                           .hass=${this.hass}
-                          .value=${(() => {
-        const st = (t.source_type ?? "manual");
-        const src = (t.source_entity ?? "").toString();
-        if (st === "legacy") {
-          const v = (t.legacy_entity ?? "").toString().trim();
-          return v || (src && !/_woche$/i.test(src) ? src : "");
-        }
-        if (st === "entity") {
-          const v = (t.integration_entity ?? "").toString().trim();
-          return v || (src && /_woche$/i.test(src) ? src : "");
-        }
-        return src;
-      })()}
+                          .value=${t.source_entity ?? ""}
                           .includeDomains=${["sensor"]}
                           .entityFilter=${(entityId) => {
-        const id = (entityId ?? "").toString();
-        return (t.source_type ?? "manual") === "entity" ? /_woche$/i.test(id) : /^sensor\./.test(id);
+        const id = (typeof entityId === "string")
+          ? entityId
+          : (entityId && typeof entityId === "object" && "entity_id" in entityId ? entityId.entity_id : "");
+        const sid = (id ?? "").toString();
+        return (t.source_type ?? "manual") === "entity" ? /_woche$/i.test(sid) : /^sensor\./.test(sid);
       }}
-                          .label=${(t.source_type ?? "manual") === "entity" ? "Stundenplan24 Sensor" : "REST-Sensor (Legacy)"}
+                          .label=${"Sensor auswählen"}
                           @value-changed=${(e) => {
         try {
-          this.setSourceEntity(e.detail?.value ?? e.target?.value);
+          const v = e.detail?.value ?? e.target?.value;
+          const id = (typeof v === "string") ? v : (v && typeof v === "object" ? v.entity_id : undefined);
+          this.setSourceEntity(id);
         } catch (s) {
           console.error("stundenplan-card editor: setSourceEntity failed", s);
         }
@@ -1836,37 +1793,15 @@ const ut = class ut extends U {
                       ` : d``}
                       <ha-textfield
                         label="…oder Entity-ID manuell"
-                        .value=${(() => {
-        const st = (t.source_type ?? "manual");
-        const src = (t.source_entity ?? "").toString();
-        if (st === "legacy") {
-          const v = (t.legacy_entity ?? "").toString().trim();
-          return v || (src && !/_woche$/i.test(src) ? src : "");
-        }
-        if (st === "entity") {
-          const v = (t.integration_entity ?? "").toString().trim();
-          return v || (src && /_woche$/i.test(src) ? src : "");
-        }
-        return src;
-      })()}
+                        .value=${t.source_entity ?? ""}
                         @input=${(e) => this.setSourceEntity(e.target.value)}
                         placeholder=${(t.source_type ?? "manual") === "legacy" ? "sensor.stundenplan" : "sensor.05b_woche"}
                       ></ha-textfield>
 
                       ${(t.source_type ?? "manual") === "legacy" ? d`
                         <div class="grid2">
-                          <ha-textfield label="Attribut" .value=${(() => {
-            const v = (t.legacy_attribute ?? "").toString().trim();
-            if (v) return v;
-            const src = (t.source_attribute ?? "").toString().trim();
-            return src && src !== "rows_table" ? src : "";
-          })()} @input=${(e) => { this.onText(e, "legacy_attribute"); this.onText(e, "source_attribute"); }} placeholder="plan"></ha-textfield>
-                          <ha-textfield label="Time-Key" .value=${(() => {
-            const v = (t.legacy_time_key ?? "").toString().trim();
-            if (v) return v;
-            const src = (t.source_time_key ?? "").toString().trim();
-            return src && src !== "time" ? src : "";
-          })()} @input=${(e) => { this.onText(e, "legacy_time_key"); this.onText(e, "source_time_key"); }} placeholder="Stunde"></ha-textfield>
+                          <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-textfield>
+                          <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-textfield>
                         </div>
                         <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
                       ` : d``}
