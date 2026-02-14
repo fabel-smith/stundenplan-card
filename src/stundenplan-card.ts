@@ -1529,13 +1529,14 @@ ${this.renderSection(
       (<code>${offsetInfo || "—"}</code>).
     </div>
 
-    <ha-entity-picker
-      .hass=${this.hass}
-      .value=${cfg.splan24_entity ?? ""}
-      .includeDomains=${["sensor"]}
-      .label=${"Stundenplan24 Woche Sensor"}
-      @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value)}
-    ></ha-entity-picker>
+<hui-entity-picker
+  .hass=${this.hass}
+  .value=${cfg.splan24_entity ?? ""}
+  .includeDomains=${["sensor"]}
+  .label=${"Stundenplan24 Woche Sensor"}
+  @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value)}
+></hui-entity-picker>
+
 
     <div class="sub" style="margin-top:6px;">
       Attribut fest: <code>rows_ha</code>
