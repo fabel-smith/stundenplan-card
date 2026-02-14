@@ -1806,13 +1806,25 @@ const ut = class ut extends U {
       })()}
                         <ha-entity-picker
                           .hass=${this.hass}
-                          .value=${(t.source_type ?? "manual") === "legacy" ? (t.legacy_entity ?? t.source_entity ?? "") : ((t.source_type ?? "manual") === "entity" ? (t.integration_entity ?? t.source_entity ?? "") : (t.source_entity ?? ""))}
+                          .value=${(() => {
+        const st = (t.source_type ?? "manual");
+        const src = (t.source_entity ?? "").toString();
+        if (st === "legacy") {
+          const v = (t.legacy_entity ?? "").toString().trim();
+          return v || (src && !/_woche$/i.test(src) ? src : "");
+        }
+        if (st === "entity") {
+          const v = (t.integration_entity ?? "").toString().trim();
+          return v || (src && /_woche$/i.test(src) ? src : "");
+        }
+        return src;
+      })()}
                           .includeDomains=${["sensor"]}
                           .entityFilter=${(entityId) => {
         const id = (entityId ?? "").toString();
         return (t.source_type ?? "manual") === "entity" ? /_woche$/i.test(id) : /^sensor\./.test(id);
       }}
-                          .label=${"Sensor auswählen"}
+                          .label=${(t.source_type ?? "manual") === "entity" ? "Stundenplan24 Sensor" : "REST-Sensor (Legacy)"}
                           @value-changed=${(e) => {
         try {
           this.setSourceEntity(e.detail?.value ?? e.target?.value);
@@ -1824,15 +1836,37 @@ const ut = class ut extends U {
                       ` : d``}
                       <ha-textfield
                         label="…oder Entity-ID manuell"
-                        .value=${(t.source_type ?? "manual") === "legacy" ? (t.legacy_entity ?? t.source_entity ?? "") : ((t.source_type ?? "manual") === "entity" ? (t.integration_entity ?? t.source_entity ?? "") : (t.source_entity ?? ""))}
+                        .value=${(() => {
+        const st = (t.source_type ?? "manual");
+        const src = (t.source_entity ?? "").toString();
+        if (st === "legacy") {
+          const v = (t.legacy_entity ?? "").toString().trim();
+          return v || (src && !/_woche$/i.test(src) ? src : "");
+        }
+        if (st === "entity") {
+          const v = (t.integration_entity ?? "").toString().trim();
+          return v || (src && /_woche$/i.test(src) ? src : "");
+        }
+        return src;
+      })()}
                         @input=${(e) => this.setSourceEntity(e.target.value)}
                         placeholder=${(t.source_type ?? "manual") === "legacy" ? "sensor.stundenplan" : "sensor.05b_woche"}
                       ></ha-textfield>
 
                       ${(t.source_type ?? "manual") === "legacy" ? d`
                         <div class="grid2">
-                          <ha-textfield label="Attribut" .value=${t.legacy_attribute ?? t.source_attribute ?? ""} @input=${(e) => { this.onText(e, "legacy_attribute"); this.onText(e, "source_attribute"); }} placeholder="plan"></ha-textfield>
-                          <ha-textfield label="Time-Key" .value=${t.legacy_time_key ?? t.source_time_key ?? ""} @input=${(e) => { this.onText(e, "legacy_time_key"); this.onText(e, "source_time_key"); }} placeholder="Stunde"></ha-textfield>
+                          <ha-textfield label="Attribut" .value=${(() => {
+            const v = (t.legacy_attribute ?? "").toString().trim();
+            if (v) return v;
+            const src = (t.source_attribute ?? "").toString().trim();
+            return src && src !== "rows_table" ? src : "";
+          })()} @input=${(e) => { this.onText(e, "legacy_attribute"); this.onText(e, "source_attribute"); }} placeholder="plan"></ha-textfield>
+                          <ha-textfield label="Time-Key" .value=${(() => {
+            const v = (t.legacy_time_key ?? "").toString().trim();
+            if (v) return v;
+            const src = (t.source_time_key ?? "").toString().trim();
+            return src && src !== "time" ? src : "";
+          })()} @input=${(e) => { this.onText(e, "legacy_time_key"); this.onText(e, "source_time_key"); }} placeholder="Stunde"></ha-textfield>
                         </div>
                         <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
                       ` : d``}
