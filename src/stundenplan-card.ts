@@ -1739,7 +1739,7 @@ const ut = class ut extends U {
                           .hass=${this.hass}
                           .value=${t.source_entity ?? ""}
                           .includeDomains=${["sensor"]}
-                          .entityFilter=${(e) => /_woche$/i.test(e?.entity_id ?? "")}
+                          .entityFilter=${(entityId) => /_woche$/i.test(entityId ?? "")}
                           .label=${"Sensor auswählen"}
                           @value-changed=${(e) => {
         try {

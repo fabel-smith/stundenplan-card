@@ -1730,7 +1730,7 @@ const mt = class extends W {
                           .hass=${this.hass}
                           .value=${t.source_entity ?? ""}
                           .includeDomains=${["sensor"]}
-                          .entityFilter=${(i) => /_woche$/i.test(i?.entity_id ?? "")}
+                          .entityFilter=${(i) => /_woche$/i.test(i ?? "")}
                           .label=${"Sensor auswählen"}
                           @value-changed=${(i) => {
         try {
