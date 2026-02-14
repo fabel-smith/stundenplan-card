@@ -1391,10 +1391,10 @@ export class StundenplanCardEditor extends LitElement {
   private _config?: Required<StundenplanConfig>;
 
   @state() private _open: Record<string, boolean> = {
-    general: true,
+    general: false,
     highlights: false,
     colors: false,
-    sources: true,
+    sources: false,
     manual: false,
   };
 
@@ -1662,7 +1662,7 @@ export class StundenplanCardEditor extends LitElement {
     const cfg = this._config;
 
     return html`
-      <div class="wrap" @click=${this._stopEvent} @mousedown=${this._stopEvent} @mouseup=${this._stopEvent} @touchstart=${this._stopEvent} @pointerdown=${this._stopEvent}>
+      <div class="wrap">
         ${this.renderSection(
           "Allgemein",
           "general",
@@ -1776,20 +1776,28 @@ export class StundenplanCardEditor extends LitElement {
 
             ${(cfg.source_type ?? "manual") === "entity"
               ? html`
-                  <ha-entity-picker
+                  ${this.isHaEntityPickerAvailable() ? html`
+                        ${(() => {
+                          const ids = Object.keys(this.hass?.states ?? {}).filter((eid) => /^sensor\./.test(eid) && /_woche$/i.test(eid));
+                          const total = Object.keys(this.hass?.states ?? {}).length;
+                          const loading = total < 20 || (total > 0 && ids.length === 0);
+                          return loading ? html`<div class="hint">Lade Stundenplan-Sensoren…</div>` : html``;
+                        })()}
+                        <ha-entity-picker
                           .hass=${this.hass}
                           .value=${cfg.source_entity ?? ""}
                           .includeDomains=${["sensor"]}
                           .entityFilter=${(stateObj: any) => /_woche$/i.test(stateObj?.entity_id ?? "")}
                           .label=${"Sensor auswählen"}
-                          @value-changed=${(e: any) => { try { e?.stopPropagation?.(); this.setSourceEntity(e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: setSourceEntity failed", err); } }}
+                          @value-changed=${(e: any) => { try { this.setSourceEntity(e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: setSourceEntity failed", err); } }}
                         ></ha-entity-picker>
-                        <ha-textfield
-                          label="…oder Entity-ID manuell"
-                          .value=${cfg.source_entity ?? ""}
-                          @input=${(e: any) => this.setSourceEntity(e.target.value)}
-                          placeholder="sensor.05b_woche"
-                        ></ha-textfield>
+                      ` : html``}
+                      <ha-textfield
+                        label="…oder Entity-ID manuell"
+                        .value=${cfg.source_entity ?? ""}
+                        @input=${(e: any) => this.setSourceEntity(e.target.value)}
+                        placeholder="sensor.05b_woche"
+                      ></ha-textfield>
                   <div class="grid2" style="margin-top:8px;">
                     <ha-textfield
                       label="Attribut (auto)"
