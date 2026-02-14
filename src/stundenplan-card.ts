@@ -57,6 +57,10 @@ type StundenplanConfig = {
   source_attribute?: string;
   source_time_key?: string;
 
+  source_type?: "entity" | "json" | "manual";
+  json_url?: string;
+  no_data_text?: string;
+
   // internal (auto-set) – not shown in UI
   week_offset_entity?: string;
   week_offset_attribute?: string;
@@ -70,10 +74,6 @@ type StundenplanConfig = {
   source_attribute_a?: string;
   source_entity_b?: string;
   source_attribute_b?: string;
-
-  // Stundenplan24 picker (sets legacy source_*)
-  splan24_entity?: string;
-  splan24_attribute?: string;
 
   filter_main_only?: boolean;
   filter_allow_prefixes?: string[];
@@ -239,7 +239,6 @@ function mapCfgDayToIsoDow(label: string): number | null {
 /* ===================== Card ===================== */
 
 export class StundenplanCard extends LitElement {
-  @state() private _pendingManualFocus: { row: number; day?: string } | null = null;
   public getGridOptions() {
     return { columns: "full" };
   }
@@ -247,6 +246,13 @@ export class StundenplanCard extends LitElement {
   @property({ attribute: false }) public accessor hass: any;
   @state() private accessor config?: Required<StundenplanConfig>;
   @state() private accessor _rowsCache: Row[] = [];
+  @state() private accessor _noData: boolean = false;
+  @state() private accessor _noDataMsg: string = "";
+
+  @state() private accessor _jsonRows: Row[] | null = null;
+  @state() private accessor _jsonStatus: "idle" | "loading" | "ok" | "error" = "idle";
+  @state() private accessor _jsonError: string = "";
+  private _jsonUrlLast: string = "";
 
   private _tick?: number;
   private _lastWatchSig: string | null = null;
@@ -264,7 +270,6 @@ export class StundenplanCard extends LitElement {
     add(cfg.source_entity_a);
     add(cfg.source_entity_b);
     add(cfg.week_map_entity);
-    add(cfg.splan24_entity);
 
     return Array.from(out);
   }
@@ -356,26 +361,6 @@ export class StundenplanCard extends LitElement {
       }
       this.recomputeRowsIfWatchedChanged();
     }
-    // Nach Klick in der Vorschau zur entsprechenden Zeile / Fach scrollen und fokussieren
-    if (this._pendingManualFocus) {
-      const { row, day } = this._pendingManualFocus;
-      this._pendingManualFocus = null;
-
-      const rowEl = this.shadowRoot?.getElementById(`manual-row-${row}`);
-      rowEl?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-
-      if (day) {
-        const cellEl = this.shadowRoot?.getElementById(`manual-cell-${row}-${day}`) as any;
-        // ha-textfield hat manchmal .focus() nicht direkt, daher try/catch
-        try {
-          cellEl?.focus?.();
-          // fallback: inner input
-          (cellEl?.shadowRoot?.querySelector("input") as any)?.focus?.();
-          (cellEl?.shadowRoot?.querySelector("textarea") as any)?.focus?.();
-        } catch (_e) {}
-      }
-    }
-  
   }
 
   static getStubConfig(): Required<StundenplanConfig> {
@@ -402,11 +387,12 @@ export class StundenplanCard extends LitElement {
       source_attribute: "",
       source_time_key: "time",
 
+      source_type: "manual",
+      json_url: "",
+      no_data_text: "Keine Daten für diesen Zeitraum (Ferien/Feiertag).",
+
       week_offset_entity: "",
       week_offset_attribute: "",
-
-      splan24_entity: "",
-      splan24_attribute: "rows_ha",
 
       week_mode: "off",
       week_a_is_even_kw: true,
@@ -492,6 +478,19 @@ export class StundenplanCard extends LitElement {
       weekModeRaw === "kw_parity" || weekModeRaw === "week_map" || weekModeRaw === "off" ? weekModeRaw : "off";
 
     const source_entity = (cfg.source_entity ?? stub.source_entity).toString().trim();
+
+    // Determine source type early so we can enforce internal defaults
+    const source_type: "entity" | "json" | "manual" = (((cfg.source_type ?? (source_entity ? "entity" : "manual")) + "")
+      .toString()
+      .trim() as any);
+
+    // Enforce fixed mapping for Stundenplan24 integration (no UI for these)
+    const source_attribute =
+      source_type === "entity" ? "rows_table" : (cfg.source_attribute ?? stub.source_attribute).toString();
+
+    const source_time_key =
+      source_type === "entity" ? "time" : (cfg.source_time_key ?? stub.source_time_key).toString();
+
     const week_offset_entity_raw = (cfg.week_offset_entity ?? "").toString().trim();
     const week_offset_entity = week_offset_entity_raw || inferWeekOffsetEntity(source_entity);
 
@@ -515,14 +514,15 @@ export class StundenplanCard extends LitElement {
       highlight_current_time_text_color: (cfg.highlight_current_time_text_color ?? stub.highlight_current_time_text_color).toString(),
 
       source_entity,
-      source_attribute: (cfg.source_attribute ?? stub.source_attribute).toString(),
-      source_time_key: (cfg.source_time_key ?? stub.source_time_key).toString(),
+
+      source_attribute,
+      source_time_key,
+
+      source_type,
+      json_url: (cfg.json_url ?? "").toString(),
 
       week_offset_entity,
       week_offset_attribute: (cfg.week_offset_attribute ?? "").toString(),
-
-      splan24_entity: (cfg.splan24_entity ?? "").toString(),
-      splan24_attribute: (cfg.splan24_attribute ?? "rows_ha").toString(),
 
       week_mode,
       week_a_is_even_kw: cfg.week_a_is_even_kw ?? stub.week_a_is_even_kw,
@@ -638,6 +638,53 @@ export class StundenplanCard extends LitElement {
     if (!Array.isArray(data)) return null;
     return this.buildRowsFromArray(cfg, data);
   }
+  private async loadJsonRows(cfg: Required<StundenplanConfig>, urlRaw: string): Promise<void> {
+    const url = (urlRaw ?? "").toString().trim();
+    if (!url) {
+      this._jsonRows = null;
+      this._jsonStatus = "idle";
+      this._jsonError = "";
+      return;
+    }
+
+    this._jsonStatus = "loading";
+    this._jsonError = "";
+
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      const rowsAny = Array.isArray(data) ? data : Array.isArray((data as any)?.rows) ? (data as any).rows : null;
+
+      const built = rowsAny ? this.buildRowsFromArray(cfg, rowsAny) : null;
+      this._jsonRows = built ?? [];
+      this._jsonStatus = "ok";
+    } catch (err: any) {
+      this._jsonRows = [];
+      this._jsonStatus = "error";
+      this._jsonError = (err?.message ?? "JSON konnte nicht geladen werden").toString();
+    } finally {
+      this.requestUpdate();
+    }
+  }
+
+  private ensureJsonLoaded(cfg: Required<StundenplanConfig>): void {
+    const url = (cfg.json_url ?? "").toString().trim();
+    if (url === this._jsonUrlLast && this._jsonStatus !== "error") return;
+
+    if (url !== this._jsonUrlLast) {
+      this._jsonUrlLast = url;
+      this._jsonRows = null;
+      this._jsonStatus = "idle";
+      this._jsonError = "";
+    }
+
+    // fire & forget
+    if (this._jsonStatus === "idle" && url) void this.loadJsonRows(cfg, url);
+  }
+
+
 
   private weekFromParity(cfg: Required<StundenplanConfig>): "A" | "B" {
     const { isoWeek } = getISOWeekYear(new Date());
@@ -734,6 +781,18 @@ export class StundenplanCard extends LitElement {
   }
 
   private getRowsResolved(cfg: Required<StundenplanConfig>): Row[] {
+    const stype = (cfg.source_type ?? "manual") as any;
+
+    if (stype === "manual") {
+      return cfg.rows ?? [];
+    }
+
+    if (stype === "json") {
+      this.ensureJsonLoaded(cfg);
+      return this._jsonRows ?? [];
+    }
+
+    // entity
     if (cfg.week_mode !== "off") {
       const w = this.getActiveWeek(cfg);
 
@@ -744,33 +803,60 @@ export class StundenplanCard extends LitElement {
 
       if (w === "A" && entA) {
         const rA = this.getRowsFromEntity(cfg, entA, attrA);
-        if (rA) return rA;
+        return rA ?? [];
       }
       if (w === "B" && entB) {
         const rB = this.getRowsFromEntity(cfg, entB, attrB);
-        if (rB) return rB;
+        return rB ?? [];
       }
 
-      const legacyEnt = (cfg.source_entity ?? "").trim();
-      if (legacyEnt) {
-        const rLegacy = this.getRowsFromEntity(cfg, legacyEnt, (cfg.source_attribute ?? "").trim());
-        if (rLegacy) return rLegacy;
+      const ent = (cfg.source_entity ?? "").trim();
+      if (ent) {
+        const r = this.getRowsFromEntity(cfg, ent, (cfg.source_attribute ?? "").trim());
+        return r ?? [];
       }
 
-      return cfg.rows ?? [];
+      return [];
     }
 
     const ent = (cfg.source_entity ?? "").toString().trim();
-    if (ent) return this.getRowsFromEntity(cfg, ent, (cfg.source_attribute ?? "").toString().trim()) ?? (cfg.rows ?? []);
-    return cfg.rows ?? [];
+    if (!ent) return [];
+    return this.getRowsFromEntity(cfg, ent, (cfg.source_attribute ?? "").toString().trim()) ?? [];
   }
-
   private recomputeRows() {
     if (!this.config) {
       this._rowsCache = [];
+      this._noData = false;
+      this._noDataMsg = "";
       return;
     }
-    this._rowsCache = this.getRowsResolved(this.config);
+
+    const cfg = this.config;
+    const stype = (cfg.source_type ?? "manual") as any;
+
+    const rows = this.getRowsResolved(cfg);
+    this._rowsCache = rows;
+
+    if (stype === "manual") {
+      this._noData = false;
+      this._noDataMsg = "";
+      return;
+    }
+
+    const msgDefault = "Keine Daten für diesen Zeitraum (Ferien/Feiertag).";
+    if (!rows || rows.length === 0) {
+      this._noData = true;
+      if (stype === "json" && this._jsonStatus === "error") {
+        this._noDataMsg = `JSON: ${this._jsonError || msgDefault}`;
+      } else if (stype === "json" && this._jsonStatus === "loading") {
+        this._noDataMsg = "JSON wird geladen…";
+      } else {
+        this._noDataMsg = msgDefault;
+      }
+    } else {
+      this._noData = false;
+      this._noDataMsg = "";
+    }
   }
 
   // Parse to Fach (bold) + Raum + Lehrer + Info/Notes
@@ -977,7 +1063,9 @@ export class StundenplanCard extends LitElement {
             </thead>
 
             <tbody>
-              ${rows.map((r) => {
+              ${this._noData
+                ? html`<tr class="nodata"><td class="nodataCell" colspan=${(cfg.days?.length ?? 0) + 1}>${this._noDataMsg}</td></tr>`
+                : rows.map((r) => {
                 if (isBreakRow(r)) {
                   const parsed = parseStartEndFromTime(r.time);
                   const isCurrentBreak = !!parsed.start && !!parsed.end && this.isNowBetween(parsed.start, parsed.end);
@@ -1064,9 +1152,6 @@ export class StundenplanCard extends LitElement {
     `;
   }
 
-  
-
-
   static styles = css`
     :host {
       display: block;
@@ -1082,7 +1167,7 @@ export class StundenplanCard extends LitElement {
 
     .headerRow {
       display: flex;
-      align-items: center;
+      align-items: start;
       justify-content: space-between;
       gap: 12px;
       padding: 14px 14px 8px 14px;
@@ -1094,7 +1179,7 @@ export class StundenplanCard extends LitElement {
     }
     .headRight {
       display: flex;
-      align-items: center;
+      align-items: start;
       gap: 10px;
       flex-wrap: nowrap;
     }
@@ -1112,7 +1197,7 @@ export class StundenplanCard extends LitElement {
     .offsetInline {
       display: flex;
       gap: 8px;
-      align-items: center;
+      align-items: start;
       padding: 6px 8px;
       border: 1px solid var(--divider-color);
       border-radius: 12px;
@@ -1259,7 +1344,20 @@ export class StundenplanCard extends LitElement {
       white-space: pre-line;
       display: inline-block;
     }
-  `;
+  
+
+    tr.nodata td {
+      border: 1px solid var(--divider-color);
+      background: var(--secondary-background-color);
+    }
+    .nodataCell {
+      text-align: center;
+      padding: 18px 10px;
+      opacity: 0.85;
+      font-style: italic;
+      white-space: normal;
+    }
+`;
 }
 
 /* ===================== Editor ===================== */
@@ -1306,15 +1404,21 @@ export class StundenplanCardEditor extends LitElement {
   private _config?: Required<StundenplanConfig>;
 
   @state() private _open: Record<string, boolean> = {
-    general: true,
+    general: false,
     highlights: false,
     colors: false,
-    splan24: true,
-    sources: true,
+    sources: false,
     manual: false,
   };
 
   private _uiLoaded = false;
+
+  private _stopEvent = (e: any) => {
+    try {
+      e?.stopPropagation?.();
+    } catch (_err) {}
+  };
+
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -1376,27 +1480,57 @@ export class StundenplanCardEditor extends LitElement {
   private findBestRowsAttribute(entityId: string): { attr: string; timeKey: string } {
     const st = this.hass?.states?.[entityId];
     const attrs = st?.attributes ?? {};
-    // ✅ Prefer rows_ha (dein Sensor hat es)
+    // Prefer rows_table for this card
+    if (attrs.rows_table != null) return { attr: "rows_table", timeKey: "time" };
     if (attrs.rows_ha != null) return { attr: "rows_ha", timeKey: "time" };
     if (attrs.rows != null) return { attr: "rows", timeKey: "time" };
-    if (attrs.rows_table != null) return { attr: "rows_table", timeKey: "time" };
     if (attrs.rows_json != null) return { attr: "rows_json", timeKey: "time" };
     return { attr: "rows_ha", timeKey: "time" };
   }
 
-  private setSplan24Entity(entityId: string) {
+
+  private setSourceType(raw: any) {
+    if (!this._config) return;
+
+    const t: "entity" | "json" | "manual" =
+      raw === "entity" || raw === "json" || raw === "manual" ? raw : "manual";
+
+    const next: AnyObj = { ...this._config, source_type: t };
+
+    // sensible defaults
+    if (t === "json") {
+      if (next.json_url == null) next.json_url = "";
+    }
+    if (t === "entity") {
+      if (next.source_entity == null) next.source_entity = "";
+      // Fixed mapping for Stundenplan24 integration
+      next.source_attribute = "rows_table";
+      next.source_time_key = "time";
+    }
+
+    this.emit(next);
+  }
+
+  private setSourceEntity(entityId: string) {
     if (!this._config) return;
 
     const ent = (entityId ?? "").toString().trim();
-    const best = ent ? this.findBestRowsAttribute(ent) : { attr: "rows_ha", timeKey: "time" };
-
     this.emit({
       ...this._config,
-      splan24_entity: ent,
-      splan24_attribute: best.attr,
+      source_type: "entity",
       source_entity: ent,
-      source_attribute: best.attr,
-      source_time_key: best.timeKey,
+      // Fixed mapping for Stundenplan24 integration
+      source_attribute: "rows_table",
+      source_time_key: "time",
+    });
+  }
+
+  private setJsonUrl(url: string) {
+    if (!this._config) return;
+    this.emit({
+      ...this._config,
+      source_type: "json",
+      json_url: (url ?? "").toString(),
     });
   }
 
@@ -1432,15 +1566,6 @@ export class StundenplanCardEditor extends LitElement {
     this.emit({ ...this._config, rows });
   }
 
-  private addManualPause() {
-    if (!this._config) return;
-    const rows = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
-    const newRow: BreakRow = { time: "Pause", label: "Pause", is_break: true };
-    rows.push(newRow as any);
-    this.setValue("rows", rows);
-  }
-
-
   private removeManualRow(idx: number) {
     if (!this._config) return;
     const rows = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
@@ -1468,73 +1593,20 @@ export class StundenplanCardEditor extends LitElement {
     this.emit({ ...this._config, rows });
   }
 
-
-  private jumpToManual(row: number, day?: string) {
-    this._pendingManualFocus = { row, day };
-    // Fokus nach dem nächsten Render
-    this.requestUpdate();
-  }
-
-  private renderManualPreview(days: string[], rows: any[]) {
-    // kompakte Vorschau-Tabelle; Klick springt zur passenden Zeile/Zelle
-    return html`
-      <div class="manualPreview">
-        <div class="manualPreviewHint">Vorschau – Klick auf ein Fach springt zur passenden Zeile im Editor.</div>
-        <table class="previewTable">
-          <thead>
-            <tr>
-              <th>Stunde</th>
-              ${days.map((d) => html`<th>${d}</th>`)}
-            </tr>
-          </thead>
-          <tbody>
-            ${rows.map((r: any, idx: number) => {
-              if (isBreakRow(r)) {
-                return html`
-                  <tr class="previewBreak" @click=${() => this.jumpToManual(idx)}>
-                    <td class="pTime">${(r.time ?? "").toString()}</td>
-                    <td class="pBreak" colspan=${days.length}>${(r.label ?? "Pause").toString()}</td>
-                  </tr>
-                `;
-              }
-              const lr = r as LessonRow;
-              return html`
-                <tr>
-                  <td class="pTime" @click=${() => this.jumpToManual(idx)}>${(lr.time ?? "").toString()}</td>
-                  ${days.map((d: string, di: number) => {
-                    const v = (lr.cells?.[di] ?? "").toString().trim();
-                    return html`
-                      <td class="pCell" @click=${() => this.jumpToManual(idx, d)} title="Klicken zum Bearbeiten">
-                        ${v || html`<span class="pEmpty">–</span>`}
-                      </td>
-                    `;
-                  })}
-                </tr>
-              `;
-            })}
-          </tbody>
-        </table>
-      </div>
-    `;
-  }
-
   private renderManualRows() {
     if (!this._config) return html``;
     const days = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"];
     const rows = Array.isArray(this._config.rows) ? this._config.rows : [];
 
     return html`
-      ${rows.length ? this.renderManualPreview(days, rows) : html``}
-
       <div class="rowActions">
-        <mwc-button outlined @click=${this.addManualRow}>+ Stunde</mwc-button>
-        <mwc-button outlined @click=${this.addManualPause}>+ Pause</mwc-button>
+        <mwc-button outlined @click=${this.addManualRow}>+ Zeile</mwc-button>
       </div>
 
       ${rows.map((r, idx) => {
         if (isBreakRow(r)) {
           return html`
-            <div class="rowCard" id=${`manual-row-${idx}`}>
+            <div class="rowCard">
               <div class="rowHead">
                 <div class="rowTitle">Pause</div>
                 <mwc-button dense @click=${() => this.removeManualRow(idx)}>Entfernen</mwc-button>
@@ -1553,7 +1625,7 @@ export class StundenplanCardEditor extends LitElement {
 
         const lr = r as LessonRow;
         return html`
-          <div class="rowCard" id=${`manual-row-${idx}`}>
+          <div class="rowCard">
             <div class="rowHead">
               <div class="rowTitle">Zeile ${idx + 1}</div>
               <div class="rowHeadBtns">
@@ -1576,7 +1648,6 @@ export class StundenplanCardEditor extends LitElement {
                   <div class="cellEditor">
                     <div class="cellEditorHead">${d}</div>
                     <ha-textarea
-                      id=${`manual-cell-${idx}-${d}`}
                       .value=${(lr.cells?.[di] ?? "").toString()}
                       @input=${(e: any) => this.updateManualCell(idx, di, e.target.value)}
                       placeholder="Fach\nRaum\nLehrer + Info-Zeilen"
@@ -1599,12 +1670,6 @@ export class StundenplanCardEditor extends LitElement {
   protected render(): TemplateResult {
     if (!this._config) return html``;
     const cfg = this._config;
-
-    const splan24Entity = (cfg.splan24_entity ?? "").toString().trim();
-    const inferredOffset = splan24Entity ? inferWeekOffsetEntity(splan24Entity) : "";
-    const offsetInfo = inferredOffset ? inferredOffset : (cfg.week_offset_entity ?? "").toString().trim();
-
-    const pickerOk = this.isHaEntityPickerAvailable();
 
     return html`
       <div class="wrap">
@@ -1670,109 +1735,192 @@ export class StundenplanCardEditor extends LitElement {
             </div>
           `
         )}
-
-        ${this.renderSection(
-          "Stundenplan24",
-          "splan24",
-          html`
-            <div class="hint">
-              Wähle hier deinen <b>sensor.&lt;klasse&gt;_woche</b>. Dadurch werden Datenquelle automatisch gesetzt und der Offset-Helper im Hintergrund erkannt
-              (<code>${offsetInfo || "—"}</code>).
-            </div>
-
-            ${pickerOk
-              ? html`
-                  <ha-entity-picker
-                    .hass=${this.hass}
-                    .value=${cfg.splan24_entity ?? ""}
-                    .includeDomains=${["sensor"]}
-                    .label=${"Stundenplan24 Woche Sensor"}
-                    @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value)}
-                  ></ha-entity-picker>
-                `
-              : html`
-                  <div class="hint" style="opacity:0.9">
-                    (Deine HA-Version lädt <code>ha-entity-picker</code> hier nicht. Fallback: Entity-ID manuell eintragen.)
-                  </div>
-                  <ha-textfield
-                    label="Stundenplan24 Woche Sensor (entity_id)"
-                    .value=${cfg.splan24_entity ?? ""}
-                    @input=${(e: any) => this.setSplan24Entity(e.target.value)}
-                    placeholder="sensor.05b_woche"
-                  ></ha-textfield>
-                `}
-
-            <div class="sub" style="margin-top:6px;">
-              Attribut automatisch: <code>${cfg.source_attribute || "rows_ha"}</code>
-            </div>
-          `
-        )}
-
         ${this.renderSection(
           "Datenquellen",
           "sources",
           html`
             <div class="grid2">
-              <ha-textfield label="source_entity (Legacy / intern)" .value=${cfg.source_entity ?? ""} @input=${(e: any) => this.onText(e, "source_entity")}></ha-textfield>
-              <ha-textfield label="source_attribute (Legacy / intern)" .value=${cfg.source_attribute ?? ""} @input=${(e: any) => this.onText(e, "source_attribute")}></ha-textfield>
+              <ha-form
+                .hass=${this.hass}
+                .data=${{
+                  source_type: (cfg.source_type ?? "manual"),
+                }}
+                .schema=${[
+                  {
+                    name: "source_type",
+                    selector: {
+                      select: {
+                        options: [
+                          { value: "manual", label: "Manuell (rows)" },
+                          { value: "entity", label: "Stundenplan24 (Integration)" },
+                          { value: "json", label: "JSON-Datei (URL / /local/...)" },
+                        ],
+                      },
+                    },
+                  },
+                ]}
+                .computeLabel=${(s: any) =>
+                  s?.name === "source_type"
+                    ? "Quelle" : s?.name
+                }
+                @value-changed=${(e: any) => {
+                  try {
+                    e?.stopPropagation?.();
+                    const v = e?.detail?.value ?? {};
+                    // ha-form liefert i.d.R. das komplette Objekt zurück
+                    const sourceType = v.source_type ?? (cfg.source_type ?? "manual");
+                    if (sourceType !== (cfg.source_type ?? "manual")) this.setSourceType(sourceType);
+                  } catch (err) {
+                    console.error("stundenplan-card editor: ha-form value-changed failed", err);
+                  }
+                }}
+              ></ha-form>
             </div>
 
-            <div class="hint">
-              Hinweis: <code>week_offset_entity</code> wird automatisch aus <code>sensor.&lt;klasse&gt;_woche</code> abgeleitet und nicht mehr im UI angezeigt.
-            </div>
-
-            <div class="grid2">
-              <ha-select .label=${"Wechselwochen (A/B)"} .value=${cfg.week_mode ?? "off"} @selected=${(e: any) => this.setValue("week_mode", e.target.value)}>
-                <mwc-list-item value="off">off (deaktiviert)</mwc-list-item>
-                <mwc-list-item value="kw_parity">kw_parity (KW gerade/ungerade)</mwc-list-item>
-                <mwc-list-item value="week_map">week_map (Mapping Entity)</mwc-list-item>
-              </ha-select>
-
-              <ha-switch .checked=${asBool(cfg.week_a_is_even_kw, true)} @change=${(e: any) => this.onToggle(e, "week_a_is_even_kw")}></ha-switch>
-              <div class="switchLabel">Woche A = gerade KW</div>
-              <div></div>
-            </div>
-
-            ${cfg.week_mode === "week_map"
+            ${(cfg.source_type ?? "manual") === "entity"
               ? html`
-                  <div class="grid2">
-                    <ha-textfield
-                      label="week_map_entity (entity_id)"
-                      .value=${cfg.week_map_entity ?? ""}
-                      @input=${(e: any) => this.onText(e, "week_map_entity")}
-                      placeholder="sensor.week_map"
-                    ></ha-textfield>
-
-                    <ha-textfield label="week_map_attribute" .value=${cfg.week_map_attribute ?? ""} @input=${(e: any) => this.onText(e, "week_map_attribute")}></ha-textfield>
-                  </div>
+                  ${this.isHaEntityPickerAvailable() ? html`
+                        ${(() => {
+                          const ids = Object.keys(this.hass?.states ?? {}).filter((eid) => /^sensor\./.test(eid) && /_woche$/i.test(eid));
+                          const total = Object.keys(this.hass?.states ?? {}).length;
+                          const loading = total < 20 || (total > 0 && ids.length === 0);
+                          return loading ? html`<div class="hint">Lade Stundenplan-Sensoren…</div>` : html``;
+                        })()}
+                        <ha-entity-picker
+                          .hass=${this.hass}
+                          .value=${cfg.source_entity ?? ""}
+                          .includeDomains=${["sensor"]}
+                          .entityFilter=${(stateObj: any) => /_woche$/i.test(stateObj?.entity_id ?? "")}
+                          .label=${"Sensor auswählen"}
+                          @value-changed=${(e: any) => { try { this.setSourceEntity(e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: setSourceEntity failed", err); } }}
+                        ></ha-entity-picker>
+                      ` : html``}
+                      <ha-textfield
+                        label="…oder Entity-ID manuell"
+                        .value=${cfg.source_entity ?? ""}
+                        @input=${(e: any) => this.setSourceEntity(e.target.value)}
+                        placeholder="sensor.05b_woche"
+                      ></ha-textfield>
+                  <div class="hint" style="margin-top:8px;">Attribut und Time-Key werden automatisch gesetzt (<code>rows_table</code> / <code>time</code>).</div>
                 `
               : html``}
 
-            ${cfg.week_mode !== "off"
+            ${(cfg.source_type ?? "manual") === "json"
               ? html`
-                  <div class="grid2">
-                    <ha-textfield
-                      label="source_entity_a (entity_id)"
-                      .value=${cfg.source_entity_a ?? ""}
-                      @input=${(e: any) => this.onText(e, "source_entity_a")}
-                      placeholder="sensor.05b_woche_a"
-                    ></ha-textfield>
-                    <ha-textfield label="source_attribute_a" .value=${cfg.source_attribute_a ?? ""} @input=${(e: any) => this.onText(e, "source_attribute_a")}></ha-textfield>
-
-                    <ha-textfield
-                      label="source_entity_b (entity_id)"
-                      .value=${cfg.source_entity_b ?? ""}
-                      @input=${(e: any) => this.onText(e, "source_entity_b")}
-                      placeholder="sensor.05b_woche_b"
-                    ></ha-textfield>
-                    <ha-textfield label="source_attribute_b" .value=${cfg.source_attribute_b ?? ""} @input=${(e: any) => this.onText(e, "source_attribute_b")}></ha-textfield>
+                  <div class="hint">
+                    JSON kann z.B. aus <code>/config/www/</code> kommen → im UI als <code>/local/deinplan.json</code>.
+                    Unterstützt: Array von Rows oder Objekt mit <code>rows</code>.
                   </div>
+                  <ha-textfield
+                    label="JSON-URL / Pfad"
+                    .value=${cfg.json_url ?? ""}
+                    @input=${(e: any) => this.setJsonUrl(e.target.value)}
+                    placeholder="/local/stundenplan.json"
+                  ></ha-textfield>
                 `
               : html``}
+
+                        ${cfg.source_type === "json" ? html`
+            <div class="hint" style="margin-top:10px;">
+                          Wechselwochen (A/B) wird nur bei Quelle „JSON-Datei“ angeboten.
+                        </div>
+
+                        <div class="grid2">
+                          <ha-form
+                            .hass=${this.hass}
+                            .data=${{
+                              week_mode: (cfg.week_mode ?? "off"),
+                              week_a_is_even_kw: asBool(cfg.week_a_is_even_kw, true),
+                            }}
+                            .schema=${[
+                              {
+                                name: "week_mode",
+                                selector: {
+                                  select: {
+                                    mode: "list",
+                                    options: [
+                                      { value: "off", label: "off (deaktiviert)" },
+                                      { value: "kw_parity", label: "A/B nach Kalenderwoche" },
+                                    ],
+                                  },
+                                },
+                              },
+                              {
+                                name: "week_a_is_even_kw",
+                                selector: {
+                                  select: {
+                                    mode: "list",
+                                    options: [
+                                      { value: true, label: "Woche A = gerade KW" },
+                                      { value: false, label: "Woche A = ungerade KW" },
+                                    ],
+                                  },
+                                },
+                              },
+                            ]}
+                            .computeLabel=${(s: any) =>
+                              s?.name === "week_mode"
+                                ? "Wechselwochen (A/B)"
+                                : s?.name === "week_a_is_even_kw"
+                                ? "Woche A"
+                                : s?.name
+                            }
+                            @value-changed=${(e: any) => {
+                              try {
+                                e?.stopPropagation?.();
+                                const v = e?.detail?.value ?? {};
+                                const mode = (v.week_mode ?? (cfg.week_mode ?? "off")) as WeekMode;
+                                if (mode !== (cfg.week_mode ?? "off")) this.setValue("week_mode", mode);
+
+                                const val = v.week_a_is_even_kw;
+                                if (typeof val === "boolean" && val !== asBool(cfg.week_a_is_even_kw, true)) this.setValue("week_a_is_even_kw", val);
+                              } catch (err) {
+                                console.error("stundenplan-card editor: week settings change failed", err);
+                              }
+                            }}
+                          ></ha-form>
+                        </div>${cfg.week_mode === "week_map"
+                          ? html`
+                              <div class="grid2">
+                                <ha-textfield
+                                  label="week_map_entity (entity_id)"
+                                  .value=${cfg.week_map_entity ?? ""}
+                                  @input=${(e: any) => this.onText(e, "week_map_entity")}
+                                  placeholder="sensor.week_map"
+                                ></ha-textfield>
+
+                                <ha-textfield label="week_map_attribute" .value=${cfg.week_map_attribute ?? ""} @input=${(e: any) => this.onText(e, "week_map_attribute")}></ha-textfield>
+                              </div>
+                            `
+                          : html``}
+
+                        ${cfg.week_mode !== "off"
+                          ? html`
+                              <div class="grid2">
+                                <ha-textfield
+                                  label="source_entity_a (entity_id)"
+                                  .value=${cfg.source_entity_a ?? ""}
+                                  @input=${(e: any) => this.onText(e, "source_entity_a")}
+                                  placeholder="sensor.05b_woche_a"
+                                ></ha-textfield>
+                                <ha-textfield label="source_attribute_a" .value=${cfg.source_attribute_a ?? ""} @input=${(e: any) => this.onText(e, "source_attribute_a")}></ha-textfield>
+
+                                <ha-textfield
+                                  label="source_entity_b (entity_id)"
+                                  .value=${cfg.source_entity_b ?? ""}
+                                  @input=${(e: any) => this.onText(e, "source_entity_b")}
+                                  placeholder="sensor.05b_woche_b"
+                                ></ha-textfield>
+                                <ha-textfield label="source_attribute_b" .value=${cfg.source_attribute_b ?? ""} @input=${(e: any) => this.onText(e, "source_attribute_b")}></ha-textfield>
+                              </div>
+                            `
+                          : html``}
+            ` : html``}
+
           `
         )}
 
-        ${(cfg.source_type ?? "manual") === "manual" ? this.renderSection("Zeilen & Fächer", "manual", this.renderManualRows()) : html``}
+        ${this.renderSection("Manuell (rows)", "manual", this.renderManualRows())}
       </div>
     `;
   }
@@ -1793,7 +1941,7 @@ export class StundenplanCardEditor extends LitElement {
       padding: 12px 12px;
       cursor: pointer;
       display: flex;
-      align-items: center;
+      align-items: start;
       justify-content: space-between;
       background: var(--secondary-background-color);
       user-select: none;
@@ -1813,13 +1961,13 @@ export class StundenplanCardEditor extends LitElement {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
-      align-items: center;
+      align-items: start;
     }
     .grid3 {
       display: grid;
       grid-template-columns: auto 1fr 1fr;
       gap: 10px;
-      align-items: center;
+      align-items: start;
     }
     .switchLabel {
       opacity: 0.9;
@@ -1849,7 +1997,7 @@ export class StundenplanCardEditor extends LitElement {
     }
     .rowHead {
       display: flex;
-      align-items: center;
+      align-items: start;
       justify-content: space-between;
       gap: 10px;
     }
@@ -1888,62 +2036,7 @@ export class StundenplanCardEditor extends LitElement {
         grid-template-columns: 1fr;
       }
     }
-  
-    .manualPreview {
-      padding: 10px;
-      border-radius: 12px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      overflow: auto;
-    }
-    .manualPreviewHint {
-      font-size: 12px;
-      opacity: 0.85;
-      margin-bottom: 8px;
-    }
-    table.previewTable {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-      min-width: 520px;
-    }
-    .previewTable th,
-    .previewTable td {
-      border: 1px solid rgba(255,255,255,0.08);
-      padding: 6px 8px;
-      vertical-align: middle;
-    }
-    .previewTable th {
-      font-weight: 600;
-      opacity: 0.9;
-      background: rgba(255,255,255,0.03);
-    }
-    .pTime {
-      white-space: nowrap;
-      font-weight: 600;
-      opacity: 0.95;
-      cursor: pointer;
-    }
-    .pCell {
-      cursor: pointer;
-      white-space: pre-line;
-    }
-    .pCell:hover {
-      background: rgba(255,255,255,0.04);
-    }
-    .pEmpty {
-      opacity: 0.45;
-    }
-    .previewBreak td {
-      cursor: pointer;
-    }
-    .pBreak {
-      text-align: center;
-      opacity: 0.7;
-      font-style: italic;
-    }
-
-`;
+  `;
 }
 
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", StundenplanCard);
