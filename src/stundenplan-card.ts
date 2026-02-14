@@ -1469,17 +1469,25 @@ export class StundenplanCardEditor extends LitElement {
   }
 
 
-  private setSourceType(t: "entity" | "json" | "manual") {
+  private setSourceType(raw: any) {
     if (!this._config) return;
+
+    const t: "entity" | "json" | "manual" =
+      raw === "entity" || raw === "json" || raw === "manual" ? raw : "manual";
+
     const next: AnyObj = { ...this._config, source_type: t };
 
     // sensible defaults
-    if (t === "manual") {
-      // nothing
-    } else if (t === "json") {
-      if (!next.json_url) next.json_url = "";
-    } else if (t === "entity") {
-      // keep existing source_entity
+    if (t === "json") {
+      if (next.json_url == null) next.json_url = "";
+    }
+    if (t === "entity") {
+      if (next.source_entity == null) next.source_entity = "";
+      const best = next.source_entity
+        ? this.findBestRowsAttribute(next.source_entity)
+        : { attr: "rows_ha", timeKey: "time" };
+      if (!next.source_attribute) next.source_attribute = best.attr;
+      if (!next.source_time_key) next.source_time_key = best.timeKey;
     }
 
     this.emit(next);
@@ -1493,7 +1501,7 @@ export class StundenplanCardEditor extends LitElement {
 
     this.emit({
       ...this._config,
-      source_type: "manual",
+      source_type: "entity",
       source_entity: ent,
       source_attribute: best.attr,
       source_time_key: best.timeKey,
@@ -1720,7 +1728,7 @@ export class StundenplanCardEditor extends LitElement {
               <ha-select
                 .label=${"Quelle"}
                 .value=${(cfg.source_type ?? "manual")}
-                @selected=${(e: any) => this.setSourceType(e.detail?.value ?? e.target?.value)}
+                @selected=${(e: any) => { e?.stopPropagation?.(); this.setSourceType(e.detail?.value ?? e.target?.value); }}
               >
                 <mwc-list-item value="entity">Stundenplan24 (Integration)</mwc-list-item>
                 <mwc-list-item value="json">JSON-Datei (URL / /local/...)</mwc-list-item>
@@ -1742,8 +1750,9 @@ export class StundenplanCardEditor extends LitElement {
                           .hass=${this.hass}
                           .value=${cfg.source_entity ?? ""}
                           .includeDomains=${["sensor"]}
+                          .entityFilter=${(stateObj: any) => /_woche$/i.test(stateObj?.entity_id ?? "")}
                           .label=${"Sensor auswählen"}
-                          @value-changed=${(e: any) => this.setSourceEntity(e.detail.value)}
+                          @value-changed=${(e: any) => { e?.stopPropagation?.(); this.setSourceEntity(e.detail.value); }}
                         ></ha-entity-picker>
                       `
                     : html`
