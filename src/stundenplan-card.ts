@@ -1654,8 +1654,6 @@ export class StundenplanCardEditor extends LitElement {
     if (!this._config) return html``;
     const cfg = this._config;
 
-    const pickerOk = this.isHaEntityPickerAvailable();
-
     return html`
       <div class="wrap">
         ${this.renderSection(
@@ -1728,7 +1726,8 @@ export class StundenplanCardEditor extends LitElement {
               <ha-select
                 .label=${"Quelle"}
                 .value=${(cfg.source_type ?? "manual")}
-                @selected=${(e: any) => { e?.stopPropagation?.(); this.setSourceType(e.detail?.value ?? e.target?.value); }}
+                @selected=${(e: any) => { try { e?.stopPropagation?.(); this.setSourceType(e.detail?.value ?? e.target?.value ?? e?.detail?.selected); } catch (err) { console.error("stundenplan-card editor: setSourceType failed", err); } }}
+                @value-changed=${(e: any) => { try { e?.stopPropagation?.(); this.setSourceType(e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: setSourceType failed", err); } }}
               >
                 <mwc-list-item value="entity">Stundenplan24 (Integration)</mwc-list-item>
                 <mwc-list-item value="json">JSON-Datei (URL / /local/...)</mwc-list-item>
@@ -1744,28 +1743,20 @@ export class StundenplanCardEditor extends LitElement {
 
             ${(cfg.source_type ?? "manual") === "entity"
               ? html`
-                  ${pickerOk
-                    ? html`
-                        <ha-entity-picker
+                  <ha-entity-picker
                           .hass=${this.hass}
                           .value=${cfg.source_entity ?? ""}
                           .includeDomains=${["sensor"]}
                           .entityFilter=${(stateObj: any) => /_woche$/i.test(stateObj?.entity_id ?? "")}
                           .label=${"Sensor auswählen"}
-                          @value-changed=${(e: any) => { e?.stopPropagation?.(); this.setSourceEntity(e.detail.value); }}
+                          @value-changed=${(e: any) => { try { e?.stopPropagation?.(); this.setSourceEntity(e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: setSourceEntity failed", err); } }}
                         ></ha-entity-picker>
-                      `
-                    : html`
-                        <div class="hint" style="opacity:0.9">
-                          (Deine HA-Version lädt <code>ha-entity-picker</code> hier nicht. Fallback: Entity-ID manuell eintragen.)
-                        </div>
                         <ha-textfield
-                          label="Sensor (entity_id)"
+                          label="…oder Entity-ID manuell"
                           .value=${cfg.source_entity ?? ""}
                           @input=${(e: any) => this.setSourceEntity(e.target.value)}
                           placeholder="sensor.05b_woche"
                         ></ha-textfield>
-                      `}
                   <div class="grid2" style="margin-top:8px;">
                     <ha-textfield
                       label="Attribut (auto)"
@@ -1802,7 +1793,8 @@ export class StundenplanCardEditor extends LitElement {
             </div>
 
             <div class="grid2">
-              <ha-select .label=${"Wechselwochen (A/B)"} .value=${cfg.week_mode ?? "off"} @selected=${(e: any) => this.setValue("week_mode", e.detail?.value ?? e.target?.value)}>
+              <ha-select .label=${"Wechselwochen (A/B)"} .value=${cfg.week_mode ?? "off"} @selected=${(e: any) => { try { this.setValue("week_mode", e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: set week_mode failed", err); } }}
+              @value-changed=${(e: any) => { try { this.setValue("week_mode", e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: set week_mode failed", err); } }}>
                 <mwc-list-item value="off">off (deaktiviert)</mwc-list-item>
                 <mwc-list-item value="kw_parity">kw_parity (KW gerade/ungerade)</mwc-list-item>
                 <mwc-list-item value="week_map">week_map (Mapping Entity)</mwc-list-item>
