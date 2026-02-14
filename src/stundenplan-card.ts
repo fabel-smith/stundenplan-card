@@ -506,7 +506,6 @@ export class StundenplanCard extends LitElement {
 
       source_type: (((cfg.source_type ?? (source_entity ? "entity" : "manual")) + "").toString().trim() as any),
       json_url: (cfg.json_url ?? "").toString(),
-      no_data_text: (cfg.no_data_text ?? "Keine Daten für diesen Zeitraum (Ferien/Feiertag).").toString(),
 
       week_offset_entity,
       week_offset_attribute: (cfg.week_offset_attribute ?? "").toString(),
@@ -830,7 +829,7 @@ export class StundenplanCard extends LitElement {
       return;
     }
 
-    const msgDefault = (cfg.no_data_text ?? "Keine Daten für diesen Zeitraum (Ferien/Feiertag).").toString();
+    const msgDefault = "Keine Daten für diesen Zeitraum (Ferien/Feiertag).";
     if (!rows || rows.length === 0) {
       this._noData = true;
       if (stype === "json" && this._jsonStatus === "error") {
@@ -1734,7 +1733,6 @@ export class StundenplanCardEditor extends LitElement {
                 .hass=${this.hass}
                 .data=${{
                   source_type: (cfg.source_type ?? "manual"),
-                  no_data_text: (cfg.no_data_text ?? "Keine Daten für diesen Zeitraum (Ferien/Feiertag)."),
                 }}
                 .schema=${[
                   {
@@ -1749,14 +1747,10 @@ export class StundenplanCardEditor extends LitElement {
                       },
                     },
                   },
-                  { name: "no_data_text", selector: { text: {} } },
                 ]}
                 .computeLabel=${(s: any) =>
                   s?.name === "source_type"
-                    ? "Quelle"
-                    : s?.name === "no_data_text"
-                    ? "Text bei fehlenden Daten"
-                    : s?.name
+                    ? "Quelle" : s?.name
                 }
                 @value-changed=${(e: any) => {
                   try {
@@ -1764,9 +1758,7 @@ export class StundenplanCardEditor extends LitElement {
                     const v = e?.detail?.value ?? {};
                     // ha-form liefert i.d.R. das komplette Objekt zurück
                     const sourceType = v.source_type ?? (cfg.source_type ?? "manual");
-                    const noDataText = v.no_data_text ?? (cfg.no_data_text ?? "Keine Daten für diesen Zeitraum (Ferien/Feiertag).");
                     if (sourceType !== (cfg.source_type ?? "manual")) this.setSourceType(sourceType);
-                    if (noDataText !== (cfg.no_data_text ?? "")) this.setValue("no_data_text", noDataText);
                   } catch (err) {
                     console.error("stundenplan-card editor: ha-form value-changed failed", err);
                   }
