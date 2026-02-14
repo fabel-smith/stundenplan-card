@@ -1730,17 +1730,48 @@ export class StundenplanCardEditor extends LitElement {
           "sources",
           html`
             <div class="grid2">
-              <ha-select
-                .label=${"Quelle"}
-                .value=${(cfg.source_type ?? "manual")}
-               
-                @selected=${(e: any) => { try { e?.stopPropagation?.(); this.setSourceType(e.detail?.value ?? e.target?.value ?? e?.detail?.selected); } catch (err) { console.error("stundenplan-card editor: setSourceType failed", err); } }}
-                @value-changed=${(e: any) => { try { e?.stopPropagation?.(); this.setSourceType(e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: setSourceType failed", err); } }}
-              >
-                <mwc-list-item value="entity">Stundenplan24 (Integration)</mwc-list-item>
-                <mwc-list-item value="json">JSON-Datei (URL / /local/...)</mwc-list-item>
-                <mwc-list-item value="manual">Manuell (rows)</mwc-list-item>
-              </ha-select>
+              <ha-form
+                .hass=${this.hass}
+                .data=${{
+                  source_type: (cfg.source_type ?? "manual"),
+                  no_data_text: (cfg.no_data_text ?? "Keine Daten für diesen Zeitraum (Ferien/Feiertag)."),
+                }}
+                .schema=${[
+                  {
+                    name: "source_type",
+                    selector: {
+                      select: {
+                        options: [
+                          { value: "manual", label: "Manuell (rows)" },
+                          { value: "entity", label: "Stundenplan24 (Integration)" },
+                          { value: "json", label: "JSON-Datei (URL / /local/...)" },
+                        ],
+                      },
+                    },
+                  },
+                  { name: "no_data_text", selector: { text: {} } },
+                ]}
+                .computeLabel=${(s: any) =>
+                  s?.name === "source_type"
+                    ? "Quelle"
+                    : s?.name === "no_data_text"
+                    ? "Text bei fehlenden Daten"
+                    : s?.name
+                }
+                @value-changed=${(e: any) => {
+                  try {
+                    e?.stopPropagation?.();
+                    const v = e?.detail?.value ?? {};
+                    // ha-form liefert i.d.R. das komplette Objekt zurück
+                    const sourceType = v.source_type ?? (cfg.source_type ?? "manual");
+                    const noDataText = v.no_data_text ?? (cfg.no_data_text ?? "Keine Daten für diesen Zeitraum (Ferien/Feiertag).");
+                    if (sourceType !== (cfg.source_type ?? "manual")) this.setSourceType(sourceType);
+                    if (noDataText !== (cfg.no_data_text ?? "")) this.setValue("no_data_text", noDataText);
+                  } catch (err) {
+                    console.error("stundenplan-card editor: ha-form value-changed failed", err);
+                  }
+                }}
+              ></ha-form>
 
               <ha-textfield
                 label="Text bei fehlenden Daten"
@@ -1801,12 +1832,35 @@ export class StundenplanCardEditor extends LitElement {
             </div>
 
             <div class="grid2">
-              <ha-select .label=${"Wechselwochen (A/B)"} .value=${cfg.week_mode ?? "off"} @selected=${(e: any) => { try { this.setValue("week_mode", e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: set week_mode failed", err); } }}
-              @value-changed=${(e: any) => { try { this.setValue("week_mode", e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: set week_mode failed", err); } }}>
-                <mwc-list-item value="off">off (deaktiviert)</mwc-list-item>
-                <mwc-list-item value="kw_parity">kw_parity (KW gerade/ungerade)</mwc-list-item>
-                <mwc-list-item value="week_map">week_map (Mapping Entity)</mwc-list-item>
-              </ha-select>
+              <ha-form
+                .hass=${this.hass}
+                .data=${{ week_mode: (cfg.week_mode ?? "off") }}
+                .schema=${[
+                  {
+                    name: "week_mode",
+                    selector: {
+                      select: {
+                        options: [
+                          { value: "off", label: "off (deaktiviert)" },
+                          { value: "even", label: "Woche A = gerade KW" },
+                          { value: "odd", label: "Woche A = ungerade KW" },
+                        ],
+                      },
+                    },
+                  },
+                ]}
+                .computeLabel=${() => "Wechselwochen (A/B)"}
+                @value-changed=${(e: any) => {
+                  try {
+                    e?.stopPropagation?.();
+                    const v = e?.detail?.value ?? {};
+                    const mode = v.week_mode ?? (cfg.week_mode ?? "off");
+                    if (mode !== (cfg.week_mode ?? "off")) this.setValue("week_mode", mode);
+                  } catch (err) {
+                    console.error("stundenplan-card editor: week_mode change failed", err);
+                  }
+                }}
+              ></ha-form>
 
               <ha-switch .checked=${asBool(cfg.week_a_is_even_kw, true)} @change=${(e: any) => this.onToggle(e, "week_a_is_even_kw")}></ha-switch>
               <div class="switchLabel">Woche A = gerade KW</div>
