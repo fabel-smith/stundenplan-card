@@ -1,6 +1,6 @@
 {
   "name": "stundenplan-card",
-  "version": "v2.9.15",
+  "version": "v2.10.1",
   "private": true,
   "type": "module",
   "scripts": {

@@ -818,8 +818,8 @@ export class StundenplanCard extends LitElement {
       return html`
         <div class="cellWrap">
           <div class="fach">${tri.fach}</div>
-          <div class="raum">${tri.raum}</div>
           <div class="lehrer">${tri.lehrer}</div>
+          <div class="raum">${tri.raum}</div>
 
           ${tri.notes?.length
             ? html`
@@ -1300,26 +1300,27 @@ export class StundenplanCardEditor extends LitElement {
     return { attr: "rows_table", timeKey: "time" };
   }
 
-  private setSplan24Entity(entityId: string) {
-    if (!this._config) return;
+private setSplan24Entity(entityId: string) {
+  if (!this._config) return;
 
-    const ent = (entityId ?? "").toString().trim();
-    const best = ent ? this.findBestRowsAttribute(ent) : { attr: "rows_table", timeKey: "time" };
-    const inferredOffset = inferWeekOffsetEntity(ent);
+  const ent = (entityId ?? "").toString().trim();
 
-    this.emit({
-      ...this._config,
-      splan24_entity: ent,
-      splan24_attribute: best.attr || "rows_table",
+  // FIX: Attribut nicht auswählbar, sondern fest
+  const attr = "rows_ha"; // oder "rows" – je nachdem, was du nutzen willst
 
-      source_entity: ent,
-      source_attribute: best.attr || "rows_table",
-      source_time_key: best.timeKey || "time",
+  // optional: offset helper automatisch merken/setzen (wie bei dir schon umgesetzt)
+  // const offset = `number.${ent.split(".")[1]}_woche_offset`;
 
-      week_offset_entity: inferredOffset || this._config.week_offset_entity || "",
-      week_offset_attribute: this._config.week_offset_attribute || "",
-    });
-  }
+  this.emit({
+    ...this._config,
+    splan24_entity: ent,
+    splan24_attribute: attr,
+    source_entity: ent,
+    source_attribute: attr,
+    source_time_key: "time",
+  });
+}
+
 
   private renderSection(title: string, key: string, body: TemplateResult) {
     const open = !!this._open[key];
