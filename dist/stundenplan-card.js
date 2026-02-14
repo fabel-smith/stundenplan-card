@@ -762,7 +762,7 @@ const v = (C = class extends P {
       source_entity: "",
       source_attribute: "",
       source_time_key: "time",
-      source_type: "entity",
+      source_type: "manual",
       json_url: "",
       no_data_text: "Keine Daten für diesen Zeitraum (Ferien/Feiertag).",
       week_offset_entity: "",
@@ -975,7 +975,7 @@ const v = (C = class extends P {
     return o.length ? o : null;
   }
   getRowsResolved(t) {
-    const e = t.source_type ?? (t.source_entity ? "entity" : "manual");
+    const e = t.source_type ?? "manual";
     if (e === "manual")
       return t.rows ?? [];
     if (e === "json")
@@ -997,7 +997,7 @@ const v = (C = class extends P {
       this._rowsCache = [], this._noData = !1, this._noDataMsg = "";
       return;
     }
-    const t = this.config, e = t.source_type ?? (t.source_entity ? "entity" : "manual"), s = this.getRowsResolved(t);
+    const t = this.config, e = t.source_type ?? "manual", s = this.getRowsResolved(t);
     if (this._rowsCache = s, e === "manual") {
       this._noData = !1, this._noDataMsg = "";
       return;
@@ -1491,7 +1491,7 @@ const ut = class ut extends P {
     const e = (t ?? "").toString().trim(), s = e ? this.findBestRowsAttribute(e) : { attr: "rows_ha", timeKey: "time" };
     this.emit({
       ...this._config,
-      source_type: "entity",
+      source_type: "manual",
       source_entity: e,
       source_attribute: s.attr,
       source_time_key: s.timeKey
@@ -1688,10 +1688,10 @@ const ut = class ut extends P {
             <div class="grid2">
               <ha-select
                 .label=${"Quelle"}
-                .value=${t.source_type ?? (t.source_entity ? "entity" : "manual")}
-                @selected=${(s) => this.setSourceType(s.target.value)}
+                .value=${t.source_type ?? "manual"}
+                @selected=${(s) => this.setSourceType(s.detail?.value ?? s.target?.value)}
               >
-                <mwc-list-item value="entity">Integration (Sensor/Entity)</mwc-list-item>
+                <mwc-list-item value="entity">Stundenplan24 (Integration)</mwc-list-item>
                 <mwc-list-item value="json">JSON-Datei (URL / /local/...)</mwc-list-item>
                 <mwc-list-item value="manual">Manuell (rows)</mwc-list-item>
               </ha-select>
@@ -1703,7 +1703,7 @@ const ut = class ut extends P {
               ></ha-textfield>
             </div>
 
-            ${(t.source_type ?? (t.source_entity ? "entity" : "manual")) === "entity" ? d`
+            ${(t.source_type ?? "manual") === "entity" ? d`
                   ${e ? d`
                         <ha-entity-picker
                           .hass=${this.hass}
@@ -1738,7 +1738,7 @@ const ut = class ut extends P {
                   </div>
                 ` : d``}
 
-            ${(t.source_type ?? (t.source_entity ? "entity" : "manual")) === "json" ? d`
+            ${(t.source_type ?? "manual") === "json" ? d`
                   <div class="hint">
                     JSON kann z.B. aus <code>/config/www/</code> kommen → im UI als <code>/local/deinplan.json</code>.
                     Unterstützt: Array von Rows oder Objekt mit <code>rows</code>.
@@ -1756,7 +1756,7 @@ const ut = class ut extends P {
             </div>
 
             <div class="grid2">
-              <ha-select .label=${"Wechselwochen (A/B)"} .value=${t.week_mode ?? "off"} @selected=${(s) => this.setValue("week_mode", s.target.value)}>
+              <ha-select .label=${"Wechselwochen (A/B)"} .value=${t.week_mode ?? "off"} @selected=${(s) => this.setValue("week_mode", s.detail?.value ?? s.target?.value)}>
                 <mwc-list-item value="off">off (deaktiviert)</mwc-list-item>
                 <mwc-list-item value="kw_parity">kw_parity (KW gerade/ungerade)</mwc-list-item>
                 <mwc-list-item value="week_map">week_map (Mapping Entity)</mwc-list-item>

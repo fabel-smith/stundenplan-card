@@ -387,7 +387,7 @@ export class StundenplanCard extends LitElement {
       source_attribute: "",
       source_time_key: "time",
 
-      source_type: "entity",
+      source_type: "manual",
       json_url: "",
       no_data_text: "Keine Daten für diesen Zeitraum (Ferien/Feiertag).",
 
@@ -768,7 +768,7 @@ export class StundenplanCard extends LitElement {
   }
 
   private getRowsResolved(cfg: Required<StundenplanConfig>): Row[] {
-    const stype = (cfg.source_type ?? (cfg.source_entity ? "entity" : "manual")) as any;
+    const stype = (cfg.source_type ?? "manual") as any;
 
     if (stype === "manual") {
       return cfg.rows ?? [];
@@ -819,7 +819,7 @@ export class StundenplanCard extends LitElement {
     }
 
     const cfg = this.config;
-    const stype = (cfg.source_type ?? (cfg.source_entity ? "entity" : "manual")) as any;
+    const stype = (cfg.source_type ?? "manual") as any;
 
     const rows = this.getRowsResolved(cfg);
     this._rowsCache = rows;
@@ -1493,7 +1493,7 @@ export class StundenplanCardEditor extends LitElement {
 
     this.emit({
       ...this._config,
-      source_type: "entity",
+      source_type: "manual",
       source_entity: ent,
       source_attribute: best.attr,
       source_time_key: best.timeKey,
@@ -1719,10 +1719,10 @@ export class StundenplanCardEditor extends LitElement {
             <div class="grid2">
               <ha-select
                 .label=${"Quelle"}
-                .value=${(cfg.source_type ?? (cfg.source_entity ? "entity" : "manual"))}
-                @selected=${(e: any) => this.setSourceType(e.target.value)}
+                .value=${(cfg.source_type ?? "manual")}
+                @selected=${(e: any) => this.setSourceType(e.detail?.value ?? e.target?.value)}
               >
-                <mwc-list-item value="entity">Integration (Sensor/Entity)</mwc-list-item>
+                <mwc-list-item value="entity">Stundenplan24 (Integration)</mwc-list-item>
                 <mwc-list-item value="json">JSON-Datei (URL / /local/...)</mwc-list-item>
                 <mwc-list-item value="manual">Manuell (rows)</mwc-list-item>
               </ha-select>
@@ -1734,7 +1734,7 @@ export class StundenplanCardEditor extends LitElement {
               ></ha-textfield>
             </div>
 
-            ${(cfg.source_type ?? (cfg.source_entity ? "entity" : "manual")) === "entity"
+            ${(cfg.source_type ?? "manual") === "entity"
               ? html`
                   ${pickerOk
                     ? html`
@@ -1773,7 +1773,7 @@ export class StundenplanCardEditor extends LitElement {
                 `
               : html``}
 
-            ${(cfg.source_type ?? (cfg.source_entity ? "entity" : "manual")) === "json"
+            ${(cfg.source_type ?? "manual") === "json"
               ? html`
                   <div class="hint">
                     JSON kann z.B. aus <code>/config/www/</code> kommen → im UI als <code>/local/deinplan.json</code>.
@@ -1793,7 +1793,7 @@ export class StundenplanCardEditor extends LitElement {
             </div>
 
             <div class="grid2">
-              <ha-select .label=${"Wechselwochen (A/B)"} .value=${cfg.week_mode ?? "off"} @selected=${(e: any) => this.setValue("week_mode", e.target.value)}>
+              <ha-select .label=${"Wechselwochen (A/B)"} .value=${cfg.week_mode ?? "off"} @selected=${(e: any) => this.setValue("week_mode", e.detail?.value ?? e.target?.value)}>
                 <mwc-list-item value="off">off (deaktiviert)</mwc-list-item>
                 <mwc-list-item value="kw_parity">kw_parity (KW gerade/ungerade)</mwc-list-item>
                 <mwc-list-item value="week_map">week_map (Mapping Entity)</mwc-list-item>
