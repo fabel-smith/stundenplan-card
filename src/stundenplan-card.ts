@@ -718,10 +718,22 @@ const v = (D = class extends U {
   }
   async setWeekOffset(t, e) {
     const s = (t.week_offset_entity ?? "").trim();
-    if (!s) return;
-    const i = this.hass?.states?.[s], n = i?.attributes?.min, o = i?.attributes?.max, l = Number.isFinite(Number(n)) ? Number(n) : -52, a = Number.isFinite(Number(o)) ? Number(o) : 52;
-    let c = e;
-    c = Math.max(l, c), c = Math.min(a, c), await this.hass.callService("number", "set_value", { entity_id: s, value: c });
+    if (!s || !this.hass) return;
+
+    const st = this.hass.states?.[s];
+    const minAttr = st?.attributes?.min;
+    const maxAttr = st?.attributes?.max;
+    const min = Number.isFinite(Number(minAttr)) ? Number(minAttr) : -52;
+    const max = Number.isFinite(Number(maxAttr)) ? Number(maxAttr) : 52;
+
+    let value = Number(e);
+    if (!Number.isFinite(value)) value = 0;
+    value = Math.max(min, Math.min(max, value));
+
+    const domain = s.split(".")[0];
+    await this.hass.callService(domain, "set_value", { entity_id: s, value });
+
+    this.requestUpdate();
   }
   connectedCallback() {
     super.connectedCallback(), this._tick = window.setInterval(() => {
