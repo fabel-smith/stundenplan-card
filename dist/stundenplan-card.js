@@ -1748,7 +1748,7 @@ const mt = class extends W {
                           .includeDomains=${["sensor"]}
                           .entityFilter=${(i) => {
         const r = ((typeof i == "string" ? i : i && typeof i == "object" && "entity_id" in i ? i.entity_id : "") ?? "").toString();
-        return (t.source_type ?? "manual") === "entity" ? /_woche$/i.test(r) : /^sensor\./.test(r);
+        return r && (t.source_type ?? "manual") === "integration" ? /_woche$/i.test(r) : !0;
       }}
                           .label=${"Sensor auswählen"}
                           @value-changed=${(i) => {

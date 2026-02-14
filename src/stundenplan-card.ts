@@ -1777,7 +1777,12 @@ const ut = class ut extends U {
           ? entityId
           : (entityId && typeof entityId === "object" && "entity_id" in entityId ? entityId.entity_id : "");
         const sid = (id ?? "").toString();
-        return (t.source_type ?? "manual") === "entity" ? /_woche$/i.test(sid) : /^sensor\./.test(sid);
+        if (!sid) return true;
+        const mode = (t.source_type ?? "manual");
+        // In Stundenplan24 (Integration) we only want the *_woche sensors
+        if (mode === "integration") return /_woche$/i.test(sid);
+        // Legacy/manual: allow any sensor (domain is already limited by includeDomains)
+        return true;
       }}
                           .label=${"Sensor auswählen"}
                           @value-changed=${(e) => {
