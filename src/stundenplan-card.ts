@@ -1304,12 +1304,7 @@ private setSplan24Entity(entityId: string) {
   if (!this._config) return;
 
   const ent = (entityId ?? "").toString().trim();
-
-  // FIX: Attribut nicht auswählbar, sondern fest
-  const attr = "rows_ha"; // oder "rows" – je nachdem, was du nutzen willst
-
-  // optional: offset helper automatisch merken/setzen (wie bei dir schon umgesetzt)
-  // const offset = `number.${ent.split(".")[1]}_woche_offset`;
+  const attr = "rows_ha";
 
   this.emit({
     ...this._config,
@@ -1320,6 +1315,7 @@ private setSplan24Entity(entityId: string) {
     source_time_key: "time",
   });
 }
+
 
 
   private renderSection(title: string, key: string, body: TemplateResult) {
@@ -1524,37 +1520,29 @@ private setSplan24Entity(entityId: string) {
           `
         )}
 
-        ${this.renderSection(
-          "Stundenplan24",
-          "splan24",
-          html`
-            <div class="hint">
-              Wähle hier deinen <b>sensor.&lt;klasse&gt;_woche</b>. Dadurch werden Datenquelle + Attribut automatisch gesetzt und der Offset-Helper im Hintergrund erkannt
-              (<code>${offsetInfo || "—"}</code>).
-            </div>
+${this.renderSection(
+  "Stundenplan24",
+  "splan24",
+  html`
+    <div class="hint">
+      Wähle hier deinen <b>sensor.&lt;klasse&gt;_woche</b>. Dadurch werden Datenquelle automatisch gesetzt und der Offset-Helper im Hintergrund erkannt
+      (<code>${offsetInfo || "—"}</code>).
+    </div>
 
-            <div class="grid2">
-              <ha-entity-picker
-                .hass=${this.hass}
-                .value=${cfg.splan24_entity ?? ""}
-                .includeDomains=${["sensor"]}
-                .label=${"Stundenplan24 Woche Sensor (Entity-rows)"}
-                @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value)}
-              ></ha-entity-picker>
+    <ha-entity-picker
+      .hass=${this.hass}
+      .value=${cfg.splan24_entity ?? ""}
+      .includeDomains=${["sensor"]}
+      .label=${"Stundenplan24 Woche Sensor"}
+      @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value)}
+    ></ha-entity-picker>
 
-              <ha-select
-                .label=${"Attribut"}
-                .value=${cfg.splan24_attribute ?? "rows_table"}
-                @selected=${(e: any) => this.setValue("splan24_attribute", e.target.value)}
-              >
-                <mwc-list-item value="rows_table">rows_table</mwc-list-item>
-                <mwc-list-item value="rows">rows</mwc-list-item>
-                <mwc-list-item value="rows_ha">rows_ha</mwc-list-item>
-                <mwc-list-item value="rows_json">rows_json</mwc-list-item>
-              </ha-select>
-            </div>
-          `
-        )}
+    <div class="sub" style="margin-top:6px;">
+      Attribut fest: <code>rows_ha</code>
+    </div>
+  `
+)}
+
 
         ${this.renderSection(
           "Datenquellen",

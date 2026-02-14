@@ -1546,37 +1546,29 @@ const tt = class tt extends D {
           `
     )}
 
-        ${this.renderSection(
+${this.renderSection(
       "Stundenplan24",
       "splan24",
       d`
-            <div class="hint">
-              Wähle hier deinen <b>sensor.&lt;klasse&gt;_woche</b>. Dadurch werden Datenquelle + Attribut automatisch gesetzt und der Offset-Helper im Hintergrund erkannt
-              (<code>${s || "—"}</code>).
-            </div>
+    <div class="hint">
+      Wähle hier deinen <b>sensor.&lt;klasse&gt;_woche</b>. Dadurch werden Datenquelle automatisch gesetzt und der Offset-Helper im Hintergrund erkannt
+      (<code>${s || "—"}</code>).
+    </div>
 
-            <div class="grid2">
-              <ha-entity-picker
-                .hass=${this.hass}
-                .value=${t.splan24_entity ?? ""}
-                .includeDomains=${["sensor"]}
-                .label=${"Stundenplan24 Woche Sensor (Entity-rows)"}
-                @value-changed=${(r) => this.setSplan24Entity(r.detail.value)}
-              ></ha-entity-picker>
+    <ha-entity-picker
+      .hass=${this.hass}
+      .value=${t.splan24_entity ?? ""}
+      .includeDomains=${["sensor"]}
+      .label=${"Stundenplan24 Woche Sensor"}
+      @value-changed=${(r) => this.setSplan24Entity(r.detail.value)}
+    ></ha-entity-picker>
 
-              <ha-select
-                .label=${"Attribut"}
-                .value=${t.splan24_attribute ?? "rows_table"}
-                @selected=${(r) => this.setValue("splan24_attribute", r.target.value)}
-              >
-                <mwc-list-item value="rows_table">rows_table</mwc-list-item>
-                <mwc-list-item value="rows">rows</mwc-list-item>
-                <mwc-list-item value="rows_ha">rows_ha</mwc-list-item>
-                <mwc-list-item value="rows_json">rows_json</mwc-list-item>
-              </ha-select>
-            </div>
-          `
+    <div class="sub" style="margin-top:6px;">
+      Attribut fest: <code>rows_ha</code>
+    </div>
+  `
     )}
+
 
         ${this.renderSection(
       "Datenquellen",
