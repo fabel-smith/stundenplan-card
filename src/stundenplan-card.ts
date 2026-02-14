@@ -807,18 +807,7 @@ const v = (D = class extends U {
         cells: u
       };
       return O.some((w) => !!w) && (b.cell_styles = O), b;
-    }), o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", a = (t.source_entity ?? e.source_entity).toString().trim(), _ = (t.week_offset_entity ?? "").toString().trim() || je(a), f = (() => {
-      const raw = ((t.source_type ?? "") + "").toString().trim();
-      if (raw === "manual" || raw === "entity" || raw === "json" || raw === "legacy") return raw;
-      if (a) {
-        const attr = ((t.source_attribute ?? "") + "").toString().trim();
-        const tk = ((t.source_time_key ?? "") + "").toString().trim();
-        const looksIntegration = /_woche$/i.test(a) && (attr === "" || attr === "rows_table") && (tk === "" || tk === "time");
-        if (!looksIntegration && (attr || tk)) return "legacy";
-        return "entity";
-      }
-      return "manual";
-    })();
+    }), o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", a = (t.source_entity ?? e.source_entity).toString().trim(), _ = (t.week_offset_entity ?? "").toString().trim() || je(a);
     return {
       type: (t.type ?? e.type).toString(),
       title: (t.title ?? e.title).toString(),
@@ -834,9 +823,9 @@ const v = (D = class extends U {
       highlight_current_time_text: t.highlight_current_time_text ?? e.highlight_current_time_text,
       highlight_current_time_text_color: (t.highlight_current_time_text_color ?? e.highlight_current_time_text_color).toString(),
       source_entity: a,
-      source_attribute: (f === "entity" ? "rows_table" : f === "legacy" ? (((t.source_attribute ?? "") + "").toString().trim() || "plan") : (t.source_attribute ?? e.source_attribute)).toString(),
-      source_time_key: (f === "entity" ? "time" : f === "legacy" ? (((t.source_time_key ?? "") + "").toString().trim() || "Stunde") : (t.source_time_key ?? e.source_time_key)).toString(),
-      source_type: f,
+      source_attribute: (t.source_attribute ?? e.source_attribute).toString(),
+      source_time_key: (t.source_time_key ?? e.source_time_key).toString(),
+      source_type: ((t.source_type ?? (a ? "entity" : "manual")) + "").toString().trim(),
       json_url: (t.json_url ?? "").toString(),
       week_offset_entity: _,
       week_offset_attribute: (t.week_offset_attribute ?? "").toString(),
@@ -1498,18 +1487,12 @@ const ut = class ut extends U {
   }
   setSourceType(t) {
     if (!this._config) return;
-    const e = t === "entity" || t === "json" || t === "manual" || t === "legacy" ? t : "manual", s = { ...this._config, source_type: e };
-    if (e === "json" && s.json_url == null && (s.json_url = ""));
-    if (e === "entity") {
+    const e = t === "entity" || t === "json" || t === "manual" ? t : "manual", s = { ...this._config, source_type: e };
+    if (e === "json" && s.json_url == null && (s.json_url = ""), e === "entity") {
       s.source_entity == null && (s.source_entity = "");
       // Stundenplan24-Integration: Attribute/Time-Key sind fest verdrahtet
       s.source_attribute = "rows_table";
       s.source_time_key = "time";
-    }
-    if (e === "legacy") {
-      s.source_entity == null && (s.source_entity = "");
-      s.source_attribute = (s.source_attribute ?? "").toString().trim() || "plan";
-      s.source_time_key = (s.source_time_key ?? "").toString().trim() || "Stunde";
     }
     this.emit(s);
   }
@@ -1727,8 +1710,7 @@ const ut = class ut extends U {
               options: [
                 { value: "manual", label: "Manuell (rows)" },
                 { value: "entity", label: "Stundenplan24 (Integration)" },
-                { value: "json", label: "JSON-Datei (URL / /local/...)" },
-                { value: "legacy", label: "Single-Source (Legacy / einfach)" }
+                { value: "json", label: "JSON-Datei (URL / /local/...)" }
               ]
             }
           }
@@ -1747,23 +1729,17 @@ const ut = class ut extends U {
               ></ha-form>
             </div>
 
-            ${["entity","legacy"].includes(t.source_type ?? "manual") ? d`
+            ${(t.source_type ?? "manual") === "entity" ? d`
                   ${this.isHaEntityPickerAvailable() ? d`
                         ${(() => {
-        const st = (t.source_type ?? "manual");
-        const all = Object.keys(this.hass?.states ?? {});
-        const e = st === "entity" ? all.filter((n) => /^sensor\./.test(n) && /_woche$/i.test(n)) : all.filter((n) => /^sensor\./.test(n));
-        const s = all.length;
-        return st === "entity" && (s < 20 || s > 0 && e.length === 0) ? d`<div class="hint">Lade Stundenplan-Sensoren…</div>` : d``;
+        const e = Object.keys(this.hass?.states ?? {}).filter((n) => /^sensor\./.test(n) && /_woche$/i.test(n)), s = Object.keys(this.hass?.states ?? {}).length;
+        return s < 20 || s > 0 && e.length === 0 ? d`<div class="hint">Lade Stundenplan-Sensoren…</div>` : d``;
       })()}
                         <ha-entity-picker
                           .hass=${this.hass}
                           .value=${t.source_entity ?? ""}
                           .includeDomains=${["sensor"]}
-                          .entityFilter=${(entityId) => {
-        const id = (entityId ?? "").toString();
-        return (t.source_type ?? "manual") === "entity" ? /_woche$/i.test(id) : /^sensor\./.test(id);
-      }}
+                          .entityFilter=${(e) => /_woche$/i.test(e?.entity_id ?? "")}
                           .label=${"Sensor auswählen"}
                           @value-changed=${(e) => {
         try {
@@ -1780,14 +1756,6 @@ const ut = class ut extends U {
                         @input=${(e) => this.setSourceEntity(e.target.value)}
                         placeholder="sensor.05b_woche"
                       ></ha-textfield>
-
-                      ${(t.source_type ?? "manual") === "legacy" ? d`
-                        <div class="grid2">
-                          <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-textfield>
-                          <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-textfield>
-                        </div>
-                        <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
-                      ` : d``}
                 ` : d``}
 
             ${(t.source_type ?? "manual") === "json" ? d`
@@ -1803,9 +1771,9 @@ const ut = class ut extends U {
                   ></ha-textfield>
                 ` : d``}
 
-                        ${t.source_type === "legacy" ? d`
+                        ${t.source_type === "json" ? d`
             <div class="hint" style="margin-top:10px;">
-                          Wechselwochen (A/B) gehört zu „Single-Source (Legacy / einfach)“. 
+                          Wechselwochen (A/B) wird nur bei Quelle „JSON-Datei“ angeboten.
                         </div>
 
                         <div class="grid2">
