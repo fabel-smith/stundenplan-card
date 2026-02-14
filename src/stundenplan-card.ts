@@ -1829,100 +1829,103 @@ export class StundenplanCardEditor extends LitElement {
                 `
               : html``}
 
+                        ${cfg.source_type === "json" ? html`
             <div class="hint" style="margin-top:10px;">
-              Wechselwochen (A/B) ist optional – funktioniert nur mit Entities (A/B-Sensoren).
-            </div>
+                          Wechselwochen (A/B) wird nur bei Quelle „JSON-Datei“ angeboten.
+                        </div>
 
-            <div class="grid2">
-              <ha-form
-                .hass=${this.hass}
-                .data=${{
-                  week_mode: (cfg.week_mode ?? "off"),
-                  week_a_is_even_kw: asBool(cfg.week_a_is_even_kw, true),
-                }}
-                .schema=${[
-                  {
-                    name: "week_mode",
-                    selector: {
-                      select: {
-                        mode: "list",
-                        options: [
-                          { value: "off", label: "off (deaktiviert)" },
-                          { value: "kw_parity", label: "A/B nach Kalenderwoche" },
-                        ],
-                      },
-                    },
-                  },
-                  {
-                    name: "week_a_is_even_kw",
-                    selector: {
-                      select: {
-                        mode: "list",
-                        options: [
-                          { value: true, label: "Woche A = gerade KW" },
-                          { value: false, label: "Woche A = ungerade KW" },
-                        ],
-                      },
-                    },
-                  },
-                ]}
-                .computeLabel=${(s: any) =>
-                  s?.name === "week_mode"
-                    ? "Wechselwochen (A/B)"
-                    : s?.name === "week_a_is_even_kw"
-                    ? "Woche A"
-                    : s?.name
-                }
-                @value-changed=${(e: any) => {
-                  try {
-                    e?.stopPropagation?.();
-                    const v = e?.detail?.value ?? {};
-                    const mode = (v.week_mode ?? (cfg.week_mode ?? "off")) as WeekMode;
-                    if (mode !== (cfg.week_mode ?? "off")) this.setValue("week_mode", mode);
+                        <div class="grid2">
+                          <ha-form
+                            .hass=${this.hass}
+                            .data=${{
+                              week_mode: (cfg.week_mode ?? "off"),
+                              week_a_is_even_kw: asBool(cfg.week_a_is_even_kw, true),
+                            }}
+                            .schema=${[
+                              {
+                                name: "week_mode",
+                                selector: {
+                                  select: {
+                                    mode: "list",
+                                    options: [
+                                      { value: "off", label: "off (deaktiviert)" },
+                                      { value: "kw_parity", label: "A/B nach Kalenderwoche" },
+                                    ],
+                                  },
+                                },
+                              },
+                              {
+                                name: "week_a_is_even_kw",
+                                selector: {
+                                  select: {
+                                    mode: "list",
+                                    options: [
+                                      { value: true, label: "Woche A = gerade KW" },
+                                      { value: false, label: "Woche A = ungerade KW" },
+                                    ],
+                                  },
+                                },
+                              },
+                            ]}
+                            .computeLabel=${(s: any) =>
+                              s?.name === "week_mode"
+                                ? "Wechselwochen (A/B)"
+                                : s?.name === "week_a_is_even_kw"
+                                ? "Woche A"
+                                : s?.name
+                            }
+                            @value-changed=${(e: any) => {
+                              try {
+                                e?.stopPropagation?.();
+                                const v = e?.detail?.value ?? {};
+                                const mode = (v.week_mode ?? (cfg.week_mode ?? "off")) as WeekMode;
+                                if (mode !== (cfg.week_mode ?? "off")) this.setValue("week_mode", mode);
 
-                    const val = v.week_a_is_even_kw;
-                    if (typeof val === "boolean" && val !== asBool(cfg.week_a_is_even_kw, true)) this.setValue("week_a_is_even_kw", val);
-                  } catch (err) {
-                    console.error("stundenplan-card editor: week settings change failed", err);
-                  }
-                }}
-              ></ha-form>
-            </div>${cfg.week_mode === "week_map"
-              ? html`
-                  <div class="grid2">
-                    <ha-textfield
-                      label="week_map_entity (entity_id)"
-                      .value=${cfg.week_map_entity ?? ""}
-                      @input=${(e: any) => this.onText(e, "week_map_entity")}
-                      placeholder="sensor.week_map"
-                    ></ha-textfield>
+                                const val = v.week_a_is_even_kw;
+                                if (typeof val === "boolean" && val !== asBool(cfg.week_a_is_even_kw, true)) this.setValue("week_a_is_even_kw", val);
+                              } catch (err) {
+                                console.error("stundenplan-card editor: week settings change failed", err);
+                              }
+                            }}
+                          ></ha-form>
+                        </div>${cfg.week_mode === "week_map"
+                          ? html`
+                              <div class="grid2">
+                                <ha-textfield
+                                  label="week_map_entity (entity_id)"
+                                  .value=${cfg.week_map_entity ?? ""}
+                                  @input=${(e: any) => this.onText(e, "week_map_entity")}
+                                  placeholder="sensor.week_map"
+                                ></ha-textfield>
 
-                    <ha-textfield label="week_map_attribute" .value=${cfg.week_map_attribute ?? ""} @input=${(e: any) => this.onText(e, "week_map_attribute")}></ha-textfield>
-                  </div>
-                `
-              : html``}
+                                <ha-textfield label="week_map_attribute" .value=${cfg.week_map_attribute ?? ""} @input=${(e: any) => this.onText(e, "week_map_attribute")}></ha-textfield>
+                              </div>
+                            `
+                          : html``}
 
-            ${cfg.week_mode !== "off"
-              ? html`
-                  <div class="grid2">
-                    <ha-textfield
-                      label="source_entity_a (entity_id)"
-                      .value=${cfg.source_entity_a ?? ""}
-                      @input=${(e: any) => this.onText(e, "source_entity_a")}
-                      placeholder="sensor.05b_woche_a"
-                    ></ha-textfield>
-                    <ha-textfield label="source_attribute_a" .value=${cfg.source_attribute_a ?? ""} @input=${(e: any) => this.onText(e, "source_attribute_a")}></ha-textfield>
+                        ${cfg.week_mode !== "off"
+                          ? html`
+                              <div class="grid2">
+                                <ha-textfield
+                                  label="source_entity_a (entity_id)"
+                                  .value=${cfg.source_entity_a ?? ""}
+                                  @input=${(e: any) => this.onText(e, "source_entity_a")}
+                                  placeholder="sensor.05b_woche_a"
+                                ></ha-textfield>
+                                <ha-textfield label="source_attribute_a" .value=${cfg.source_attribute_a ?? ""} @input=${(e: any) => this.onText(e, "source_attribute_a")}></ha-textfield>
 
-                    <ha-textfield
-                      label="source_entity_b (entity_id)"
-                      .value=${cfg.source_entity_b ?? ""}
-                      @input=${(e: any) => this.onText(e, "source_entity_b")}
-                      placeholder="sensor.05b_woche_b"
-                    ></ha-textfield>
-                    <ha-textfield label="source_attribute_b" .value=${cfg.source_attribute_b ?? ""} @input=${(e: any) => this.onText(e, "source_attribute_b")}></ha-textfield>
-                  </div>
-                `
-              : html``}
+                                <ha-textfield
+                                  label="source_entity_b (entity_id)"
+                                  .value=${cfg.source_entity_b ?? ""}
+                                  @input=${(e: any) => this.onText(e, "source_entity_b")}
+                                  placeholder="sensor.05b_woche_b"
+                                ></ha-textfield>
+                                <ha-textfield label="source_attribute_b" .value=${cfg.source_attribute_b ?? ""} @input=${(e: any) => this.onText(e, "source_attribute_b")}></ha-textfield>
+                              </div>
+                            `
+                          : html``}
+            ` : html``}
+
           `
         )}
 
