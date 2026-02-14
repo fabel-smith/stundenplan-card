@@ -718,42 +718,10 @@ const v = (D = class extends U {
   }
   async setWeekOffset(t, e) {
     const s = (t.week_offset_entity ?? "").trim();
-    if (!s || !this.hass) return;
-
-    const st = this.hass.states?.[s];
-    const minAttr = st?.attributes?.min;
-    const maxAttr = st?.attributes?.max;
-    const min = Number.isFinite(Number(minAttr)) ? Number(minAttr) : -52;
-    const max = Number.isFinite(Number(maxAttr)) ? Number(maxAttr) : 52;
-
-    let value = Number(e);
-    if (!Number.isFinite(value)) value = 0;
-    value = Math.max(min, Math.min(max, value));
-
-    const domain = s.split(".")[0];
-    try {
-      // 1) Offset setzen (triggert async_set_native_value in deiner Integration)
-      await this.hass.callService(domain, "set_value", { entity_id: s, value });
-
-      // 2) Plan-Entities aktiv neu aktualisieren, damit Lovelace sofort neue rows_table bekommt
-      //    (bei manchen Setups kommt das Coordinator-Update nicht zuverlässig in der Card an)
-      const toUpdate = [
-        s,
-        (t.source_entity ?? "").trim(),
-        (t.source_entity_a ?? "").trim(),
-        (t.source_entity_b ?? "").trim(),
-        (t.week_map_entity ?? "").trim(),
-      ].filter((x) => !!x);
-      if (toUpdate.length) {
-        await this.hass.callService("homeassistant", "update_entity", { entity_id: toUpdate });
-      }
-    } catch (err) {
-      // Silent fail is super confusing; at least log it.
-      // eslint-disable-next-line no-console
-      console.error("stundenplan-card: setWeekOffset failed", err);
-    }
-
-    this.requestUpdate();
+    if (!s) return;
+    const i = this.hass?.states?.[s], n = i?.attributes?.min, o = i?.attributes?.max, l = Number.isFinite(Number(n)) ? Number(n) : -52, a = Number.isFinite(Number(o)) ? Number(o) : 52;
+    let c = e;
+    c = Math.max(l, c), c = Math.min(a, c), await this.hass.callService("number", "set_value", { entity_id: s, value: c });
   }
   connectedCallback() {
     super.connectedCallback(), this._tick = window.setInterval(() => {
@@ -839,7 +807,18 @@ const v = (D = class extends U {
         cells: u
       };
       return O.some((w) => !!w) && (b.cell_styles = O), b;
-    }), o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", a = (t.source_entity ?? e.source_entity).toString().trim(), _ = (t.week_offset_entity ?? "").toString().trim() || je(a);
+    }), o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", a = (t.source_entity ?? e.source_entity).toString().trim(), _ = (t.week_offset_entity ?? "").toString().trim() || je(a), f = (() => {
+      const raw = ((t.source_type ?? "") + "").toString().trim();
+      if (raw === "manual" || raw === "entity" || raw === "json" || raw === "legacy") return raw;
+      if (a) {
+        const attr = ((t.source_attribute ?? "") + "").toString().trim();
+        const tk = ((t.source_time_key ?? "") + "").toString().trim();
+        const looksIntegration = /_woche$/i.test(a) && (attr === "" || attr === "rows_table") && (tk === "" || tk === "time");
+        if (!looksIntegration && (attr || tk)) return "legacy";
+        return "entity";
+      }
+      return "manual";
+    })();
     return {
       type: (t.type ?? e.type).toString(),
       title: (t.title ?? e.title).toString(),
@@ -855,9 +834,9 @@ const v = (D = class extends U {
       highlight_current_time_text: t.highlight_current_time_text ?? e.highlight_current_time_text,
       highlight_current_time_text_color: (t.highlight_current_time_text_color ?? e.highlight_current_time_text_color).toString(),
       source_entity: a,
-      source_attribute: (t.source_attribute ?? e.source_attribute).toString(),
-      source_time_key: (t.source_time_key ?? e.source_time_key).toString(),
-      source_type: ((t.source_type ?? (a ? "entity" : "manual")) + "").toString().trim(),
+      source_attribute: (f === "entity" ? "rows_table" : f === "legacy" ? (((t.source_attribute ?? "") + "").toString().trim() || "plan") : (t.source_attribute ?? e.source_attribute)).toString(),
+      source_time_key: (f === "entity" ? "time" : f === "legacy" ? (((t.source_time_key ?? "") + "").toString().trim() || "Stunde") : (t.source_time_key ?? e.source_time_key)).toString(),
+      source_type: f,
       json_url: (t.json_url ?? "").toString(),
       week_offset_entity: _,
       week_offset_attribute: (t.week_offset_attribute ?? "").toString(),
@@ -1126,9 +1105,9 @@ const v = (D = class extends U {
 
             ${p ? d`
                   <div class="offsetInline">
-                    <button class="btnMini" @click=${() => this.setWeekOffset(t, (h ?? 0) - 1)}>&lt;</button>
-                    <div class="offsetVal">${h ?? 0}</div>
-                    <button class="btnMini" @click=${() => this.setWeekOffset(t, (h ?? 0) + 1)}>&gt;</button>
+                    <button class="btnMini" @click=${() => h != null && this.setWeekOffset(t, h - 1)}>&lt;</button>
+                    <div class="offsetVal">${h ?? "?"}</div>
+                    <button class="btnMini" @click=${() => h != null && this.setWeekOffset(t, h + 1)}>&gt;</button>
                   </div>
                 ` : d``}
           </div>
@@ -1519,12 +1498,18 @@ const ut = class ut extends U {
   }
   setSourceType(t) {
     if (!this._config) return;
-    const e = t === "entity" || t === "json" || t === "manual" ? t : "manual", s = { ...this._config, source_type: e };
-    if (e === "json" && s.json_url == null && (s.json_url = ""), e === "entity") {
+    const e = t === "entity" || t === "json" || t === "manual" || t === "legacy" ? t : "manual", s = { ...this._config, source_type: e };
+    if (e === "json" && s.json_url == null && (s.json_url = ""));
+    if (e === "entity") {
       s.source_entity == null && (s.source_entity = "");
       // Stundenplan24-Integration: Attribute/Time-Key sind fest verdrahtet
       s.source_attribute = "rows_table";
       s.source_time_key = "time";
+    }
+    if (e === "legacy") {
+      s.source_entity == null && (s.source_entity = "");
+      s.source_attribute = (s.source_attribute ?? "").toString().trim() || "plan";
+      s.source_time_key = (s.source_time_key ?? "").toString().trim() || "Stunde";
     }
     this.emit(s);
   }
@@ -1742,7 +1727,8 @@ const ut = class ut extends U {
               options: [
                 { value: "manual", label: "Manuell (rows)" },
                 { value: "entity", label: "Stundenplan24 (Integration)" },
-                { value: "json", label: "JSON-Datei (URL / /local/...)" }
+                { value: "json", label: "JSON-Datei (URL / /local/...)" },
+                { value: "legacy", label: "Single-Source (Legacy / einfach)" }
               ]
             }
           }
@@ -1761,17 +1747,23 @@ const ut = class ut extends U {
               ></ha-form>
             </div>
 
-            ${(t.source_type ?? "manual") === "entity" ? d`
+            ${["entity","legacy"].includes(t.source_type ?? "manual") ? d`
                   ${this.isHaEntityPickerAvailable() ? d`
                         ${(() => {
-        const e = Object.keys(this.hass?.states ?? {}).filter((n) => /^sensor\./.test(n) && /_woche$/i.test(n)), s = Object.keys(this.hass?.states ?? {}).length;
-        return s < 20 || s > 0 && e.length === 0 ? d`<div class="hint">Lade Stundenplan-Sensoren…</div>` : d``;
+        const st = (t.source_type ?? "manual");
+        const all = Object.keys(this.hass?.states ?? {});
+        const e = st === "entity" ? all.filter((n) => /^sensor\./.test(n) && /_woche$/i.test(n)) : all.filter((n) => /^sensor\./.test(n));
+        const s = all.length;
+        return st === "entity" && (s < 20 || s > 0 && e.length === 0) ? d`<div class="hint">Lade Stundenplan-Sensoren…</div>` : d``;
       })()}
                         <ha-entity-picker
                           .hass=${this.hass}
                           .value=${t.source_entity ?? ""}
                           .includeDomains=${["sensor"]}
-                          .entityFilter=${(entityId) => /_woche$/i.test(entityId ?? "")}
+                          .entityFilter=${(entityId) => {
+        const id = (entityId ?? "").toString();
+        return (t.source_type ?? "manual") === "entity" ? /_woche$/i.test(id) : /^sensor\./.test(id);
+      }}
                           .label=${"Sensor auswählen"}
                           @value-changed=${(e) => {
         try {
@@ -1788,6 +1780,14 @@ const ut = class ut extends U {
                         @input=${(e) => this.setSourceEntity(e.target.value)}
                         placeholder="sensor.05b_woche"
                       ></ha-textfield>
+
+                      ${(t.source_type ?? "manual") === "legacy" ? d`
+                        <div class="grid2">
+                          <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-textfield>
+                          <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-textfield>
+                        </div>
+                        <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
+                      ` : d``}
                 ` : d``}
 
             ${(t.source_type ?? "manual") === "json" ? d`
