@@ -1,3 +1,11 @@
+/* stundenplan-card.ts
+ *
+ * ✅ Fixes:
+ * 1) Editor: Entity-Picker funktioniert zuverlässig (Fallback auf Textfeld, falls ha-entity-picker in deiner HA-Version nicht geladen ist)
+ * 2) Editor: setzt automatisch bestes Attribut (rows_ha bevorzugt, sonst rows / rows_table / rows_json / rows_ha)
+ * 3) Card: Zeit wird in der linken Spalte neben der Stunde angezeigt (Start–Ende)
+ */
+
 import { LitElement, html, css, TemplateResult } from "lit";
 import { property, state } from "lit/decorators.js";
 
@@ -228,6 +236,8 @@ function mapCfgDayToIsoDow(label: string): number | null {
   return null;
 }
 
+/* ===================== Card ===================== */
+
 export class StundenplanCard extends LitElement {
   public getGridOptions() {
     return { columns: "full" };
@@ -375,7 +385,7 @@ export class StundenplanCard extends LitElement {
       week_offset_attribute: "",
 
       splan24_entity: "",
-      splan24_attribute: "rows_table",
+      splan24_attribute: "rows_ha",
 
       week_mode: "off",
       week_a_is_even_kw: true,
@@ -491,7 +501,7 @@ export class StundenplanCard extends LitElement {
       week_offset_attribute: (cfg.week_offset_attribute ?? "").toString(),
 
       splan24_entity: (cfg.splan24_entity ?? "").toString(),
-      splan24_attribute: (cfg.splan24_attribute ?? "rows_table").toString(),
+      splan24_attribute: (cfg.splan24_attribute ?? "rows_ha").toString(),
 
       week_mode,
       week_a_is_even_kw: cfg.week_a_is_even_kw ?? stub.week_a_is_even_kw,
@@ -585,7 +595,10 @@ export class StundenplanCard extends LitElement {
         return (obj?.[key] ?? "").toString();
       });
 
-      const lr: LessonRow = { time: timeStr, start: parsed.start, end: parsed.end, cells };
+      const start = (obj?.start ?? "").toString().trim() || parsed.start;
+      const end = (obj?.end ?? "").toString().trim() || parsed.end;
+
+      const lr: LessonRow = { time: timeStr, start: start || undefined, end: end || undefined, cells };
       return lr;
     });
 
@@ -595,10 +608,11 @@ export class StundenplanCard extends LitElement {
   private getRowsFromEntity(cfg: Required<StundenplanConfig>, entityId: string, attributeName: string): Row[] | null {
     let data = this.readEntityJson(entityId, attributeName);
 
-    if (data == null) data = this.readEntityJson(entityId, "rows_table");
-    if (data == null) data = this.readEntityJson(entityId, "rows");
-    if (data == null) data = this.readEntityJson(entityId, "rows_json");
+    // Fallback order (deine Sensoren liefern rows_ha zuverlässig)
     if (data == null) data = this.readEntityJson(entityId, "rows_ha");
+    if (data == null) data = this.readEntityJson(entityId, "rows");
+    if (data == null) data = this.readEntityJson(entityId, "rows_table");
+    if (data == null) data = this.readEntityJson(entityId, "rows_json");
 
     if (!Array.isArray(data)) return null;
     return this.buildRowsFromArray(cfg, data);
@@ -738,7 +752,7 @@ export class StundenplanCard extends LitElement {
     this._rowsCache = this.getRowsResolved(this.config);
   }
 
-  // Parse to Fach (bold) + Raum + Lehrer + Info/Notes  ✅ order like screenshot
+  // Parse to Fach (bold) + Raum + Lehrer + Info/Notes
   private parseCellTriplet(val: string): { fach?: string; raum?: string; lehrer?: string; notes?: string[] } | null {
     const raw = (val ?? "").toString().replace(/\r/g, "").trim();
     if (!raw) return null;
@@ -763,12 +777,10 @@ export class StundenplanCard extends LitElement {
       /\bentfällt\b/i.test(s) ||
       /\bvertretung\b/i.test(s);
 
-    // room is numeric (027/140/203/221/142) or alpha+digits (SH1)
     const isRoom = (s: string) => /^\d{1,4}$/.test(s) || /^[A-ZÄÖÜ]{1,4}\d{1,3}$/i.test(s);
 
     const tail = lines.slice(1);
 
-    // find room (prefer first non-note that looks like room; else last room)
     let roomIdx = -1;
     for (let i = 0; i < tail.length; i++) {
       if (!isNote(tail[i]) && isRoom(tail[i])) {
@@ -788,7 +800,6 @@ export class StundenplanCard extends LitElement {
 
     const raum = tail[roomIdx];
 
-    // teacher: first non-note after room; else last non-note non-room
     let lehrer: string | undefined;
     for (let i = roomIdx + 1; i < tail.length; i++) {
       const s = tail[i];
@@ -802,7 +813,6 @@ export class StundenplanCard extends LitElement {
       lehrer = cand.length ? cand[cand.length - 1] : undefined;
     }
 
-    // notes: all note-lines (anywhere after fach), keep order
     const notes = lines.slice(1).filter((s) => isNote(s));
 
     return { fach, raum, lehrer, notes: notes.length ? notes : undefined };
@@ -826,7 +836,13 @@ export class StundenplanCard extends LitElement {
                 <div class="notes">
                   ${tri.notes.map((n) => {
                     const cls =
-                      n.startsWith("🔴") ? "note noteRed" : n.startsWith("🟠") ? "note noteOrange" : n.startsWith("🟡") ? "note noteYellow" : "note";
+                      n.startsWith("🔴")
+                        ? "note noteRed"
+                        : n.startsWith("🟠")
+                        ? "note noteOrange"
+                        : n.startsWith("🟡")
+                        ? "note noteYellow"
+                        : "note";
                     const clean = n.replace(/^[🟠🔴🟡🟢⚪️🟣🟤]\s*/g, "").trim();
                     return html`<div class=${cls}><span class="dot">${n.slice(0, 2).trim()}</span><span class="txt">${clean}</span></div>`;
                   })}
@@ -837,7 +853,6 @@ export class StundenplanCard extends LitElement {
       `;
     }
 
-    // fallback: show first line bold, remaining as note-block
     const lines = v.replace(/\r/g, "").split("\n").map((x) => x.trim()).filter(Boolean);
     const first = (lines[0] ?? "").trim();
     const rest = lines.slice(1);
@@ -979,15 +994,21 @@ export class StundenplanCard extends LitElement {
                 const suppressCurrent = !!cfg.free_only_column_highlight && todayCellIsFree;
                 const allowCurrent = !suppressCurrent;
 
+                // ✅ time cell: show lesson + start-end
+                const timeLine = row.start && row.end ? `${row.start}–${row.end}` : "";
+
                 let timeStyle = `--sp-hl:${currentOverlay};`;
-                if (allowCurrent && cfg.highlight_current && isCurrentTime)
-                  timeStyle += "box-shadow: inset 0 0 0 9999px var(--sp-hl);";
-                if (allowCurrent && isCurrentTime && cfg.highlight_current_time_text && currentTimeTextColor)
-                  timeStyle += `color:${currentTimeTextColor};`;
+                if (allowCurrent && cfg.highlight_current && isCurrentTime) timeStyle += "box-shadow: inset 0 0 0 9999px var(--sp-hl);";
+                if (allowCurrent && isCurrentTime && cfg.highlight_current_time_text && currentTimeTextColor) timeStyle += `color:${currentTimeTextColor};`;
 
                 return html`
                   <tr>
-                    <td class="time" style=${timeStyle}>${row.time}</td>
+                    <td class="time" style=${timeStyle}>
+                      <div class="timeWrap">
+                        <div class="timeSt">${row.time}</div>
+                        ${timeLine ? html`<div class="timeHm">${timeLine}</div>` : html``}
+                      </div>
+                    </td>
 
                     ${cfg.days.map((_, i) => {
                       const val = this.filterCellText(cellsRaw[i] ?? "", cfg);
@@ -1123,7 +1144,22 @@ export class StundenplanCard extends LitElement {
     .time {
       font-weight: 700;
       white-space: nowrap;
-      width: 110px;
+      width: 125px;
+    }
+    .timeWrap {
+      display: grid;
+      gap: 2px;
+      justify-items: center;
+      line-height: 1.1;
+    }
+    .timeSt {
+      font-size: 13px;
+      font-weight: 800;
+    }
+    .timeHm {
+      font-size: 11px;
+      font-weight: 650;
+      opacity: 0.85;
     }
 
     td.today,
@@ -1155,7 +1191,6 @@ export class StundenplanCard extends LitElement {
       white-space: nowrap;
     }
 
-    /* Notes like Stundenplan24: smaller, left aligned, indented */
     .notes {
       margin-top: 4px;
       display: grid;
@@ -1255,7 +1290,31 @@ export class StundenplanCardEditor extends LitElement {
     manual: false,
   };
 
+  private _uiLoaded = false;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+    this.ensureUiLoaded();
+  }
+
+  private async ensureUiLoaded(): Promise<void> {
+    if (this._uiLoaded) return;
+    this._uiLoaded = true;
+
+    try {
+      const w = window as any;
+      // In vielen HA-Versionen ist das verfügbar und lädt die Editor-Controls nach
+      await w.loadCardHelpers?.();
+    } catch {
+      // egal – wir haben Fallback auf Textfield
+    }
+    // nachladen reicht oft erst nach einem tick
+    setTimeout(() => this.requestUpdate(), 0);
+  }
+
   public setConfig(cfg: StundenplanConfig): void {
+    this.ensureUiLoaded();
+
     const type = ((cfg?.type ?? "") + "").toString();
     if (type !== "custom:stundenplan-card" && type !== "stundenplan-card") {
       throw new Error(`Unsupported editor type: ${type}`);
@@ -1293,31 +1352,29 @@ export class StundenplanCardEditor extends LitElement {
   private findBestRowsAttribute(entityId: string): { attr: string; timeKey: string } {
     const st = this.hass?.states?.[entityId];
     const attrs = st?.attributes ?? {};
-    if (attrs.rows_table != null) return { attr: "rows_table", timeKey: "time" };
-    if (attrs.rows != null) return { attr: "rows", timeKey: "time" };
-    if (attrs.rows_json != null) return { attr: "rows_json", timeKey: "time" };
+    // ✅ Prefer rows_ha (dein Sensor hat es)
     if (attrs.rows_ha != null) return { attr: "rows_ha", timeKey: "time" };
-    return { attr: "rows_table", timeKey: "time" };
+    if (attrs.rows != null) return { attr: "rows", timeKey: "time" };
+    if (attrs.rows_table != null) return { attr: "rows_table", timeKey: "time" };
+    if (attrs.rows_json != null) return { attr: "rows_json", timeKey: "time" };
+    return { attr: "rows_ha", timeKey: "time" };
   }
 
-private setSplan24Entity(entityId: string) {
-  if (!this._config) return;
+  private setSplan24Entity(entityId: string) {
+    if (!this._config) return;
 
-  const ent = (entityId ?? "").toString().trim();
-  const attr = "rows_ha";
+    const ent = (entityId ?? "").toString().trim();
+    const best = ent ? this.findBestRowsAttribute(ent) : { attr: "rows_ha", timeKey: "time" };
 
-  this.emit({
-    ...this._config,
-    splan24_entity: ent,
-    splan24_attribute: attr,
-    source_entity: ent,
-    source_attribute: attr,
-    source_time_key: "time",
-  });
-}
-
-
-
+    this.emit({
+      ...this._config,
+      splan24_entity: ent,
+      splan24_attribute: best.attr,
+      source_entity: ent,
+      source_attribute: best.attr,
+      source_time_key: best.timeKey,
+    });
+  }
 
   private renderSection(title: string, key: string, body: TemplateResult) {
     const open = !!this._open[key];
@@ -1448,6 +1505,10 @@ private setSplan24Entity(entityId: string) {
     `;
   }
 
+  private isHaEntityPickerAvailable(): boolean {
+    return typeof customElements !== "undefined" && !!customElements.get("ha-entity-picker");
+  }
+
   protected render(): TemplateResult {
     if (!this._config) return html``;
     const cfg = this._config;
@@ -1455,6 +1516,8 @@ private setSplan24Entity(entityId: string) {
     const splan24Entity = (cfg.splan24_entity ?? "").toString().trim();
     const inferredOffset = splan24Entity ? inferWeekOffsetEntity(splan24Entity) : "";
     const offsetInfo = inferredOffset ? inferredOffset : (cfg.week_offset_entity ?? "").toString().trim();
+
+    const pickerOk = this.isHaEntityPickerAvailable();
 
     return html`
       <div class="wrap">
@@ -1521,31 +1584,42 @@ private setSplan24Entity(entityId: string) {
           `
         )}
 
-${this.renderSection(
-  "Stundenplan24",
-  "splan24",
-  html`
-    <div class="hint">
-      Wähle hier deinen <b>sensor.&lt;klasse&gt;_woche</b>. Dadurch werden Datenquelle automatisch gesetzt und der Offset-Helper im Hintergrund erkannt
-      (<code>${offsetInfo || "—"}</code>).
-    </div>
+        ${this.renderSection(
+          "Stundenplan24",
+          "splan24",
+          html`
+            <div class="hint">
+              Wähle hier deinen <b>sensor.&lt;klasse&gt;_woche</b>. Dadurch werden Datenquelle automatisch gesetzt und der Offset-Helper im Hintergrund erkannt
+              (<code>${offsetInfo || "—"}</code>).
+            </div>
 
-    <ha-entity-picker
-      .hass=${this.hass}
-      .value=${cfg.splan24_entity ?? ""}
-      .includeDomains=${["sensor"]}
-      .label=${"Stundenplan24 Woche Sensor"}
-      @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value)}
-    ></ha-entity-picker>
+            ${pickerOk
+              ? html`
+                  <ha-entity-picker
+                    .hass=${this.hass}
+                    .value=${cfg.splan24_entity ?? ""}
+                    .includeDomains=${["sensor"]}
+                    .label=${"Stundenplan24 Woche Sensor"}
+                    @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value)}
+                  ></ha-entity-picker>
+                `
+              : html`
+                  <div class="hint" style="opacity:0.9">
+                    (Deine HA-Version lädt <code>ha-entity-picker</code> hier nicht. Fallback: Entity-ID manuell eintragen.)
+                  </div>
+                  <ha-textfield
+                    label="Stundenplan24 Woche Sensor (entity_id)"
+                    .value=${cfg.splan24_entity ?? ""}
+                    @input=${(e: any) => this.setSplan24Entity(e.target.value)}
+                    placeholder="sensor.05b_woche"
+                  ></ha-textfield>
+                `}
 
-    <div class="sub" style="margin-top:6px;">
-      Attribut fest: <code>rows_ha</code>
-    </div>
-  `
-)}
-
-
-
+            <div class="sub" style="margin-top:6px;">
+              Attribut automatisch: <code>${cfg.source_attribute || "rows_ha"}</code>
+            </div>
+          `
+        )}
 
         ${this.renderSection(
           "Datenquellen",
@@ -1575,13 +1649,12 @@ ${this.renderSection(
             ${cfg.week_mode === "week_map"
               ? html`
                   <div class="grid2">
-                    <ha-entity-picker
-                      .hass=${this.hass}
+                    <ha-textfield
+                      label="week_map_entity (entity_id)"
                       .value=${cfg.week_map_entity ?? ""}
-                      .includeDomains=${["sensor", "input_text"]}
-                      .label=${"week_map_entity"}
-                      @value-changed=${(e: any) => this.setValue("week_map_entity", e.detail.value)}
-                    ></ha-entity-picker>
+                      @input=${(e: any) => this.onText(e, "week_map_entity")}
+                      placeholder="sensor.week_map"
+                    ></ha-textfield>
 
                     <ha-textfield label="week_map_attribute" .value=${cfg.week_map_attribute ?? ""} @input=${(e: any) => this.onText(e, "week_map_attribute")}></ha-textfield>
                   </div>
@@ -1591,22 +1664,20 @@ ${this.renderSection(
             ${cfg.week_mode !== "off"
               ? html`
                   <div class="grid2">
-                    <ha-entity-picker
-                      .hass=${this.hass}
+                    <ha-textfield
+                      label="source_entity_a (entity_id)"
                       .value=${cfg.source_entity_a ?? ""}
-                      .includeDomains=${["sensor"]}
-                      .label=${"source_entity_a"}
-                      @value-changed=${(e: any) => this.setValue("source_entity_a", e.detail.value)}
-                    ></ha-entity-picker>
+                      @input=${(e: any) => this.onText(e, "source_entity_a")}
+                      placeholder="sensor.05b_woche_a"
+                    ></ha-textfield>
                     <ha-textfield label="source_attribute_a" .value=${cfg.source_attribute_a ?? ""} @input=${(e: any) => this.onText(e, "source_attribute_a")}></ha-textfield>
 
-                    <ha-entity-picker
-                      .hass=${this.hass}
+                    <ha-textfield
+                      label="source_entity_b (entity_id)"
                       .value=${cfg.source_entity_b ?? ""}
-                      .includeDomains=${["sensor"]}
-                      .label=${"source_entity_b"}
-                      @value-changed=${(e: any) => this.setValue("source_entity_b", e.detail.value)}
-                    ></ha-entity-picker>
+                      @input=${(e: any) => this.onText(e, "source_entity_b")}
+                      placeholder="sensor.05b_woche_b"
+                    ></ha-textfield>
                     <ha-textfield label="source_attribute_b" .value=${cfg.source_attribute_b ?? ""} @input=${(e: any) => this.onText(e, "source_attribute_b")}></ha-textfield>
                   </div>
                 `
@@ -1740,6 +1811,6 @@ customElements.get("stundenplan-card-editor") || customElements.define("stundenp
 (window as any).customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan mit Wochenblättern (Offset Helper auto) + Stundenplan24 Notes-Layout",
+  description: "Stundenplan mit Wochenblättern (Offset Helper auto) + Stundenplan24 Notes-Layout + Zeiten",
   preview: true,
 });
