@@ -1318,6 +1318,7 @@ private setSplan24Entity(entityId: string) {
 
 
 
+
   private renderSection(title: string, key: string, body: TemplateResult) {
     const open = !!this._open[key];
     return html`
@@ -1529,24 +1530,20 @@ ${this.renderSection(
       (<code>${offsetInfo || "—"}</code>).
     </div>
 
-    <ha-form
+    <ha-entity-picker
       .hass=${this.hass}
-      .data=${{ splan24_entity: cfg.splan24_entity ?? "" }}
-      .schema=${[
-        {
-          name: "splan24_entity",
-          label: "Stundenplan24 Woche Sensor",
-          selector: { entity: { domain: "sensor" } },
-        },
-      ]}
-      @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value?.splan24_entity)}
-    ></ha-form>
+      .value=${cfg.splan24_entity ?? ""}
+      .includeDomains=${["sensor"]}
+      .label=${"Stundenplan24 Woche Sensor"}
+      @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value)}
+    ></ha-entity-picker>
 
     <div class="sub" style="margin-top:6px;">
       Attribut fest: <code>rows_ha</code>
     </div>
   `
 )}
+
 
 
 

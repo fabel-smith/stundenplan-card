@@ -1555,24 +1555,20 @@ ${this.renderSection(
       (<code>${s || "—"}</code>).
     </div>
 
-    <ha-form
+    <ha-entity-picker
       .hass=${this.hass}
-      .data=${{ splan24_entity: t.splan24_entity ?? "" }}
-      .schema=${[
-        {
-          name: "splan24_entity",
-          label: "Stundenplan24 Woche Sensor",
-          selector: { entity: { domain: "sensor" } }
-        }
-      ]}
-      @value-changed=${(r) => this.setSplan24Entity(r.detail.value?.splan24_entity)}
-    ></ha-form>
+      .value=${t.splan24_entity ?? ""}
+      .includeDomains=${["sensor"]}
+      .label=${"Stundenplan24 Woche Sensor"}
+      @value-changed=${(r) => this.setSplan24Entity(r.detail.value)}
+    ></ha-entity-picker>
 
     <div class="sub" style="margin-top:6px;">
       Attribut fest: <code>rows_ha</code>
     </div>
   `
     )}
+
 
 
 
