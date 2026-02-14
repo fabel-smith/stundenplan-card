@@ -731,7 +731,27 @@ const v = (D = class extends U {
     value = Math.max(min, Math.min(max, value));
 
     const domain = s.split(".")[0];
-    await this.hass.callService(domain, "set_value", { entity_id: s, value });
+    try {
+      // 1) Offset setzen (triggert async_set_native_value in deiner Integration)
+      await this.hass.callService(domain, "set_value", { entity_id: s, value });
+
+      // 2) Plan-Entities aktiv neu aktualisieren, damit Lovelace sofort neue rows_table bekommt
+      //    (bei manchen Setups kommt das Coordinator-Update nicht zuverlässig in der Card an)
+      const toUpdate = [
+        s,
+        (t.source_entity ?? "").trim(),
+        (t.source_entity_a ?? "").trim(),
+        (t.source_entity_b ?? "").trim(),
+        (t.week_map_entity ?? "").trim(),
+      ].filter((x) => !!x);
+      if (toUpdate.length) {
+        await this.hass.callService("homeassistant", "update_entity", { entity_id: toUpdate });
+      }
+    } catch (err) {
+      // Silent fail is super confusing; at least log it.
+      // eslint-disable-next-line no-console
+      console.error("stundenplan-card: setWeekOffset failed", err);
+    }
 
     this.requestUpdate();
   }
