@@ -1529,20 +1529,25 @@ ${this.renderSection(
       (<code>${offsetInfo || "—"}</code>).
     </div>
 
-<hui-entity-picker
-  .hass=${this.hass}
-  .value=${cfg.splan24_entity ?? ""}
-  .includeDomains=${["sensor"]}
-  .label=${"Stundenplan24 Woche Sensor"}
-  @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value)}
-></hui-entity-picker>
-
+    <ha-form
+      .hass=${this.hass}
+      .data=${{ splan24_entity: cfg.splan24_entity ?? "" }}
+      .schema=${[
+        {
+          name: "splan24_entity",
+          label: "Stundenplan24 Woche Sensor",
+          selector: { entity: { domain: "sensor" } },
+        },
+      ]}
+      @value-changed=${(e: any) => this.setSplan24Entity(e.detail.value?.splan24_entity)}
+    ></ha-form>
 
     <div class="sub" style="margin-top:6px;">
       Attribut fest: <code>rows_ha</code>
     </div>
   `
 )}
+
 
 
         ${this.renderSection(
