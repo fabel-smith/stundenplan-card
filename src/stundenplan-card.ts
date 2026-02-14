@@ -1655,7 +1655,7 @@ export class StundenplanCardEditor extends LitElement {
     const cfg = this._config;
 
     return html`
-      <div class="wrap">
+      <div class="wrap" =${(e: any) => e?.stopPropagation?.()} =${(e: any) => e?.stopPropagation?.()} =${(e: any) => e?.stopPropagation?.()} =${(e: any) => e?.stopPropagation?.()}>
         ${this.renderSection(
           "Allgemein",
           "general",
@@ -1726,6 +1726,7 @@ export class StundenplanCardEditor extends LitElement {
               <ha-select
                 .label=${"Quelle"}
                 .value=${(cfg.source_type ?? "manual")}
+                =${(e: any) => e?.stopPropagation?.()}
                 @selected=${(e: any) => { try { e?.stopPropagation?.(); this.setSourceType(e.detail?.value ?? e.target?.value ?? e?.detail?.selected); } catch (err) { console.error("stundenplan-card editor: setSourceType failed", err); } }}
                 @value-changed=${(e: any) => { try { e?.stopPropagation?.(); this.setSourceType(e.detail?.value ?? e.target?.value); } catch (err) { console.error("stundenplan-card editor: setSourceType failed", err); } }}
               >

@@ -248,7 +248,7 @@ let N = class extends HTMLElement {
 };
 N.elementStyles = [], N.shadowRootOptions = { mode: "open" }, N[V("elementProperties")] = /* @__PURE__ */ new Map(), N[V("finalized")] = /* @__PURE__ */ new Map(), de?.({ ReactiveElement: N }), (dt.reactiveElementVersions ??= []).push("2.1.2");
 const xt = globalThis, jt = (r) => r, lt = xt.trustedTypes, Ot = lt ? lt.createPolicy("lit-html", { createHTML: (r) => r }) : void 0, Jt = "$lit$", E = `lit$${Math.random().toFixed(9).slice(2)}$`, Vt = "?" + E, _e = `<${Vt}>`, j = document, K = () => j.createComment(""), Y = (r) => r === null || typeof r != "object" && typeof r != "function", St = Array.isArray, pe = (r) => St(r) || typeof r?.[Symbol.iterator] == "function", ft = `[ 	
-\f\r]`, J = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, Wt = /-->/g, Pt = />/g, T = RegExp(`>|${ft}(?:([^\\s"'>=/]+)(${ft}*=${ft}*(?:[^ 	
+\f\r]`, J = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, Pt = /-->/g, Wt = />/g, T = RegExp(`>|${ft}(?:([^\\s"'>=/]+)(${ft}*=${ft}*(?:[^ 	
 \f\r"'\`<>=]|("|')|))|$)`, "g"), Nt = /'/g, Ut = /"/g, Kt = /^(?:script|style|textarea|title)$/i, ge = (r) => (t, ...e) => ({ _$litType$: r, strings: t, values: e }), d = ge(1), H = /* @__PURE__ */ Symbol.for("lit-noChange"), f = /* @__PURE__ */ Symbol.for("lit-nothing"), Ht = /* @__PURE__ */ new WeakMap(), R = j.createTreeWalker(j, 129);
 function Yt(r, t) {
   if (!St(r) || !r.hasOwnProperty("raw")) throw Error("invalid template strings array");
@@ -260,7 +260,7 @@ const fe = (r, t) => {
   for (let l = 0; l < e; l++) {
     const a = r[l];
     let c, _, h = -1, p = 0;
-    for (; p < a.length && (o.lastIndex = p, _ = o.exec(a), _ !== null); ) p = o.lastIndex, o === J ? _[1] === "!--" ? o = Wt : _[1] !== void 0 ? o = Pt : _[2] !== void 0 ? (Kt.test(_[2]) && (i = RegExp("</" + _[2], "g")), o = T) : _[3] !== void 0 && (o = T) : o === T ? _[0] === ">" ? (o = i ?? J, h = -1) : _[1] === void 0 ? h = -2 : (h = o.lastIndex - _[2].length, c = _[1], o = _[3] === void 0 ? T : _[3] === '"' ? Ut : Nt) : o === Ut || o === Nt ? o = T : o === Wt || o === Pt ? o = J : (o = T, i = void 0);
+    for (; p < a.length && (o.lastIndex = p, _ = o.exec(a), _ !== null); ) p = o.lastIndex, o === J ? _[1] === "!--" ? o = Pt : _[1] !== void 0 ? o = Wt : _[2] !== void 0 ? (Kt.test(_[2]) && (i = RegExp("</" + _[2], "g")), o = T) : _[3] !== void 0 && (o = T) : o === T ? _[0] === ">" ? (o = i ?? J, h = -1) : _[1] === void 0 ? h = -2 : (h = o.lastIndex - _[2].length, c = _[1], o = _[3] === void 0 ? T : _[3] === '"' ? Ut : Nt) : o === Ut || o === Nt ? o = T : o === Pt || o === Wt ? o = J : (o = T, i = void 0);
     const u = o === T && r[l + 1].startsWith("/>") ? " " : "";
     n += o === J ? a + _e : h >= 0 ? (s.push(c), a.slice(0, h) + Jt + a.slice(h) + E + u) : a + E + (h === -2 ? l : u);
   }
@@ -800,10 +800,10 @@ const v = (C = class extends U {
     const e = C.getStubConfig(), s = Array.isArray(t.days) && t.days.length ? t.days.map((h) => (h ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], n = (Array.isArray(t.rows) ? t.rows : []).map((h) => {
       if (ct(h))
         return { break: !0, time: (h.time ?? "").toString(), label: (h.label ?? "Pause").toString() };
-      const p = Array.isArray(h?.cells) ? h.cells : [], u = Array.from({ length: s.length }, (w, x) => (p[x] ?? "").toString()), g = Array.isArray(h?.cell_styles) ? h.cell_styles : [], O = Array.from({ length: s.length }, (w, x) => De(g[x])), B = (h?.time ?? "").toString(), y = mt(B), m = (h?.start ?? "").toString().trim(), W = (h?.end ?? "").toString().trim(), b = {
+      const p = Array.isArray(h?.cells) ? h.cells : [], u = Array.from({ length: s.length }, (w, x) => (p[x] ?? "").toString()), g = Array.isArray(h?.cell_styles) ? h.cell_styles : [], O = Array.from({ length: s.length }, (w, x) => De(g[x])), B = (h?.time ?? "").toString(), y = mt(B), m = (h?.start ?? "").toString().trim(), P = (h?.end ?? "").toString().trim(), b = {
         time: B,
         start: m || y.start || void 0,
-        end: W || y.end || void 0,
+        end: P || y.end || void 0,
         cells: u
       };
       return O.some((w) => !!w) && (b.cell_styles = O), b;
@@ -1109,7 +1109,7 @@ const v = (C = class extends U {
               <tr>
                 <th class="time">Stunde</th>
                 ${t.days.map((y, m) => {
-      const W = t.highlight_today && m === s ? "today" : "";
+      const P = t.highlight_today && m === s ? "today" : "";
       let b = "";
       if (g)
         b = this.fmtDDMMYYYY(g[m]);
@@ -1121,7 +1121,7 @@ const v = (C = class extends U {
         }
       }
       return d`
-                    <th class=${W} style=${`--sp-hl:${n};`}>
+                    <th class=${P} style=${`--sp-hl:${n};`}>
                       <div>${y}</div>
                       <div class="thDate">${b}</div>
                     </th>
@@ -1133,7 +1133,7 @@ const v = (C = class extends U {
             <tbody>
               ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${(t.days?.length ?? 0) + 1}>${this._noDataMsg}</td></tr>` : e.map((y) => {
       if (ct(y)) {
-        const F = mt(y.time), P = !!F.start && !!F.end && this.isNowBetween(F.start, F.end), z = !!t.highlight_breaks && P;
+        const F = mt(y.time), W = !!F.start && !!F.end && this.isNowBetween(F.start, F.end), z = !!t.highlight_breaks && W;
         let I = `--sp-hl:${o};`, G = "";
         return z && (I += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", G += `--sp-hl:${o}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), z && t.highlight_current_time_text && a && (I += `color:${a};`), d`
                     <tr class="break">
@@ -1142,7 +1142,7 @@ const v = (C = class extends U {
                     </tr>
                   `;
       }
-      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], w = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), x = s >= 0 ? W[s] ?? "" : "", te = s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), Et = m.start && m.end ? `${m.start}–${m.end}` : "";
+      const m = y, P = m.cells ?? [], b = m.cell_styles ?? [], w = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), x = s >= 0 ? P[s] ?? "" : "", te = s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), Et = m.start && m.end ? `${m.start}–${m.end}` : "";
       let gt = `--sp-hl:${o};`;
       return pt && t.highlight_current && w && (gt += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), pt && w && t.highlight_current_time_text && a && (gt += `color:${a};`), d`
                   <tr>
@@ -1153,11 +1153,11 @@ const v = (C = class extends U {
                       </div>
                     </td>
 
-                    ${t.days.map((F, P) => {
-        const z = this.filterCellText(W[P] ?? "", t), I = b[P] ?? null, G = t.highlight_today && P === s ? "today" : "";
+                    ${t.days.map((F, W) => {
+        const z = this.filterCellText(P[W] ?? "", t), I = b[W] ?? null, G = t.highlight_today && W === s ? "today" : "";
         let Ct = `--sp-hl:${n};` + Me(I, i);
         const se = !yt(z);
-        return pt && se && w && t.highlight_current_text && l && s >= 0 && P === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(z, t)}</td>`;
+        return pt && se && w && t.highlight_current_text && l && s >= 0 && W === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(z, t)}</td>`;
       })}
                   </tr>
                 `;
@@ -1407,7 +1407,7 @@ $([
   D()
 ], v.prototype, "_jsonError", 1);
 let Xt = v;
-function We(r, t, e) {
+function Pe(r, t, e) {
   r.dispatchEvent(
     new CustomEvent(t, {
       detail: e,
@@ -1422,7 +1422,7 @@ function M(r, t = !1) {
   const e = String(r).trim().toLowerCase();
   return ["1", "true", "yes", "on"].includes(e) ? !0 : ["0", "false", "no", "off"].includes(e) ? !1 : t;
 }
-function Pe(r) {
+function We(r) {
   return (r ?? "").split(",").map((t) => t.trim()).filter((t) => t.length > 0);
 }
 function Ne(r) {
@@ -1469,7 +1469,7 @@ const ut = class ut extends U {
     }
   }
   emit(t) {
-    this._config = t, We(this, "config-changed", { config: t });
+    this._config = t, Pe(this, "config-changed", { config: t });
   }
   setValue(t, e) {
     this._config && this.emit({ ...this._config, [t]: e });
@@ -1623,7 +1623,7 @@ const ut = class ut extends U {
     if (!this._config) return d``;
     const t = this._config;
     return d`
-      <div class="wrap">
+      <div class="wrap" =${(e) => e?.stopPropagation?.()} =${(e) => e?.stopPropagation?.()} =${(e) => e?.stopPropagation?.()} =${(e) => e?.stopPropagation?.()}>
         ${this.renderSection(
       "Allgemein",
       "general",
@@ -1634,7 +1634,7 @@ const ut = class ut extends U {
               <ha-textfield
                 label="Tage (CSV)"
                 .value=${Ne(t.days ?? [])}
-                @input=${(e) => this.setValue("days", Pe(e.target.value))}
+                @input=${(e) => this.setValue("days", We(e.target.value))}
                 helper="z.B. Mo, Di, Mi, Do, Fr"
               ></ha-textfield>
             </div>
@@ -1694,6 +1694,7 @@ const ut = class ut extends U {
               <ha-select
                 .label=${"Quelle"}
                 .value=${t.source_type ?? "manual"}
+                =${(e) => e?.stopPropagation?.()}
                 @selected=${(e) => {
         try {
           e?.stopPropagation?.(), this.setSourceType(e.detail?.value ?? e.target?.value ?? e?.detail?.selected);
