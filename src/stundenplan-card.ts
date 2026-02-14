@@ -1094,9 +1094,9 @@ const v = (D = class extends U {
 
             ${p ? d`
                   <div class="offsetInline">
-                    <button class="btnMini" @click=${() => h != null && this.setWeekOffset(t, h - 1)}>&lt;</button>
-                    <div class="offsetVal">${h ?? "?"}</div>
-                    <button class="btnMini" @click=${() => h != null && this.setWeekOffset(t, h + 1)}>&gt;</button>
+                    <button class="btnMini" @click=${() => this.setWeekOffset(t, (h ?? 0) - 1)}>&lt;</button>
+                    <div class="offsetVal">${h ?? 0}</div>
+                    <button class="btnMini" @click=${() => this.setWeekOffset(t, (h ?? 0) + 1)}>&gt;</button>
                   </div>
                 ` : d``}
           </div>

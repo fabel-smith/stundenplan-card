@@ -1091,9 +1091,9 @@ const $ = (B = class extends W {
 
             ${g ? c`
                   <div class="offsetInline">
-                    <button class="btnMini" @click=${() => u != null && this.setWeekOffset(e, u - 1)}>&lt;</button>
-                    <div class="offsetVal">${u ?? "?"}</div>
-                    <button class="btnMini" @click=${() => u != null && this.setWeekOffset(e, u + 1)}>&gt;</button>
+                    <button class="btnMini" @click=${() => this.setWeekOffset(e, (u ?? 0) - 1)}>&lt;</button>
+                    <div class="offsetVal">${u ?? 0}</div>
+                    <button class="btnMini" @click=${() => this.setWeekOffset(e, (u ?? 0) + 1)}>&gt;</button>
                   </div>
                 ` : c``}
           </div>
