@@ -1782,9 +1782,9 @@ const mt = class extends W {
                   ></ha-textfield>
                 ` : u``}
 
-                        ${t.source_type === "json" ? u`
+                        ${t.source_type === "legacy" ? u`
             <div class="hint" style="margin-top:10px;">
-                          Wechselwochen (A/B) wird nur bei Quelle „JSON-Datei“ angeboten.
+                          Wechselwochen (A/B) gehört zu „Single-Source (Legacy / einfach)“. 
                         </div>
 
                         <div class="grid2">
