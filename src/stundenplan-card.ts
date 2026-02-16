@@ -911,14 +911,18 @@ const v = (D = class extends U {
   }
   buildRowsFromArray(t, e) {
     if (!Array.isArray(e)) return null;
-    const s = t.days ?? [], i = (t.source_time_key ?? "time").toString(), n = e.map((o) => {
+    const s = t.days ?? [];
+    const tkCfg = (t.source_time_key ?? "time").toString().trim();
+    const tkAlt1 = "Stunde";
+    const tkAlt2 = "time";
+    const n = e.map((o) => {
       if (o?.break === !0)
         return {
           break: !0,
           time: (o.time ?? o[i] ?? "").toString(),
           label: (o.label ?? "Pause").toString()
         };
-      const l = (o?.time ?? o?.[i] ?? "").toString(), a = mt(l), c = Array.from({ length: s.length }, (u, g) => {
+      const l = (o?.time ?? o?.[tkCfg] ?? o?.[tkAlt1] ?? o?.[tkAlt2] ?? "").toString(), a = mt(l), c = Array.from({ length: s.length }, (u, g) => {
         const O = (s[g] ?? "").toString();
         return (o?.[O] ?? "").toString();
       }), _ = (o?.start ?? "").toString().trim() || a.start, h = (o?.end ?? "").toString().trim() || a.end;
@@ -928,16 +932,24 @@ const v = (D = class extends U {
   }
   getRowsFromEntity(t, e, s) {
     let i = this.readEntityJson(e, s);
-    // Legacy fallback: common REST attribute name is 'plan'
-    if (i == null && s && (s + '').toString().trim() && (s + '').toString().trim() !== 'plan') {
-      i = this.readEntityJson(e, 'plan');
-      if (i != null) {
-        // Ensure legacy time key defaults to 'Stunde' if not set
-        const tk = (t.source_time_key ?? '').toString().trim();
-        if (!tk) t = { ...t, source_time_key: 'Stunde' };
-      }
+    // Common REST patterns
+    if (i == null && s && (s + "").toString().trim() && (s + "").toString().trim() !== "plan") {
+      i = this.readEntityJson(e, "plan");
     }
-    return i == null && (i = this.readEntityJson(e, "rows_ha")), i == null && (i = this.readEntityJson(e, "rows")), i == null && (i = this.readEntityJson(e, "rows_table")), i == null && (i = this.readEntityJson(e, "rows_json")), Array.isArray(i) ? this.buildRowsFromArray(t, i) : null;
+    if (i == null) i = this.readEntityJson(e, "rows_ha");
+    if (i == null) i = this.readEntityJson(e, "rows");
+    if (i == null) i = this.readEntityJson(e, "rows_table");
+    if (i == null) i = this.readEntityJson(e, "rows_json");
+
+    // Unwrap object envelopes: { plan: [...] } or { rows: [...] }
+    if (i && typeof i === "object" && !Array.isArray(i)) {
+      const maybePlan = i.plan;
+      const maybeRows = i.rows;
+      if (Array.isArray(maybePlan)) i = maybePlan;
+      else if (Array.isArray(maybeRows)) i = maybeRows;
+    }
+
+    return Array.isArray(i) ? this.buildRowsFromArray(t, i) : null;
   }
   async loadJsonRows(t, e) {
     const s = (e ?? "").toString().trim();
