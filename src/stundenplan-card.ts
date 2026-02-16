@@ -1839,156 +1839,145 @@ const ut = class ut extends U {
               ></ha-form>
             </div>
 
-            ${["entity","legacy"].includes(t.source_type ?? "manual") ? d`
-                  ${((t.source_type ?? "manual") === "entity") && this.isHaEntityPickerAvailable() ? d`
-                        ${(() => {
-        const st = (t.source_type ?? "manual");
-        const all = Object.keys(this.hass?.states ?? {});
-        const e = st === "entity" ? all.filter((n) => /^sensor\./.test(n) && /_woche$/i.test(n)) : all.filter((n) => /^sensor\./.test(n));
-        const s = all.length;
-        return st === "entity" && (s < 20 || s > 0 && e.length === 0) ? d`<div class="hint">Lade Stundenplan-Sensoren…</div>` : d``;
-      })()}
-                        <ha-entity-picker
-                          .hass=${this.hass}
-                          .value=${(t.source_type ?? "manual") === "legacy" ? (t.source_entity_legacy ?? t.source_entity ?? "") : (t.source_entity_integration ?? t.source_entity ?? "")}
-                          .includeDomains=${["sensor"]}
-                          .entityFilter=${(entityId) => {
-        const id = (typeof entityId === "string")
-          ? entityId
-          : (entityId && typeof entityId === "object" && "entity_id" in entityId ? entityId.entity_id : "");
-        const sid = (id ?? "").toString();
-        if (!sid) return true;
-        const mode = (t.source_type ?? "manual");
-        // In Stundenplan24 (Integration) we only want the *_woche sensors
-        if (mode === "entity") return /_woche$/i.test(sid);
-        // Legacy/manual: allow any sensor (domain is already limited by includeDomains)
-        return true;
-      }}
-                          .label=${"Sensor auswählen"}
-                          @value-changed=${(e) => {
-        try {
-          const v = e.detail?.value ?? e.target?.value;
-          const id = (typeof v === "string") ? v : (v && typeof v === "object" ? v.entity_id : undefined);
-          this.setSourceEntity(id);
-        } catch (s) {
-          console.error("stundenplan-card editor: setSourceEntity failed", s);
-        }
-      }}
-                        ></ha-entity-picker>
-                      ` : d``}
-                      <ha-textfield
-                        label=${(t.source_type ?? "manual") === "legacy" ? "Single-Source Entity-ID" : "Stundenplan24 Entity-ID"}
-                        .value=${(t.source_type ?? "manual") === "legacy" ? (t.source_entity_legacy ?? t.source_entity ?? "") : (t.source_entity_integration ?? t.source_entity ?? "")}
-                        @input=${(e) => this.setSourceEntity(e.target.value)}
-                        placeholder=${(t.source_type ?? "manual") === "legacy" ? "sensor.stundenplan" : "sensor.05b_woche"}
-                      ></ha-textfield>
+            ${(t.source_type ?? "manual") === "entity" ? d`
+                  <div class="hint">Stundenplan24: bitte einen <code>sensor.*_woche</code> auswählen.</div>
 
-                      ${(t.source_type ?? "manual") === "legacy" ? d`
-                        <div class="grid2">
-                          <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-textfield>
-                          <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-textfield>
-                        </div>
-                        <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
-                      ` : d``}
-                ` : d``}
+                  ${this.isHaEntityPickerAvailable() ? d`
+                    ${(() => {
+                      const all = Object.keys(this.hass?.states ?? {});
+                      const matches = all.filter((id) => /^sensor\./.test(id) && /_woche$/i.test(id));
+                      // Better loading hint: show only if we have very few states OR none of the *_woche sensors exist yet
+                      return (all.length < 5 || matches.length === 0)
+                        ? d`<div class="hint">Keine <code>*_woche</code>-Sensoren gefunden – Integration noch nicht geladen?</div>`
+                        : d``;
+                    })()}
 
-            ${(t.source_type ?? "manual") === "json" ? d`
-                  <div class="hint">
-                    JSON kann z.B. aus <code>/config/www/</code> kommen → im UI als <code>/local/deinplan.json</code>.
-                    Unterstützt: Array von Rows oder Objekt mit <code>rows</code>.
-                  </div>
+                    <ha-entity-picker
+                      .hass=${this.hass}
+                      .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
+                      .includeDomains=${["sensor"]}
+                      .entityFilter=${(entityId) => {
+                        const id = (typeof entityId === "string")
+                          ? entityId
+                          : (entityId && typeof entityId === "object" && "entity_id" in entityId ? entityId.entity_id : "");
+                        const sid = (id ?? "").toString();
+                        return !sid || /_woche$/i.test(sid);
+                      }}
+                      .label=${"Stundenplan24 Sensor"}
+                      @value-changed=${(e) => {
+                        try {
+                          const v = e.detail?.value ?? e.target?.value;
+                          const id = (typeof v === "string") ? v : (v && typeof v === "object" ? v.entity_id : undefined);
+                          this.setSourceEntity(id);
+                        } catch (s) {
+                          console.error("stundenplan-card editor: setSourceEntity failed", s);
+                        }
+                      }}
+                    ></ha-entity-picker>
+                  ` : d``}
+
                   <ha-textfield
-                    label="JSON-URL / Pfad"
-                    .value=${t.json_url ?? ""}
-                    @input=${(e) => this.setJsonUrl(e.target.value)}
-                    placeholder="/local/stundenplan.json"
+                    label="Stundenplan24 Entity-ID (manuell)"
+                    .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
+                    @input=${(e) => this.setSourceEntity(e.target.value)}
+                    placeholder="sensor.05b_woche"
                   ></ha-textfield>
                 ` : d``}
 
-                        ${t.source_type === "legacy" ? d`
-            <div class="hint" style="margin-top:10px;">
-                          Wechselwochen (A/B) gehört zu „Single-Source (Legacy / einfach)“. 
-                        </div>
+            ${(t.source_type ?? "manual") === "legacy" ? d`
+                  <div class="hint">Single-Source (Legacy): beliebiger <code>sensor.*</code> (z.B. REST-Sensor). Attribut/Time-Key nach Datenformat.</div>
 
-                        <div class="grid2">
-                          <ha-form
-                            .hass=${this.hass}
-                            .data=${{
-        week_mode: t.week_mode ?? "off",
-        week_a_is_even_kw: E(t.week_a_is_even_kw, !0)
-      }}
-                            .schema=${[
-        {
-          name: "week_mode",
-          selector: {
-            select: {
-              mode: "list",
-              options: [
-                { value: "off", label: "off (deaktiviert)" },
-                { value: "kw_parity", label: "A/B nach Kalenderwoche" }
-              ]
-            }
-          }
-        },
-        {
-          name: "week_a_is_even_kw",
-          selector: {
-            select: {
-              mode: "list",
-              options: [
-                { value: !0, label: "Woche A = gerade KW" },
-                { value: !1, label: "Woche A = ungerade KW" }
-              ]
-            }
-          }
-        }
-      ]}
-                            .computeLabel=${(e) => e?.name === "week_mode" ? "Wechselwochen (A/B)" : e?.name === "week_a_is_even_kw" ? "Woche A" : e?.name}
-                            @value-changed=${(e) => {
-        try {
-          e?.stopPropagation?.();
-          const s = e?.detail?.value ?? {}, i = s.week_mode ?? t.week_mode ?? "off";
-          i !== (t.week_mode ?? "off") && this.setValue("week_mode", i);
-          const n = s.week_a_is_even_kw;
-          typeof n == "boolean" && n !== E(t.week_a_is_even_kw, !0) && this.setValue("week_a_is_even_kw", n);
-        } catch (s) {
-          console.error("stundenplan-card editor: week settings change failed", s);
-        }
-      }}
-                          ></ha-form>
-                        </div>${t.week_mode === "week_map" ? d`
-                              <div class="grid2">
-                                <ha-textfield
-                                  label="week_map_entity (entity_id)"
-                                  .value=${t.week_map_entity ?? ""}
-                                  @input=${(e) => this.onText(e, "week_map_entity")}
-                                  placeholder="sensor.week_map"
-                                ></ha-textfield>
+                  ${this.isHaEntityPickerAvailable() ? d`
+                    <ha-entity-picker
+                      .hass=${this.hass}
+                      .value=${(t.source_entity_legacy ?? t.source_entity ?? "")}
+                      .includeDomains=${["sensor"]}
+                      .entityFilter=${(entityId) => {
+                        // allow all sensors
+                        const id = (typeof entityId === "string")
+                          ? entityId
+                          : (entityId && typeof entityId === "object" && "entity_id" in entityId ? entityId.entity_id : "");
+                        const sid = (id ?? "").toString();
+                        return !sid || /^sensor\./.test(sid);
+                      }}
+                      .label=${"Legacy Sensor"}
+                      @value-changed=${(e) => {
+                        try {
+                          const v = e.detail?.value ?? e.target?.value;
+                          const id = (typeof v === "string") ? v : (v && typeof v === "object" ? v.entity_id : undefined);
+                          this.setSourceEntity(id);
+                        } catch (s) {
+                          console.error("stundenplan-card editor: setSourceEntity failed", s);
+                        }
+                      }}
+                    ></ha-entity-picker>
+                  ` : d``}
 
-                                <ha-textfield label="week_map_attribute" .value=${t.week_map_attribute ?? ""} @input=${(e) => this.onText(e, "week_map_attribute")}></ha-textfield>
-                              </div>
-                            ` : d``}
+                  <ha-textfield
+                    label="Single-Source Entity-ID (manuell)"
+                    .value=${(t.source_entity_legacy ?? t.source_entity ?? "")}
+                    @input=${(e) => this.setSourceEntity(e.target.value)}
+                    placeholder="sensor.stundenplan"
+                  ></ha-textfield>
 
-                        ${t.week_mode !== "off" ? d`
-                              <div class="grid2">
-                                <ha-textfield
-                                  label="source_entity_a (entity_id)"
-                                  .value=${t.source_entity_a ?? ""}
-                                  @input=${(e) => this.onText(e, "source_entity_a")}
-                                  placeholder="sensor.05b_woche_a"
-                                ></ha-textfield>
-                                <ha-textfield label="source_attribute_a" .value=${t.source_attribute_a ?? ""} @input=${(e) => this.onText(e, "source_attribute_a")}></ha-textfield>
+                  <div class="grid2">
+                    <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-textfield>
+                    <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-textfield>
+                  </div>
+                  <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
 
-                                <ha-textfield
-                                  label="source_entity_b (entity_id)"
-                                  .value=${t.source_entity_b ?? ""}
-                                  @input=${(e) => this.onText(e, "source_entity_b")}
-                                  placeholder="sensor.05b_woche_b"
-                                ></ha-textfield>
-                                <ha-textfield label="source_attribute_b" .value=${t.source_attribute_b ?? ""} @input=${(e) => this.onText(e, "source_attribute_b")}></ha-textfield>
-                              </div>
-                            ` : d``}
-            ` : d``}
+                  <div class="hint" style="margin-top:10px;">
+                    Wechselwochen (A/B) gehört zu „Single-Source (Legacy / einfach)“.
+                  </div>
+
+                  <div class="grid2">
+                    <ha-form
+                      .hass=${this.hass}
+                      .data=${{
+                        week_mode: t.week_mode ?? "off",
+                        week_a_is_even_kw: E(t.week_a_is_even_kw, !0)
+                      }}
+                      .schema=${[
+                        {
+                          name: "week_mode",
+                          selector: {
+                            select: {
+                              mode: "list",
+                              options: [
+                                { value: "off", label: "off (deaktiviert)" },
+                                { value: "kw_parity", label: "A/B nach Kalenderwoche" }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          name: "week_a_is_even_kw",
+                          selector: {
+                            select: {
+                              mode: "list",
+                              options: [
+                                { value: !0, label: "Woche A = gerade KW" },
+                                { value: !1, label: "Woche A = ungerade KW" }
+                              ]
+                            }
+                          }
+                        }
+                      ]}
+                      .computeLabel=${(e) => e?.name === "week_mode" ? "Wechselwochen (A/B)" : e?.name === "week_a_is_even_kw" ? "Woche A" : e?.name}
+                      @value-changed=${(e) => {
+                        try {
+                          e?.stopPropagation?.();
+                          const s = e?.detail?.value ?? {}, i = s.week_mode ?? t.week_mode ?? "off";
+                          i !== (t.week_mode ?? "off") && this.setValue("week_mode", i);
+                          const n = s.week_a_is_even_kw;
+                          typeof n == "boolean" && n !== E(t.week_a_is_even_kw, !0) && this.setValue("week_a_is_even_kw", n);
+                        } catch (s) {
+                          console.error("stundenplan-card editor: week settings change failed", s);
+                        }
+                      }}
+                    ></ha-form>
+                  </div>
+` : d``}
 
           `
     )}
