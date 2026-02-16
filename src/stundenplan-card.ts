@@ -1156,7 +1156,9 @@ const v = (D = class extends U {
                     </tr>
                   `;
       }
-      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], w = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), x = s >= 0 ? W[s] ?? "" : "", te = s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), Et = m.start && m.end ? `${m.start}–${m.end}` : "";
+      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], w = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), x = s >= 0 ? W[s] ?? "" : "", te = s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), __rng = mt(m.time),
+      __timeHasRange = !!(__rng.start && __rng.end),
+      Et = (!__timeHasRange && m.start && m.end) ? `${m.start}–${m.end}` : "";
       let gt = `--sp-hl:${o};`;
       return pt && t.highlight_current && w && (gt += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), pt && w && t.highlight_current_time_text && a && (gt += `color:${a};`), d`
                   <tr>
