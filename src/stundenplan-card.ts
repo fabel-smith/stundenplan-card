@@ -928,6 +928,15 @@ const v = (D = class extends U {
   }
   getRowsFromEntity(t, e, s) {
     let i = this.readEntityJson(e, s);
+    // Legacy fallback: common REST attribute name is 'plan'
+    if (i == null && s && (s + '').toString().trim() && (s + '').toString().trim() !== 'plan') {
+      i = this.readEntityJson(e, 'plan');
+      if (i != null) {
+        // Ensure legacy time key defaults to 'Stunde' if not set
+        const tk = (t.source_time_key ?? '').toString().trim();
+        if (!tk) t = { ...t, source_time_key: 'Stunde' };
+      }
+    }
     return i == null && (i = this.readEntityJson(e, "rows_ha")), i == null && (i = this.readEntityJson(e, "rows")), i == null && (i = this.readEntityJson(e, "rows_table")), i == null && (i = this.readEntityJson(e, "rows_json")), Array.isArray(i) ? this.buildRowsFromArray(t, i) : null;
   }
   async loadJsonRows(t, e) {
