@@ -1904,8 +1904,8 @@ const ut = class ut extends U {
                   <ha-textfield
                     label="Stundenplan24 Entity-ID (manuell)"
                     .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
-                    @input=${(e) => this.setSourceEntity(e.target.value)}
-                    placeholder="sensor.05b_woche"
+                    @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
+placeholder="sensor.05b_woche"
                   ></ha-textfield>
                 ` : d``}
 
@@ -1941,8 +1941,8 @@ const ut = class ut extends U {
                   <ha-textfield
                     label="Single-Source Entity-ID (manuell)"
                     .value=${(t.source_entity_legacy ?? t.source_entity ?? "")}
-                    @input=${(e) => this.setSourceEntity(e.target.value)}
-                    placeholder="sensor.stundenplan"
+                    @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
+placeholder="sensor.stundenplan"
                   ></ha-textfield>
 
                   <div class="grid2">
