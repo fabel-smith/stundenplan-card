@@ -1925,8 +1925,8 @@ const ut = class ut extends U {
                   ></ha-textfield>
 
                   <div class="grid2">
-                    <ha-textfield label="Attribut" .value=${t.source_attribute_legacy ?? ""} @input=${(e) => this.onText(e, "source_attribute_legacy")} placeholder="plan"></ha-textfield>
-                    <ha-textfield label="Time-Key" .value=${t.source_time_key_legacy ?? ""} @input=${(e) => this.onText(e, "source_time_key_legacy")} placeholder="Stunde"></ha-textfield>
+                    <ha-textfield label="Attribut" .value=${t.source_attribute_legacy ?? ""} @value-changed=${(e) => this.onText(e, "source_attribute_legacy")} placeholder="plan"></ha-textfield>
+                    <ha-textfield label="Time-Key" .value=${t.source_time_key_legacy ?? ""} @value-changed=${(e) => this.onText(e, "source_time_key_legacy")} placeholder="Stunde"></ha-textfield>
                   </div>
                   <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
 

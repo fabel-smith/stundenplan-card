@@ -34,10 +34,10 @@ const de = (e) => new qt(typeof e == "string" ? e : e + "", void 0, Et), Gt = (e
   let i = "";
   for (const s of t.cssRules) i += s.cssText;
   return de(i);
-})(e) : e, { is: _e, defineProperty: pe, getOwnPropertyDescriptor: fe, getOwnPropertyNames: me, getOwnPropertySymbols: ye, getPrototypeOf: we } = Object, yt = globalThis, Ut = yt.trustedTypes, be = Ut ? Ut.emptyScript : "", ve = yt.reactiveElementPolyfillSupport, Z = (e, t) => e, pt = { toAttribute(e, t) {
+})(e) : e, { is: _e, defineProperty: pe, getOwnPropertyDescriptor: fe, getOwnPropertyNames: me, getOwnPropertySymbols: ye, getPrototypeOf: we } = Object, yt = globalThis, Ut = yt.trustedTypes, ve = Ut ? Ut.emptyScript : "", be = yt.reactiveElementPolyfillSupport, Z = (e, t) => e, pt = { toAttribute(e, t) {
   switch (t) {
     case Boolean:
-      e = e ? be : null;
+      e = e ? ve : null;
       break;
     case Object:
     case Array:
@@ -245,7 +245,7 @@ let z = class extends HTMLElement {
   firstUpdated(e) {
   }
 };
-z.elementStyles = [], z.shadowRootOptions = { mode: "open" }, z[Z("elementProperties")] = /* @__PURE__ */ new Map(), z[Z("finalized")] = /* @__PURE__ */ new Map(), ve?.({ ReactiveElement: z }), (yt.reactiveElementVersions ??= []).push("2.1.2");
+z.elementStyles = [], z.shadowRootOptions = { mode: "open" }, z[Z("elementProperties")] = /* @__PURE__ */ new Map(), z[Z("finalized")] = /* @__PURE__ */ new Map(), be?.({ ReactiveElement: z }), (yt.reactiveElementVersions ??= []).push("2.1.2");
 const Mt = globalThis, Lt = (e) => e, ft = Mt.trustedTypes, zt = ft ? ft.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, Qt = "$lit$", M = `lit$${Math.random().toFixed(9).slice(2)}$`, Xt = "?" + M, $e = `<${Xt}>`, N = document, q = () => N.createComment(""), G = (e) => e === null || typeof e != "object" && typeof e != "function", Dt = Array.isArray, xe = (e) => Dt(e) || typeof e?.[Symbol.iterator] == "function", $t = `[ 	
 \f\r]`, Y = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, Ft = /-->/g, Bt = />/g, W = RegExp(`>|${$t}(?:([^\\s"'>=/]+)(${$t}*=${$t}*(?:[^ 	
 \f\r"'\`<>=]|("|')|))|$)`, "g"), Jt = /'/g, Vt = /"/g, te = /^(?:script|style|textarea|title)$/i, Se = (e) => (t, ...i) => ({ _$litType$: e, strings: t, values: i }), c = Se(1), B = /* @__PURE__ */ Symbol.for("lit-noChange"), m = /* @__PURE__ */ Symbol.for("lit-nothing"), It = /* @__PURE__ */ new WeakMap(), O = N.createTreeWalker(N, 129);
@@ -278,8 +278,8 @@ class Q {
     for (; (r = O.nextNode()) !== null && a.length < l; ) {
       if (r.nodeType === 1) {
         if (r.hasAttributes()) for (const d of r.getAttributeNames()) if (d.endsWith(Qt)) {
-          const h = u[o++], _ = r.getAttribute(d).split(M), b = /([.?@])?(.*)/.exec(h);
-          a.push({ type: 1, index: n, name: b[2], strings: _, ctor: b[1] === "." ? Ee : b[1] === "?" ? Ce : b[1] === "@" ? Me : wt }), r.removeAttribute(d);
+          const h = u[o++], _ = r.getAttribute(d).split(M), v = /([.?@])?(.*)/.exec(h);
+          a.push({ type: 1, index: n, name: v[2], strings: _, ctor: v[1] === "." ? Ee : v[1] === "?" ? Ce : v[1] === "@" ? Me : wt }), r.removeAttribute(d);
         } else d.startsWith(M) && (a.push({ type: 6, index: n }), r.removeAttribute(d));
         if (te.test(r.tagName)) {
           const d = r.textContent.split(M), h = d.length - 1;
@@ -802,7 +802,7 @@ const x = (K = class extends F {
     const t = K.getStubConfig(), i = Array.isArray(e.days) && e.days.length ? e.days.map((p) => (p ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], s = (Array.isArray(e.rows) ? e.rows : []).map((p) => {
       if (mt(p))
         return { break: !0, time: (p.time ?? "").toString(), label: (p.label ?? "Pause").toString() };
-      const P = Array.isArray(p?.cells) ? p.cells : [], j = Array.from({ length: i.length }, (R, w) => (P[w] ?? "").toString()), v = Array.isArray(p?.cell_styles) ? p.cell_styles : [], U = Array.from({ length: i.length }, (R, w) => Ue(v[w])), tt = (p?.time ?? "").toString(), V = nt(tt), y = (p?.start ?? "").toString().trim(), f = (p?.end ?? "").toString().trim(), S = {
+      const P = Array.isArray(p?.cells) ? p.cells : [], j = Array.from({ length: i.length }, (R, w) => (P[w] ?? "").toString()), b = Array.isArray(p?.cell_styles) ? p.cell_styles : [], U = Array.from({ length: i.length }, (R, w) => Ue(b[w])), tt = (p?.time ?? "").toString(), V = nt(tt), y = (p?.start ?? "").toString().trim(), f = (p?.end ?? "").toString().trim(), S = {
         time: tt,
         start: y || V.start || void 0,
         end: f || V.end || void 0,
@@ -814,11 +814,11 @@ const x = (K = class extends F {
       if (p === "manual" || p === "entity" || p === "json" || p === "legacy") return p;
       const P = ((e.source_entity ?? t.source_entity) + "").toString().trim();
       if (P) {
-        const j = ((e.source_attribute_legacy ?? "") + "").toString().trim(), v = ((e.source_time_key_legacy ?? "") + "").toString().trim();
-        return !(/_woche$/i.test(P) && (j === "" || j === "rows_table") && (v === "" || v === "time")) && (j || v) ? "legacy" : "entity";
+        const j = ((e.source_attribute_legacy ?? "") + "").toString().trim(), b = ((e.source_time_key_legacy ?? "") + "").toString().trim();
+        return !(/_woche$/i.test(P) && (j === "" || j === "rows_table") && (b === "" || b === "time")) && (j || b) ? "legacy" : "entity";
       }
       return "manual";
-    })(), d = (e.source_entity ?? t.source_entity).toString().trim(), h = (e.source_entity_integration ?? "").toString().trim(), _ = (e.source_entity_legacy ?? "").toString().trim(), b = u === "legacy" ? _ || d : u === "entity" && h || d, T = (e.week_offset_entity ?? "").toString().trim() || Fe(b);
+    })(), d = (e.source_entity ?? t.source_entity).toString().trim(), h = (e.source_entity_integration ?? "").toString().trim(), _ = (e.source_entity_legacy ?? "").toString().trim(), v = u === "legacy" ? _ || d : u === "entity" && h || d, T = (e.week_offset_entity ?? "").toString().trim() || Fe(v);
     return {
       type: (e.type ?? t.type).toString(),
       title: (e.title ?? t.title).toString(),
@@ -835,7 +835,7 @@ const x = (K = class extends F {
       highlight_current_text_color: (e.highlight_current_text_color ?? t.highlight_current_text_color).toString(),
       highlight_current_time_text: e.highlight_current_time_text ?? t.highlight_current_time_text,
       highlight_current_time_text_color: (e.highlight_current_time_text_color ?? t.highlight_current_time_text_color).toString(),
-      source_entity: b,
+      source_entity: v,
       source_entity_integration: h || "",
       source_entity_legacy: _ || "",
       source_attribute: u === "entity" ? "rows_table" : ((e.source_attribute_legacy ?? e.source_attribute ?? "") + "").toString().trim() || "plan",
@@ -1097,14 +1097,14 @@ const x = (K = class extends F {
   }
   render() {
     if (!this.config) return c``;
-    const e = this.config, t = this._rowsCache, i = this.getTodayIndex(e.days ?? []), s = (e.view_mode ?? "week").toString(), r = Number(e.days_ahead), n = Number.isFinite(r) ? Math.max(0, Math.min(6, Math.floor(r))) : 0, o = s === "rolling" && i >= 0 ? Array.from({ length: Math.min((e.days?.length ?? 0) - i, n + 1) }, (y, f) => i + f) : Array.from({ length: e.days?.length ?? 0 }, (y, f) => f), l = o.map((y) => e.days[y]), a = "1px solid var(--divider-color)", g = Yt(e.highlight_today_color ?? "", 0.12), u = Yt(e.highlight_current_color ?? "", 0.18), d = (e.highlight_current_text_color ?? "").toString().trim(), h = (e.highlight_current_time_text_color ?? "").toString().trim(), _ = e.week_mode !== "off", b = _ ? this.getActiveWeek(e) : null, T = this.getWeekOffsetValue(e), p = (e.source_type ?? "manual").toString(), P = (e.week_offset_entity ?? "").trim().length > 0, j = P && (p === "entity" || p === "legacy" && (e.week_mode ?? "off") !== "off"), v = this.getHeaderDaysFromEntity(e), U = v && v.length >= (e.days?.length ?? 0) ? v : null, tt = this.getBaseDate(e), V = this.mondayOfWeek(tt);
+    const e = this.config, t = this._rowsCache, i = this.getTodayIndex(e.days ?? []), s = (e.view_mode ?? "week").toString(), r = Number(e.days_ahead), n = Number.isFinite(r) ? Math.max(0, Math.min(6, Math.floor(r))) : 0, o = s === "rolling" && i >= 0 ? Array.from({ length: Math.min((e.days?.length ?? 0) - i, n + 1) }, (y, f) => i + f) : Array.from({ length: e.days?.length ?? 0 }, (y, f) => f), l = o.map((y) => e.days[y]), a = "1px solid var(--divider-color)", g = Yt(e.highlight_today_color ?? "", 0.12), u = Yt(e.highlight_current_color ?? "", 0.18), d = (e.highlight_current_text_color ?? "").toString().trim(), h = (e.highlight_current_time_text_color ?? "").toString().trim(), _ = e.week_mode !== "off", v = _ ? this.getActiveWeek(e) : null, T = this.getWeekOffsetValue(e), p = (e.source_type ?? "manual").toString(), P = (e.week_offset_entity ?? "").trim().length > 0, j = P && (p === "entity" || p === "legacy" && (e.week_mode ?? "off") !== "off"), b = this.getHeaderDaysFromEntity(e), U = b && b.length >= (e.days?.length ?? 0) ? b : null, tt = this.getBaseDate(e), V = this.mondayOfWeek(tt);
     return c`
       <ha-card>
         <div class="headerRow">
           <div class="title">${e.title ?? ""}</div>
 
           <div class="headRight">
-            ${_ ? c`<div class="weekBadgeInline">Woche <b>${b}</b></div>` : c``}
+            ${_ ? c`<div class="weekBadgeInline">Woche <b>${v}</b></div>` : c``}
 
             ${j ? c`
                   <div class="offsetInline">
@@ -1155,11 +1155,11 @@ const x = (K = class extends F {
                     </tr>
                   `;
       }
-      const f = y, S = f.cells ?? [], R = f.cell_styles ?? [], w = !!f.start && !!f.end && this.isNowBetween(f.start, f.end), et = i >= 0 ? S[i] ?? "" : "", it = i >= 0 ? this.filterCellText(et, e) : "", le = i >= 0 ? xt(it) : !1, bt = !(e.free_only_column_highlight && le), Rt = nt(f.time), he = !!(Rt.start && Rt.end), Wt = !he && f.start && f.end ? `${f.start}–${f.end}` : "";
-      let vt = `--sp-hl:${u};`;
-      return bt && e.highlight_current && w && (vt += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), bt && w && e.highlight_current_time_text && h && (vt += `color:${h};`), c`
+      const f = y, S = f.cells ?? [], R = f.cell_styles ?? [], w = !!f.start && !!f.end && this.isNowBetween(f.start, f.end), et = i >= 0 ? S[i] ?? "" : "", it = i >= 0 ? this.filterCellText(et, e) : "", le = i >= 0 ? xt(it) : !1, vt = !(e.free_only_column_highlight && le), Rt = nt(f.time), he = !!(Rt.start && Rt.end), Wt = !he && f.start && f.end ? `${f.start}–${f.end}` : "";
+      let bt = `--sp-hl:${u};`;
+      return vt && e.highlight_current && w && (bt += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), vt && w && e.highlight_current_time_text && h && (bt += `color:${h};`), c`
                   <tr>
-                    <td class="time" style=${vt}>
+                    <td class="time" style=${bt}>
                       <div class="timeWrap">
                         <div class="timeSt">${f.time}</div>
                         ${Wt ? c`<div class="timeHm">${Wt}</div>` : c``}
@@ -1170,7 +1170,7 @@ const x = (K = class extends F {
         const H = o[st], L = this.filterCellText(S[H] ?? "", e), rt = R[H] ?? null, ce = e.highlight_today && H === i ? "today" : "";
         let Ot = `--sp-hl:${g};` + Le(rt, a);
         const ue = !xt(L);
-        return bt && ue && w && e.highlight_current_text && d && i >= 0 && st === i && (Ot += `color:${d};`), c`<td class=${ce} style=${Ot}>${this.renderCell(L, e)}</td>`;
+        return vt && ue && w && e.highlight_current_text && d && i >= 0 && st === i && (Ot += `color:${d};`), c`<td class=${ce} style=${Ot}>${this.renderCell(L, e)}</td>`;
       })}
                   </tr>
                 `;
@@ -1872,8 +1872,8 @@ const kt = class extends F {
                   ></ha-textfield>
 
                   <div class="grid2">
-                    <ha-textfield label="Attribut" .value=${t.source_attribute_legacy ?? ""} @input=${(i) => this.onText(i, "source_attribute_legacy")} placeholder="plan"></ha-textfield>
-                    <ha-textfield label="Time-Key" .value=${t.source_time_key_legacy ?? ""} @input=${(i) => this.onText(i, "source_time_key_legacy")} placeholder="Stunde"></ha-textfield>
+                    <ha-textfield label="Attribut" .value=${t.source_attribute_legacy ?? ""} @value-changed=${(i) => this.onText(i, "source_attribute_legacy")} placeholder="plan"></ha-textfield>
+                    <ha-textfield label="Time-Key" .value=${t.source_time_key_legacy ?? ""} @value-changed=${(i) => this.onText(i, "source_time_key_legacy")} placeholder="Stunde"></ha-textfield>
                   </div>
                   <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
 
