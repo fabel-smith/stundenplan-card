@@ -749,6 +749,8 @@ const v = (D = class extends U {
       type: "custom:stundenplan-card",
       title: "Mein Stundenplan",
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
+      view_mode: "week",
+      days_ahead: 0,
       highlight_today: !0,
       highlight_current: !0,
       highlight_breaks: !1,
@@ -807,7 +809,7 @@ const v = (D = class extends U {
         cells: u
       };
       return O.some((w) => !!w) && (b.cell_styles = O), b;
-    }), o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", a = (t.source_entity ?? e.source_entity).toString().trim(), _ = (t.week_offset_entity ?? "").toString().trim() || je(a), f = (() => {
+    }), vmRaw = ((t.view_mode ?? "week") + "").toString().trim(), vm = vmRaw === "rolling" ? "rolling" : "week", da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", a = (t.source_entity ?? e.source_entity).toString().trim(), _ = (t.week_offset_entity ?? "").toString().trim() || je(a), f = (() => {
       const raw = ((t.source_type ?? "") + "").toString().trim();
       if (raw === "manual" || raw === "entity" || raw === "json" || raw === "legacy") return raw;
       if (a) {
@@ -823,6 +825,8 @@ const v = (D = class extends U {
       type: (t.type ?? e.type).toString(),
       title: (t.title ?? e.title).toString(),
       days: s,
+      view_mode: vm,
+      days_ahead: daysAhead,
       highlight_today: t.highlight_today ?? e.highlight_today,
       highlight_current: t.highlight_current ?? e.highlight_current,
       highlight_breaks: t.highlight_breaks ?? e.highlight_breaks,
@@ -1094,7 +1098,7 @@ const v = (D = class extends U {
   }
   render() {
     if (!this.config) return d``;
-    const t = this.config, e = this._rowsCache, s = this.getTodayIndex(t.days ?? []), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), p = (t.week_offset_entity ?? "").trim().length > 0, u = this.getHeaderDaysFromEntity(t), g = u && u.length >= (t.days?.length ?? 0) ? u : null, O = this.getBaseDate(t), B = this.mondayOfWeek(O);
+    const t = this.config, e = this._rowsCache, s = this.getTodayIndex(t.days ?? []), vm = (t.view_mode ?? "week").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, idxs = vm === "rolling" && s >= 0 ? Array.from({ length: Math.min((t.days?.length ?? 0) - s, daysAhead + 1) }, (y, m) => s + m) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m), daysVis = idxs.map((y) => t.days[y]), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), p = (t.week_offset_entity ?? "").trim().length > 0, u = this.getHeaderDaysFromEntity(t), g = u && u.length >= (t.days?.length ?? 0) ? u : null, O = this.getBaseDate(t), B = this.mondayOfWeek(O);
     return d`
       <ha-card>
         <div class="headerRow">
@@ -1118,11 +1122,11 @@ const v = (D = class extends U {
             <thead>
               <tr>
                 <th class="time">Stunde</th>
-                ${t.days.map((y, m) => {
-      const W = t.highlight_today && m === s ? "today" : "";
+                ${daysVis.map((y, m) => { const orig = idxs[m];
+      const W = t.highlight_today && orig === s ? "today" : "";
       let b = "";
       if (g)
-        b = this.fmtDDMMYYYY(g[m]);
+        b = this.fmtDDMMYYYY(g[orig]);
       else {
         const w = Oe(y);
         if (w) {
@@ -1141,14 +1145,14 @@ const v = (D = class extends U {
             </thead>
 
             <tbody>
-              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${(t.days?.length ?? 0) + 1}>${this._noDataMsg}</td></tr>` : e.map((y) => {
+              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${(daysVis.length) + 1}>${this._noDataMsg}</td></tr>` : e.map((y) => {
       if (ct(y)) {
         const z = mt(y.time), P = !!z.start && !!z.end && this.isNowBetween(z.start, z.end), F = !!t.highlight_breaks && P;
         let I = `--sp-hl:${o};`, G = "";
         return F && (I += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", G += `--sp-hl:${o}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), F && t.highlight_current_time_text && a && (I += `color:${a};`), d`
                     <tr class="break">
                       <td class="time" style=${I}>${y.time}</td>
-                      <td colspan=${t.days.length} style=${G}>${y.label ?? ""}</td>
+                      <td colspan=${daysVis.length} style=${G}>${y.label ?? ""}</td>
                     </tr>
                   `;
       }
@@ -1163,8 +1167,8 @@ const v = (D = class extends U {
                       </div>
                     </td>
 
-                    ${t.days.map((z, P) => {
-        const F = this.filterCellText(W[P] ?? "", t), I = b[P] ?? null, G = t.highlight_today && P === s ? "today" : "";
+                    ${daysVis.map((z, P) => { const orig = idxs[P];
+        const F = this.filterCellText(W[orig] ?? "", t), I = b[orig] ?? null, G = t.highlight_today && orig === s ? "today" : "";
         let Ct = `--sp-hl:${n};` + Te(I, i);
         const se = !yt(F);
         return pt && se && w && t.highlight_current_text && l && s >= 0 && P === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(F, t)}</td>`;
@@ -1676,6 +1680,50 @@ const ut = class ut extends U {
                 helper="z.B. Mo, Di, Mi, Do, Fr"
               ></ha-textfield>
             </div>
+
+            <div class="grid2">
+              <ha-form
+                .hass=${this.hass}
+                .data=${{ view_mode: (t.view_mode ?? "week") }}
+                .schema=${[
+                  {
+                    name: "view_mode",
+                    selector: {
+                      select: {
+                        options: [
+                          { value: "week", label: "Ganze Woche" },
+                          { value: "rolling", label: "Ab heute (rolling)" }
+                        ]
+                      }
+                    }
+                  }
+                ]}
+                .computeLabel=${(e) => e?.name === "view_mode" ? "Ansicht" : e?.name}
+                @value-changed=${(e) => {
+                  try {
+                    e?.stopPropagation?.();
+                    const v = (e?.detail?.value ?? {}).view_mode ?? "week";
+                    this.setValue("view_mode", v);
+                  } catch (s) {
+                    console.error("stundenplan-card editor: view_mode change failed", s);
+                  }
+                }}
+              ></ha-form>
+
+              ${(t.view_mode ?? "week") === "rolling" ? d`
+                <ha-textfield
+                  label="Tage im Voraus (0=heute)"
+                  type="number"
+                  .value=${String(t.days_ahead ?? 0)}
+                  @input=${(e) => {
+                    const n = Number(e.target.value);
+                    this.setValue("days_ahead", Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0);
+                  }}
+                ></ha-textfield>
+              ` : d``}
+            </div>
+
+            <div class="hint">„Ab heute“ zeigt nur heute + X Folgetage (innerhalb der konfigurierten Wochenspalten).</div>
           `
     )}
 
