@@ -816,8 +816,8 @@ const v = (D = class extends U {
       if (raw === "manual" || raw === "entity" || raw === "json" || raw === "legacy") return raw;
       const a_guess = ((t.source_entity ?? e.source_entity) + "").toString().trim();
       if (a_guess) {
-        const attr = ((t.source_attribute ?? "") + "").toString().trim();
-        const tk = ((t.source_time_key ?? "") + "").toString().trim();
+        const attr = ((t.source_attribute_legacy ?? "") + "").toString().trim();
+        const tk = ((t.source_time_key_legacy ?? "") + "").toString().trim();
         const looksIntegration = /_woche$/i.test(a_guess) && (attr === "" || attr === "rows_table") && (tk === "" || tk === "time");
         if (!looksIntegration && (attr || tk)) return "legacy";
         return "entity";
@@ -848,8 +848,12 @@ const v = (D = class extends U {
       source_entity: a,
       source_entity_integration: a_int || "",
       source_entity_legacy: a_leg || "",
-      source_attribute: (f === "entity" ? "rows_table" : f === "legacy" ? (((t.source_attribute ?? "") + "").toString().trim() || "plan") : (t.source_attribute ?? e.source_attribute)).toString(),
-      source_time_key: (f === "entity" ? "time" : f === "legacy" ? (((t.source_time_key ?? "") + "").toString().trim() || "Stunde") : (t.source_time_key ?? e.source_time_key)).toString(),
+      source_attribute: (f === "entity")
+      ? "rows_table"
+      : (((t.source_attribute_legacy ?? t.source_attribute ?? "") + "").toString().trim() || "plan"),
+      source_time_key: (f === "entity")
+      ? "time"
+      : (((t.source_time_key_legacy ?? t.source_time_key ?? "") + "").toString().trim() || "Stunde"),
       source_type: f,
       json_url: (t.json_url ?? "").toString(),
       week_offset_entity: _,
@@ -1011,10 +1015,10 @@ const v = (D = class extends U {
       if (i === "B" && o)
         return this.getRowsFromEntity(t, o, a) ?? [];
       const c = (t.source_entity ?? "").trim();
-      return c ? this.getRowsFromEntity(t, c, (t.source_attribute ?? "").trim()) ?? [] : [];
+      return c ? this.getRowsFromEntity(t, c, (t.source_attribute_legacy ?? "").trim()) ?? [] : [];
     }
     const s = (t.source_entity ?? "").toString().trim();
-    return s ? this.getRowsFromEntity(t, s, (t.source_attribute ?? "").toString().trim()) ?? [] : [];
+    return s ? this.getRowsFromEntity(t, s, (t.source_attribute_legacy ?? "").toString().trim()) ?? [] : [];
   }
   recomputeRows() {
     if (!this.config) {
@@ -1921,8 +1925,8 @@ const ut = class ut extends U {
                   ></ha-textfield>
 
                   <div class="grid2">
-                    <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-textfield>
-                    <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-textfield>
+                    <ha-textfield label="Attribut" .value=${t.source_attribute_legacy ?? ""} @input=${(e) => this.onText(e, "source_attribute_legacy")} placeholder="plan"></ha-textfield>
+                    <ha-textfield label="Time-Key" .value=${t.source_time_key_legacy ?? ""} @input=${(e) => this.onText(e, "source_time_key_legacy")} placeholder="Stunde"></ha-textfield>
                   </div>
                   <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
 
