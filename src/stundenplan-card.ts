@@ -762,6 +762,8 @@ const v = (D = class extends U {
       highlight_current_time_text: !1,
       highlight_current_time_text_color: "#ff9100",
       source_entity: "",
+      source_entity_integration: "",
+      source_entity_legacy: "",
       source_attribute: "rows_table",
       source_time_key: "time",
       source_type: "manual",
@@ -809,18 +811,24 @@ const v = (D = class extends U {
         cells: u
       };
       return O.some((w) => !!w) && (b.cell_styles = O), b;
-    }), vmRaw = ((t.view_mode ?? "week") + "").toString().trim(), vm = vmRaw === "rolling" ? "rolling" : "week", da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", a = (t.source_entity ?? e.source_entity).toString().trim(), _ = (t.week_offset_entity ?? "").toString().trim() || je(a), f = (() => {
+    }), vmRaw = ((t.view_mode ?? "week") + "").toString().trim(), vm = vmRaw === "rolling" ? "rolling" : "week", da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", f = (() => {
       const raw = ((t.source_type ?? "") + "").toString().trim();
       if (raw === "manual" || raw === "entity" || raw === "json" || raw === "legacy") return raw;
-      if (a) {
+      const a_guess = ((t.source_entity ?? e.source_entity) + "").toString().trim();
+      if (a_guess) {
         const attr = ((t.source_attribute ?? "") + "").toString().trim();
         const tk = ((t.source_time_key ?? "") + "").toString().trim();
-        const looksIntegration = /_woche$/i.test(a) && (attr === "" || attr === "rows_table") && (tk === "" || tk === "time");
+        const looksIntegration = /_woche$/i.test(a_guess) && (attr === "" || attr === "rows_table") && (tk === "" || tk === "time");
         if (!looksIntegration && (attr || tk)) return "legacy";
         return "entity";
       }
       return "manual";
-    })();
+    })(),
+    a0 = (t.source_entity ?? e.source_entity).toString().trim(),
+    a_int = (t.source_entity_integration ?? "").toString().trim(),
+    a_leg = (t.source_entity_legacy ?? "").toString().trim(),
+    a = (f === "legacy" ? (a_leg || a0) : (f === "entity" ? (a_int || a0) : a0)),
+    _ = (t.week_offset_entity ?? "").toString().trim() || je(a);
     return {
       type: (t.type ?? e.type).toString(),
       title: (t.title ?? e.title).toString(),
@@ -838,6 +846,8 @@ const v = (D = class extends U {
       highlight_current_time_text: t.highlight_current_time_text ?? e.highlight_current_time_text,
       highlight_current_time_text_color: (t.highlight_current_time_text_color ?? e.highlight_current_time_text_color).toString(),
       source_entity: a,
+      source_entity_integration: a_int || "",
+      source_entity_legacy: a_leg || "",
       source_attribute: (f === "entity" ? "rows_table" : f === "legacy" ? (((t.source_attribute ?? "") + "").toString().trim() || "plan") : (t.source_attribute ?? e.source_attribute)).toString(),
       source_time_key: (f === "entity" ? "time" : f === "legacy" ? (((t.source_time_key ?? "") + "").toString().trim() || "Stunde") : (t.source_time_key ?? e.source_time_key)).toString(),
       source_type: f,
@@ -1529,23 +1539,36 @@ const ut = class ut extends U {
   setSourceEntity(t) {
     if (!this._config) return;
     const e = (t ?? "").toString().trim();
-    const st = (this._config.source_type ?? "entity").toString();
+    const st = (this._config.source_type ?? "manual").toString();
+
     if (st === "legacy") {
-      // Legacy: nur Entity setzen, Attribut/Time-Key beibehalten
+      // Single-Source: keep its own field + effective source_entity
       this.emit({
         ...this._config,
         source_type: "legacy",
-        source_entity: e
+        source_entity: e,
+        source_entity_legacy: e
       });
       return;
     }
-    // Stundenplan24-Integration
+
+    if (st === "entity") {
+      // Stundenplan24 (Integration): keep its own field + fixed attr/time + effective source_entity
+      this.emit({
+        ...this._config,
+        source_type: "entity",
+        source_entity: e,
+        source_entity_integration: e,
+        source_attribute: "rows_table",
+        source_time_key: "time"
+      });
+      return;
+    }
+
+    // fallback: just set effective
     this.emit({
       ...this._config,
-      source_type: "entity",
-      source_entity: e,
-      source_attribute: "rows_table",
-      source_time_key: "time"
+      source_entity: e
     });
   }
   setJsonUrl(t) {
@@ -1827,7 +1850,7 @@ const ut = class ut extends U {
       })()}
                         <ha-entity-picker
                           .hass=${this.hass}
-                          .value=${t.source_entity ?? ""}
+                          .value=${(t.source_type ?? "manual") === "legacy" ? (t.source_entity_legacy ?? t.source_entity ?? "") : (t.source_entity_integration ?? t.source_entity ?? "")}
                           .includeDomains=${["sensor"]}
                           .entityFilter=${(entityId) => {
         const id = (typeof entityId === "string")
@@ -1837,7 +1860,7 @@ const ut = class ut extends U {
         if (!sid) return true;
         const mode = (t.source_type ?? "manual");
         // In Stundenplan24 (Integration) we only want the *_woche sensors
-        if (mode === "integration") return /_woche$/i.test(sid);
+        if (mode === "entity") return /_woche$/i.test(sid);
         // Legacy/manual: allow any sensor (domain is already limited by includeDomains)
         return true;
       }}
@@ -1854,8 +1877,8 @@ const ut = class ut extends U {
                         ></ha-entity-picker>
                       ` : d``}
                       <ha-textfield
-                        label="…oder Entity-ID manuell"
-                        .value=${t.source_entity ?? ""}
+                        label=${(t.source_type ?? "manual") === "legacy" ? "Single-Source Entity-ID" : "Stundenplan24 Entity-ID"}
+                        .value=${(t.source_type ?? "manual") === "legacy" ? (t.source_entity_legacy ?? t.source_entity ?? "") : (t.source_entity_integration ?? t.source_entity ?? "")}
                         @input=${(e) => this.setSourceEntity(e.target.value)}
                         placeholder=${(t.source_type ?? "manual") === "legacy" ? "sensor.stundenplan" : "sensor.05b_woche"}
                       ></ha-textfield>
