@@ -1561,7 +1561,7 @@ const kt = class extends F {
     this.setValue(i, s);
   }
   onText(t, i) {
-    const s = (t?.target?.value ?? "").toString();
+    const s = (t?.detail?.value ?? t?.target?.value ?? t?.currentTarget?.value ?? "").toString();
     this.setValue(i, s);
   }
   addManualRow() {

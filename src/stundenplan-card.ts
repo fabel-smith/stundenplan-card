@@ -1599,7 +1599,7 @@ const ut = class ut extends U {
     this.setValue(e, s);
   }
   onText(t, e) {
-    const s = (t?.target?.value ?? "").toString();
+    const s = (t?.detail?.value ?? t?.target?.value ?? t?.currentTarget?.value ?? "").toString();
     this.setValue(e, s);
   }
   addManualRow() {
