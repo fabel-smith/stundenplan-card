@@ -1904,8 +1904,8 @@ const ut = class ut extends U {
                   <ha-textfield
                     label="Stundenplan24 Entity-ID (manuell)"
                     .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
-                    @input=${(e) => this.setSourceEntity(e.target.value)}
-                    placeholder="sensor.05b_woche"
+                    @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
+placeholder="sensor.05b_woche"
                   ></ha-textfield>
                 ` : d``}
 
@@ -1941,8 +1941,8 @@ const ut = class ut extends U {
                   <ha-textfield
                     label="Single-Source Entity-ID (manuell)"
                     .value=${(t.source_entity_legacy ?? t.source_entity ?? "")}
-                    @input=${(e) => this.setSourceEntity(e.target.value)}
-                    placeholder="sensor.stundenplan"
+                    @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
+placeholder="sensor.stundenplan"
                   ></ha-textfield>
 
                   <div class="grid2">
@@ -2133,11 +2133,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
+window.__STUNDENPLAN_CARD_VERSION = "v2026-02-16.2";
+console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
+
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan mit Wochenblättern (Offset Helper auto) + Stundenplan24 Notes-Layout + Zeiten",
+  description: "Stundenplan Card v2026-02-16.2 (marker: STUNDENPLAN_CARD_v2026-02-16.2)",
   preview: !0
 });
 export {
