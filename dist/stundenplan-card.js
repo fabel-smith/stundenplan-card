@@ -1242,10 +1242,15 @@ const v = (F = class extends W {
 
     .card {
       padding: 12px 12px 14px 12px;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
     }
 
     table {
-      width: 100%;
+      width: max-content;
+      min-width: 100%;
       border-collapse: collapse;
     }
     th,
