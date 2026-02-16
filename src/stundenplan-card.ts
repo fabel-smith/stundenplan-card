@@ -1098,7 +1098,9 @@ const v = (D = class extends U {
   }
   render() {
     if (!this.config) return d``;
-    const t = this.config, e = this._rowsCache, s = this.getTodayIndex(t.days ?? []), vm = (t.view_mode ?? "week").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, idxs = vm === "rolling" && s >= 0 ? Array.from({ length: Math.min((t.days?.length ?? 0) - s, daysAhead + 1) }, (y, m) => s + m) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m), daysVis = idxs.map((y) => t.days[y]), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), p = (t.week_offset_entity ?? "").trim().length > 0, u = this.getHeaderDaysFromEntity(t), g = u && u.length >= (t.days?.length ?? 0) ? u : null, O = this.getBaseDate(t), B = this.mondayOfWeek(O);
+    const t = this.config, e = this._rowsCache, s = this.getTodayIndex(t.days ?? []), vm = (t.view_mode ?? "week").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, idxs = vm === "rolling" && s >= 0 ? Array.from({ length: Math.min((t.days?.length ?? 0) - s, daysAhead + 1) }, (y, m) => s + m) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m), daysVis = idxs.map((y) => t.days[y]), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(),
+        p = (t.week_offset_entity ?? "").trim().length > 0,
+        showPager = p && (sourceType === "entity" || (sourceType === "legacy" && (t.week_mode ?? "off") !== "off")), u = this.getHeaderDaysFromEntity(t), g = u && u.length >= (t.days?.length ?? 0) ? u : null, O = this.getBaseDate(t), B = this.mondayOfWeek(O);
     return d`
       <ha-card>
         <div class="headerRow">
@@ -1107,7 +1109,7 @@ const v = (D = class extends U {
           <div class="headRight">
             ${c ? d`<div class="weekBadgeInline">Woche <b>${_}</b></div>` : d``}
 
-            ${p ? d`
+            ${showPager ? d`
                   <div class="offsetInline">
                     <button class="btnMini" @click=${() => h != null && this.setWeekOffset(t, h - 1)}>&lt;</button>
                     <div class="offsetVal">${h ?? "?"}</div>
