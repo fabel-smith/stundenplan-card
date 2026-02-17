@@ -813,7 +813,7 @@ const v = (D = class extends U {
       return O.some((w) => !!w) && (b.cell_styles = O), b;
     }), vmRaw = ((t.view_mode ?? "week") + "").toString().trim(), vm = vmRaw === "rolling" ? "rolling" : "week", da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", f = (() => {
       const raw = ((t.source_type ?? "") + "").toString().trim();
-      if (raw === "manual" || raw === "entity" || raw === "json" || raw === "legacy") return raw;
+      if (raw === "manual" || raw === "entity" || raw === "json" || raw === "sensor") return raw;
       const a_guess = ((t.source_entity ?? e.source_entity) + "").toString().trim();
       if (a_guess) {
         const attr = ((t.source_attribute ?? "") + "").toString().trim();
@@ -827,7 +827,7 @@ const v = (D = class extends U {
     a0 = (t.source_entity ?? e.source_entity).toString().trim(),
     a_int = (t.source_entity_integration ?? "").toString().trim(),
     a_leg = (t.source_entity_legacy ?? "").toString().trim(),
-    a = (f === "legacy" ? (a_leg || a0) : (f === "entity" ? (a_int || a0) : a0)),
+    a = (f === "sensor" ? (a_leg || a0) : (f === "entity" ? (a_int || a0) : a0)),
     _ = (t.week_offset_entity ?? "").toString().trim() || je(a);
     return {
       type: (t.type ?? e.type).toString(),
@@ -1013,7 +1013,7 @@ const v = (D = class extends U {
     const e = (
       (t.source_type ?? "manual") === "entity"
         ? ((t.source_entity_integration ?? t.source_entity) ?? "")
-        : (t.source_type ?? "manual") === "legacy"
+        : (t.source_type ?? "manual") === "sensor"
           ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
           : (t.source_entity ?? "")
     ).toString().trim();
@@ -1034,7 +1034,7 @@ const v = (D = class extends U {
     const effEntity = (
       e === "entity"
         ? ((t.source_entity_integration ?? t.source_entity) ?? "")
-        : e === "legacy"
+        : e === "sensor"
           ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
           : (t.source_entity ?? "")
     ).toString().trim();
@@ -1149,7 +1149,7 @@ const v = (D = class extends U {
     if (!this.config) return d``;
     const t = this.config, e = this._rowsCache, s = this.getTodayIndex(t.days ?? []), vm = (t.view_mode ?? "week").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, idxs = vm === "rolling" && s >= 0 ? Array.from({ length: Math.min((t.days?.length ?? 0) - s, daysAhead + 1) }, (y, m) => s + m) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m), daysVis = idxs.map((y) => t.days[y]), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(),
         p = (t.week_offset_entity ?? "").trim().length > 0,
-        showPager = p && (sourceType === "entity" || (sourceType === "legacy" && (t.week_mode ?? "off") !== "off")), u = this.getHeaderDaysFromEntity(t), g = u && u.length >= (t.days?.length ?? 0) ? u : null, O = this.getBaseDate(t), B = this.mondayOfWeek(O);
+        showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), u = this.getHeaderDaysFromEntity(t), g = u && u.length >= (t.days?.length ?? 0) ? u : null, O = this.getBaseDate(t), B = this.mondayOfWeek(O);
     return d`
       <ha-card>
         <div class="headerRow">
@@ -1592,7 +1592,7 @@ const ut = class ut extends U {
   }
   setSourceType(t) {
     if (!this._config) return;
-    const e = t === "entity" || t === "json" || t === "manual" || t === "legacy" ? t : "manual", s = { ...this._config, source_type: e };
+    const e = t === "entity" || t === "json" || t === "manual" || t === "sensor" ? t : "manual", s = { ...this._config, source_type: e };
     if (e === "json" && s.json_url == null && (s.json_url = ""));
     if (e === "entity") {
       s.source_entity == null && (s.source_entity = "");
@@ -1600,8 +1600,9 @@ const ut = class ut extends U {
       s.source_attribute = "rows_table";
       s.source_time_key = "time";
     }
-    if (e === "legacy") {
+    if (e === "sensor") {
       s.source_entity == null && (s.source_entity = "");
+      s.source_entity_integration = "";
       s.source_attribute = (s.source_attribute ?? "").toString().trim() || "plan";
       s.source_time_key = (s.source_time_key ?? "").toString().trim() || "Stunde";
     }
@@ -1612,7 +1613,7 @@ const ut = class ut extends U {
     const e = (t ?? "").toString().trim();
     const st = (this._config.source_type ?? "manual").toString();
 
-    if (st === "legacy") {
+    if (st === "sensor") {
       // Single-Source: keep its own field + effective source_entity
       this.emit({
         ...this._config,
@@ -1902,7 +1903,7 @@ const ut = class ut extends U {
                 ...(((t.source_type ?? "manual") === "json")
                   ? [{ value: "json", label: "JSON-Datei (deprecated)" }]
                   : []),
-                { value: "legacy", label: "Single-Source (Legacy / einfach)" }
+                { value: "sensor", label: "Beliebiger Sensor (JSON)" }
               ]
             }
           }
@@ -1966,13 +1967,13 @@ placeholder="sensor.05b_woche"
                   ></ha-textfield>
                 ` : d``}
 
-            ${(t.source_type ?? "manual") === "legacy" ? d`
-                  <div class="hint">Single-Source (Legacy): beliebiger <code>sensor.*</code> (z.B. REST-Sensor). Attribut/Time-Key nach Datenformat.</div>
+            ${(t.source_type ?? "manual") === "sensor" ? d`
+                  <div class="hint">Beliebiger Sensor (JSON): beliebiger <code>sensor.*</code> (z.B. REST-Sensor). Attribut/Time-Key nach Datenformat.</div>
 
                   ${this.isHaEntityPickerAvailable() ? d`
                     <ha-entity-picker
                       .hass=${this.hass}
-                      .value=${(t.source_entity_legacy ?? t.source_entity ?? "")}
+                      .value=${(t.source_entity ?? "")}
                       .includeDomains=${["sensor"]}
                       .entityFilter=${(entityId) => {
                         // allow all sensors
@@ -1982,7 +1983,7 @@ placeholder="sensor.05b_woche"
                         const sid = (id ?? "").toString();
                         return !sid || /^sensor\./.test(sid);
                       }}
-                      .label=${"Legacy Sensor"}
+                      .label=${"Sensor (JSON)"}
                       @value-changed=${(e) => {
                         try {
                           const v = e.detail?.value ?? e.target?.value;
@@ -1996,8 +1997,8 @@ placeholder="sensor.05b_woche"
                   ` : d``}
 
                   <ha-textfield
-                    label="Single-Source Entity-ID (manuell)"
-                    .value=${(t.source_entity_legacy ?? t.source_entity ?? "")}
+                    label="Sensor Entity-ID (manuell)"
+                    .value=${(t.source_entity ?? "")}
                     @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
 placeholder="sensor.stundenplan"
                   ></ha-textfield>
@@ -2006,7 +2007,7 @@ placeholder="sensor.stundenplan"
                     <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} @change=${(e) => this.onText(e, "source_attribute")} @value-changed=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-textfield>
                     <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} @change=${(e) => this.onText(e, "source_time_key")} @value-changed=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-textfield>
                   </div>
-                  <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
+                  <div class="hint">Sensor (JSON): REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
 
                   <div class="hint" style="margin-top:10px;">
                     Wechselwochen (A/B) gehört zu „Single-Source (Legacy / einfach)“.
