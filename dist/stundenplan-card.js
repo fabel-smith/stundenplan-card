@@ -34,10 +34,10 @@ const ge = (e) => new Gt(typeof e == "string" ? e : e + "", void 0, Ct), Qt = (e
   let s = "";
   for (const r of t.cssRules) s += r.cssText;
   return ge(s);
-})(e) : e, { is: pe, defineProperty: fe, getOwnPropertyDescriptor: me, getOwnPropertyNames: ye, getOwnPropertySymbols: we, getPrototypeOf: ve } = Object, wt = globalThis, Ht = wt.trustedTypes, be = Ht ? Ht.emptyScript : "", $e = wt.reactiveElementPolyfillSupport, Z = (e, t) => e, ft = { toAttribute(e, t) {
+})(e) : e, { is: pe, defineProperty: fe, getOwnPropertyDescriptor: me, getOwnPropertyNames: ye, getOwnPropertySymbols: we, getPrototypeOf: be } = Object, wt = globalThis, Ht = wt.trustedTypes, ve = Ht ? Ht.emptyScript : "", $e = wt.reactiveElementPolyfillSupport, Z = (e, t) => e, ft = { toAttribute(e, t) {
   switch (t) {
     case Boolean:
-      e = e ? be : null;
+      e = e ? ve : null;
       break;
     case Object:
     case Array:
@@ -93,7 +93,7 @@ let F = class extends HTMLElement {
   }
   static _$Ei() {
     if (this.hasOwnProperty(Z("elementProperties"))) return;
-    const e = ve(this);
+    const e = be(this);
     e.finalize(), e.l !== void 0 && (this.l = [...e.l]), this.elementProperties = new Map(e.elementProperties);
   }
   static finalize() {
@@ -258,10 +258,10 @@ const Ae = (e, t) => {
   let n, o = t === 2 ? "<svg>" : t === 3 ? "<math>" : "", a = K;
   for (let c = 0; c < s; c++) {
     const l = e[c];
-    let _, d, g = -1, h = 0;
-    for (; h < l.length && (a.lastIndex = h, d = a.exec(l), d !== null); ) h = a.lastIndex, a === K ? d[1] === "!--" ? a = Bt : d[1] !== void 0 ? a = Vt : d[2] !== void 0 ? (ee.test(d[2]) && (n = RegExp("</" + d[2], "g")), a = O) : d[3] !== void 0 && (a = O) : a === O ? d[0] === ">" ? (a = n ?? K, g = -1) : d[1] === void 0 ? g = -2 : (g = a.lastIndex - d[2].length, _ = d[1], a = d[3] === void 0 ? O : d[3] === '"' ? It : Jt) : a === It || a === Jt ? a = O : a === Bt || a === Vt ? a = K : (a = O, n = void 0);
+    let d, g, _ = -1, h = 0;
+    for (; h < l.length && (a.lastIndex = h, g = a.exec(l), g !== null); ) h = a.lastIndex, a === K ? g[1] === "!--" ? a = Bt : g[1] !== void 0 ? a = Vt : g[2] !== void 0 ? (ee.test(g[2]) && (n = RegExp("</" + g[2], "g")), a = O) : g[3] !== void 0 && (a = O) : a === O ? g[0] === ">" ? (a = n ?? K, _ = -1) : g[1] === void 0 ? _ = -2 : (_ = a.lastIndex - g[2].length, d = g[1], a = g[3] === void 0 ? O : g[3] === '"' ? It : Jt) : a === It || a === Jt ? a = O : a === Bt || a === Vt ? a = K : (a = O, n = void 0);
     const p = a === O && e[c + 1].startsWith("/>") ? " " : "";
-    o += a === K ? l + Se : g >= 0 ? (r.push(_), l.slice(0, g) + Xt + l.slice(g) + T + p) : l + T + (g === -2 ? c : p);
+    o += a === K ? l + Se : _ >= 0 ? (r.push(d), l.slice(0, _) + Xt + l.slice(_) + T + p) : l + T + (_ === -2 ? c : p);
   }
   return [ie(e, o + (e[s] || "<?>") + (t === 2 ? "</svg>" : t === 3 ? "</math>" : "")), r];
 };
@@ -270,29 +270,29 @@ class X {
     let n;
     this.parts = [];
     let o = 0, a = 0;
-    const c = t.length - 1, l = this.parts, [_, d] = Ae(t, s);
-    if (this.el = X.createElement(_, r), W.currentNode = this.el.content, s === 2 || s === 3) {
-      const g = this.el.content.firstChild;
-      g.replaceWith(...g.childNodes);
+    const c = t.length - 1, l = this.parts, [d, g] = Ae(t, s);
+    if (this.el = X.createElement(d, r), W.currentNode = this.el.content, s === 2 || s === 3) {
+      const _ = this.el.content.firstChild;
+      _.replaceWith(..._.childNodes);
     }
     for (; (n = W.nextNode()) !== null && l.length < c; ) {
       if (n.nodeType === 1) {
-        if (n.hasAttributes()) for (const g of n.getAttributeNames()) if (g.endsWith(Xt)) {
-          const h = d[a++], p = n.getAttribute(g).split(T), v = /([.?@])?(.*)/.exec(h);
-          l.push({ type: 1, index: o, name: v[2], strings: p, ctor: v[1] === "." ? Ce : v[1] === "?" ? Me : v[1] === "@" ? De : vt }), n.removeAttribute(g);
-        } else g.startsWith(T) && (l.push({ type: 6, index: o }), n.removeAttribute(g));
+        if (n.hasAttributes()) for (const _ of n.getAttributeNames()) if (_.endsWith(Xt)) {
+          const h = g[a++], p = n.getAttribute(_).split(T), b = /([.?@])?(.*)/.exec(h);
+          l.push({ type: 1, index: o, name: b[2], strings: p, ctor: b[1] === "." ? Ce : b[1] === "?" ? Me : b[1] === "@" ? De : bt }), n.removeAttribute(_);
+        } else _.startsWith(T) && (l.push({ type: 6, index: o }), n.removeAttribute(_));
         if (ee.test(n.tagName)) {
-          const g = n.textContent.split(T), h = g.length - 1;
+          const _ = n.textContent.split(T), h = _.length - 1;
           if (h > 0) {
             n.textContent = mt ? mt.emptyScript : "";
-            for (let p = 0; p < h; p++) n.append(g[p], G()), W.nextNode(), l.push({ type: 2, index: ++o });
-            n.append(g[h], G());
+            for (let p = 0; p < h; p++) n.append(_[p], G()), W.nextNode(), l.push({ type: 2, index: ++o });
+            n.append(_[h], G());
           }
         }
       } else if (n.nodeType === 8) if (n.data === te) l.push({ type: 2, index: o });
       else {
-        let g = -1;
-        for (; (g = n.data.indexOf(T, g + 1)) !== -1; ) l.push({ type: 7, index: o }), g += T.length - 1;
+        let _ = -1;
+        for (; (_ = n.data.indexOf(T, _ + 1)) !== -1; ) l.push({ type: 7, index: o }), _ += T.length - 1;
       }
       o++;
     }
@@ -324,8 +324,8 @@ class Ee {
     let o = W.nextNode(), a = 0, c = 0, l = r[0];
     for (; l !== void 0; ) {
       if (a === l.index) {
-        let _;
-        l.type === 2 ? _ = new tt(o, o.nextSibling, this, t) : l.type === 1 ? _ = new l.ctor(o, l.name, l.strings, this, t) : l.type === 6 && (_ = new Te(o, this, t)), this._$AV.push(_), l = r[++c];
+        let d;
+        l.type === 2 ? d = new tt(o, o.nextSibling, this, t) : l.type === 1 ? d = new l.ctor(o, l.name, l.strings, this, t) : l.type === 6 && (d = new Te(o, this, t)), this._$AV.push(d), l = r[++c];
       }
       a !== l?.index && (o = W.nextNode(), a++);
     }
@@ -395,7 +395,7 @@ class tt {
     this._$AM === void 0 && (this._$Cv = t, this._$AP?.(t));
   }
 }
-class vt {
+class bt {
   get tagName() {
     return this.element.tagName;
   }
@@ -411,8 +411,8 @@ class vt {
     if (o === void 0) t = J(this, t, s, 0), a = !Q(t) || t !== this._$AH && t !== V, a && (this._$AH = t);
     else {
       const c = t;
-      let l, _;
-      for (t = o[0], l = 0; l < o.length - 1; l++) _ = J(this, c[r + l], s, l), _ === V && (_ = this._$AH[l]), a ||= !Q(_) || _ !== this._$AH[l], _ === y ? t = y : t !== y && (t += (_ ?? "") + o[l + 1]), this._$AH[l] = _;
+      let l, d;
+      for (t = o[0], l = 0; l < o.length - 1; l++) d = J(this, c[r + l], s, l), d === V && (d = this._$AH[l]), a ||= !Q(d) || d !== this._$AH[l], d === y ? t = y : t !== y && (t += (d ?? "") + o[l + 1]), this._$AH[l] = d;
     }
     a && !n && this.j(t);
   }
@@ -420,7 +420,7 @@ class vt {
     t === y ? this.element.removeAttribute(this.name) : this.element.setAttribute(this.name, t ?? "");
   }
 }
-class Ce extends vt {
+class Ce extends bt {
   constructor() {
     super(...arguments), this.type = 3;
   }
@@ -428,7 +428,7 @@ class Ce extends vt {
     this.element[this.name] = t === y ? void 0 : t;
   }
 }
-class Me extends vt {
+class Me extends bt {
   constructor() {
     super(...arguments), this.type = 4;
   }
@@ -436,7 +436,7 @@ class Me extends vt {
     this.element.toggleAttribute(this.name, !!t && t !== y);
   }
 }
-class De extends vt {
+class De extends bt {
   constructor(t, s, r, n, o) {
     super(t, s, r, n, o), this.type = 5;
   }
@@ -691,7 +691,7 @@ const k = (q = class extends B {
       const n = (r ?? "").toString().trim();
       n && t.add(n);
     };
-    return s(e.week_offset_entity), s(e.source_entity), s(e.source_entity_a), s(e.source_entity_b), s(e.week_map_entity), Array.from(t);
+    return s(e.week_offset_entity), s(e.source_entity), s(e.source_entity_integration), s(e.source_entity_legacy), s(e.source_entity_a), s(e.source_entity_b), s(e.week_map_entity), Array.from(t);
   }
   getEntitySig(e) {
     const t = this.hass?.states?.[e];
@@ -802,14 +802,14 @@ const k = (q = class extends B {
     const t = q.getStubConfig(), s = Array.isArray(e.days) && e.days.length ? e.days.map((f) => (f ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], r = (Array.isArray(e.rows) ? e.rows : []).map((f) => {
       if (yt(f))
         return { break: !0, time: (f.time ?? "").toString(), label: (f.label ?? "Pause").toString() };
-      const U = Array.isArray(f?.cells) ? f.cells : [], R = Array.from({ length: s.length }, (N, b) => (U[b] ?? "").toString()), S = Array.isArray(f?.cell_styles) ? f.cell_styles : [], H = Array.from({ length: s.length }, (N, b) => He(S[b])), et = (f?.time ?? "").toString(), I = ot(et), w = (f?.start ?? "").toString().trim(), m = (f?.end ?? "").toString().trim(), A = {
+      const U = Array.isArray(f?.cells) ? f.cells : [], R = Array.from({ length: s.length }, (N, v) => (U[v] ?? "").toString()), S = Array.isArray(f?.cell_styles) ? f.cell_styles : [], H = Array.from({ length: s.length }, (N, v) => He(S[v])), et = (f?.time ?? "").toString(), I = ot(et), w = (f?.start ?? "").toString().trim(), m = (f?.end ?? "").toString().trim(), A = {
         time: et,
         start: w || I.start || void 0,
         end: m || I.end || void 0,
         cells: R
       };
       return H.some((N) => !!N) && (A.cell_styles = H), A;
-    }), n = ((e.view_mode ?? "week") + "").toString().trim(), o = n === "rolling" ? "rolling" : "week", a = Number(e.days_ahead), c = Number.isFinite(a) ? Math.max(0, Math.min(6, Math.floor(a))) : 0, l = ((e.week_mode ?? t.week_mode) + "").toString().trim(), _ = l === "kw_parity" || l === "week_map" || l === "off" ? l : "off", d = (() => {
+    }), n = ((e.view_mode ?? "week") + "").toString().trim(), o = n === "rolling" ? "rolling" : "week", a = Number(e.days_ahead), c = Number.isFinite(a) ? Math.max(0, Math.min(6, Math.floor(a))) : 0, l = ((e.week_mode ?? t.week_mode) + "").toString().trim(), d = l === "kw_parity" || l === "week_map" || l === "off" ? l : "off", g = (() => {
       const f = ((e.source_type ?? "") + "").toString().trim();
       if (f === "manual" || f === "entity" || f === "json" || f === "legacy") return f;
       const U = ((e.source_entity ?? t.source_entity) + "").toString().trim();
@@ -818,7 +818,7 @@ const k = (q = class extends B {
         return !(/_woche$/i.test(U) && (R === "" || R === "rows_table") && (S === "" || S === "time")) && (R || S) ? "legacy" : "entity";
       }
       return "manual";
-    })(), g = (e.source_entity ?? t.source_entity).toString().trim(), h = (e.source_entity_integration ?? "").toString().trim(), p = (e.source_entity_legacy ?? "").toString().trim(), v = d === "legacy" ? p || g : d === "entity" && h || g, $ = (e.week_offset_entity ?? "").toString().trim() || Be(v);
+    })(), _ = (e.source_entity ?? t.source_entity).toString().trim(), h = (e.source_entity_integration ?? "").toString().trim(), p = (e.source_entity_legacy ?? "").toString().trim(), b = g === "legacy" ? p || _ : g === "entity" && h || _, $ = (e.week_offset_entity ?? "").toString().trim() || Be(b);
     return {
       type: (e.type ?? t.type).toString(),
       title: (e.title ?? t.title).toString(),
@@ -835,16 +835,16 @@ const k = (q = class extends B {
       highlight_current_text_color: (e.highlight_current_text_color ?? t.highlight_current_text_color).toString(),
       highlight_current_time_text: e.highlight_current_time_text ?? t.highlight_current_time_text,
       highlight_current_time_text_color: (e.highlight_current_time_text_color ?? t.highlight_current_time_text_color).toString(),
-      source_entity: v,
+      source_entity: b,
       source_entity_integration: h || "",
       source_entity_legacy: p || "",
-      source_attribute: d === "entity" ? "rows_table" : ((e.source_attribute_legacy ?? e.source_attribute ?? "") + "").toString().trim() || "plan",
-      source_time_key: d === "entity" ? "time" : ((e.source_time_key_legacy ?? e.source_time_key ?? "") + "").toString().trim() || "Stunde",
-      source_type: d,
+      source_attribute: g === "entity" ? "rows_table" : ((e.source_attribute_legacy ?? e.source_attribute ?? "") + "").toString().trim() || "plan",
+      source_time_key: g === "entity" ? "time" : ((e.source_time_key_legacy ?? e.source_time_key ?? "") + "").toString().trim() || "Stunde",
+      source_type: g,
       json_url: (e.json_url ?? "").toString(),
       week_offset_entity: $,
       week_offset_attribute: (e.week_offset_attribute ?? "").toString(),
-      week_mode: _,
+      week_mode: d,
       week_a_is_even_kw: e.week_a_is_even_kw ?? t.week_a_is_even_kw,
       week_map_entity: (e.week_map_entity ?? t.week_map_entity).toString(),
       week_map_attribute: (e.week_map_attribute ?? t.week_map_attribute).toString(),
@@ -904,11 +904,11 @@ const k = (q = class extends B {
           time: (c.time ?? c[i] ?? "").toString(),
           label: (c.label ?? "Pause").toString()
         };
-      const l = (c?.time ?? c?.[r] ?? c?.[n] ?? c?.[o] ?? "").toString(), _ = ot(l), d = Array.from({ length: s.length }, (p, v) => {
-        const $ = (s[v] ?? "").toString();
+      const l = (c?.time ?? c?.[r] ?? c?.[n] ?? c?.[o] ?? "").toString(), d = ot(l), g = Array.from({ length: s.length }, (p, b) => {
+        const $ = (s[b] ?? "").toString();
         return (c?.[$] ?? "").toString();
-      }), g = (c?.start ?? "").toString().trim() || _.start, h = (c?.end ?? "").toString().trim() || _.end;
-      return { time: l, start: g || void 0, end: h || void 0, cells: d };
+      }), _ = (c?.start ?? "").toString().trim() || d.start, h = (c?.end ?? "").toString().trim() || d.end;
+      return { time: l, start: _ || void 0, end: h || void 0, cells: g };
     });
     return a.length ? a : null;
   }
@@ -953,8 +953,8 @@ const k = (q = class extends B {
     if (!r || typeof r != "object") return null;
     const { isoWeek: n, isoYear: o } = qt(/* @__PURE__ */ new Date()), a = String(n), c = String(o);
     if (r?.[c] && typeof r[c] == "object") {
-      const _ = Zt(r[c][a]);
-      if (_) return _;
+      const d = Zt(r[c][a]);
+      if (d) return d;
     }
     return Zt(r?.[a]) || null;
   }
@@ -978,7 +978,7 @@ const k = (q = class extends B {
   }
   // Prefer meta.days from source_entity for header dates (YYYYMMDD)
   getHeaderDaysFromEntity(e) {
-    const t = (e.source_entity ?? "").toString().trim();
+    const t = ((e.source_type ?? "manual") === "entity" ? e.source_entity_integration ?? e.source_entity ?? "" : (e.source_type ?? "manual") === "legacy" ? e.source_entity_legacy ?? e.source_entity ?? "" : e.source_entity ?? "").toString().trim();
     if (!t || !this.hass?.states?.[t]) return null;
     const s = this.hass.states[t].attributes ?? {}, r = s?.meta_ha?.days ?? s?.meta?.days ?? s?.days ?? (typeof s?.meta_json == "string" ? this.parseAnyJson(s.meta_json)?.days : null) ?? null;
     if (!Array.isArray(r) || r.length < 3) return null;
@@ -986,28 +986,28 @@ const k = (q = class extends B {
     for (const o of r) {
       const a = (o ?? "").toString().trim().match(/^(\d{4})(\d{2})(\d{2})$/);
       if (!a) continue;
-      const c = Number(a[1]), l = Number(a[2]), _ = Number(a[3]), d = new Date(c, l - 1, _, 12, 0, 0, 0);
-      Number.isNaN(d.getTime()) || n.push(d);
+      const c = Number(a[1]), l = Number(a[2]), d = Number(a[3]), g = new Date(c, l - 1, d, 12, 0, 0, 0);
+      Number.isNaN(g.getTime()) || n.push(g);
     }
     return n.length ? n : null;
   }
   getRowsResolved(e) {
-    const t = e.source_type ?? "manual";
+    const t = e.source_type ?? "manual", s = (t === "entity" ? e.source_entity_integration ?? e.source_entity ?? "" : t === "legacy" ? e.source_entity_legacy ?? e.source_entity ?? "" : e.source_entity ?? "").toString().trim();
     if (t === "manual")
       return e.rows ?? [];
     if (t === "json")
       return this.ensureJsonLoaded(e), this._jsonRows ?? [];
     if (e.week_mode !== "off") {
-      const r = this.getActiveWeek(e), n = (e.source_entity_a ?? "").trim(), o = (e.source_entity_b ?? "").trim(), a = (e.source_attribute_a ?? "").trim(), c = (e.source_attribute_b ?? "").trim();
-      if (r === "A" && n)
-        return this.getRowsFromEntity(e, n, a) ?? [];
-      if (r === "B" && o)
+      const n = this.getActiveWeek(e), o = (e.source_entity_a ?? "").trim(), a = (e.source_entity_b ?? "").trim(), c = (e.source_attribute_a ?? "").trim(), l = (e.source_attribute_b ?? "").trim();
+      if (n === "A" && o)
         return this.getRowsFromEntity(e, o, c) ?? [];
-      const l = (e.source_entity ?? "").trim();
-      return l ? this.getRowsFromEntity(e, l, (e.source_attribute_legacy ?? "").trim()) ?? [] : [];
+      if (n === "B" && a)
+        return this.getRowsFromEntity(e, a, l) ?? [];
+      const d = s;
+      return d ? this.getRowsFromEntity(e, d, (e.source_attribute_legacy ?? "").trim()) ?? [] : [];
     }
-    const s = (e.source_entity ?? "").toString().trim();
-    return s ? this.getRowsFromEntity(e, s, (e.source_attribute_legacy ?? "").toString().trim()) ?? [] : [];
+    const r = s;
+    return r ? this.getRowsFromEntity(e, r, (e.source_attribute_legacy ?? "").toString().trim()) ?? [] : [];
   }
   recomputeRows() {
     if (!this.config) {
@@ -1048,21 +1048,21 @@ const k = (q = class extends B {
         }
     }
     if (l < 0) return null;
-    const _ = c[l];
-    let d;
+    const d = c[l];
+    let g;
     for (let h = l + 1; h < c.length; h++) {
       const p = c[h];
       if (!o(p) && !a(p)) {
-        d = p;
+        g = p;
         break;
       }
     }
-    if (!d) {
+    if (!g) {
       const h = c.filter((p) => !o(p) && !a(p));
-      d = h.length ? h[h.length - 1] : void 0;
+      g = h.length ? h[h.length - 1] : void 0;
     }
-    const g = s.slice(1).filter((h) => o(h));
-    return { fach: n, raum: _, lehrer: d, notes: g.length ? g : void 0 };
+    const _ = s.slice(1).filter((h) => o(h));
+    return { fach: n, raum: d, lehrer: g, notes: _.length ? _ : void 0 };
   }
   renderCell(e, t) {
     const s = (e ?? "").toString(), r = this.filterCellText(s, t);
@@ -1078,8 +1078,8 @@ const k = (q = class extends B {
           ${n.notes?.length ? u`
                 <div class="notes">
                   ${n.notes.map((l) => {
-        const _ = l.startsWith("🔴") ? "note noteRed" : l.startsWith("🟠") ? "note noteOrange" : l.startsWith("🟡") ? "note noteYellow" : "note", d = l.replace(/^[🟠🔴🟡🟢⚪️🟣🟤]\s*/g, "").trim();
-        return u`<div class=${_}><span class="dot">${l.slice(0, 2).trim()}</span><span class="txt">${d}</span></div>`;
+        const d = l.startsWith("🔴") ? "note noteRed" : l.startsWith("🟠") ? "note noteOrange" : l.startsWith("🟡") ? "note noteYellow" : "note", g = l.replace(/^[🟠🔴🟡🟢⚪️🟣🟤]\s*/g, "").trim();
+        return u`<div class=${d}><span class="dot">${l.slice(0, 2).trim()}</span><span class="txt">${g}</span></div>`;
       })}
                 </div>
               ` : u``}
@@ -1092,8 +1092,8 @@ const k = (q = class extends B {
           <div class="fach">${a}</div>
           <div class="notes">
             ${c.map((l) => {
-      const _ = l.startsWith("🔴") ? "note noteRed" : l.startsWith("🟠") ? "note noteOrange" : l.startsWith("🟡") ? "note noteYellow" : "note", d = l.replace(/^[🟠🔴🟡🟢⚪️🟣🟤]\s*/g, "").trim(), g = /^[🟠🔴🟡🟢⚪️🟣🟤]/.test(l) ? l.slice(0, 2).trim() : "•";
-      return u`<div class=${_}><span class="dot">${g}</span><span class="txt">${d || l}</span></div>`;
+      const d = l.startsWith("🔴") ? "note noteRed" : l.startsWith("🟠") ? "note noteOrange" : l.startsWith("🟡") ? "note noteYellow" : "note", g = l.replace(/^[🟠🔴🟡🟢⚪️🟣🟤]\s*/g, "").trim(), _ = /^[🟠🔴🟡🟢⚪️🟣🟤]/.test(l) ? l.slice(0, 2).trim() : "•";
+      return u`<div class=${d}><span class="dot">${_}</span><span class="txt">${g || l}</span></div>`;
     })}
           </div>
         </div>
@@ -1101,14 +1101,14 @@ const k = (q = class extends B {
   }
   render() {
     if (!this.config) return u``;
-    const e = this.config, t = this._rowsCache, s = this.getTodayIndex(e.days ?? []), r = (e.view_mode ?? "week").toString(), n = Number(e.days_ahead), o = Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0, a = r === "rolling" && s >= 0 ? Array.from({ length: Math.min((e.days?.length ?? 0) - s, o + 1) }, (w, m) => s + m) : Array.from({ length: e.days?.length ?? 0 }, (w, m) => m), c = a.map((w) => e.days[w]), l = "1px solid var(--divider-color)", _ = Kt(e.highlight_today_color ?? "", 0.12), d = Kt(e.highlight_current_color ?? "", 0.18), g = (e.highlight_current_text_color ?? "").toString().trim(), h = (e.highlight_current_time_text_color ?? "").toString().trim(), p = e.week_mode !== "off", v = p ? this.getActiveWeek(e) : null, $ = this.getWeekOffsetValue(e), f = (e.source_type ?? "manual").toString(), U = (e.week_offset_entity ?? "").trim().length > 0, R = U && (f === "entity" || f === "legacy" && (e.week_mode ?? "off") !== "off"), S = this.getHeaderDaysFromEntity(e), H = S && S.length >= (e.days?.length ?? 0) ? S : null, et = this.getBaseDate(e), I = this.mondayOfWeek(et);
+    const e = this.config, t = this._rowsCache, s = this.getTodayIndex(e.days ?? []), r = (e.view_mode ?? "week").toString(), n = Number(e.days_ahead), o = Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0, a = r === "rolling" && s >= 0 ? Array.from({ length: Math.min((e.days?.length ?? 0) - s, o + 1) }, (w, m) => s + m) : Array.from({ length: e.days?.length ?? 0 }, (w, m) => m), c = a.map((w) => e.days[w]), l = "1px solid var(--divider-color)", d = Kt(e.highlight_today_color ?? "", 0.12), g = Kt(e.highlight_current_color ?? "", 0.18), _ = (e.highlight_current_text_color ?? "").toString().trim(), h = (e.highlight_current_time_text_color ?? "").toString().trim(), p = e.week_mode !== "off", b = p ? this.getActiveWeek(e) : null, $ = this.getWeekOffsetValue(e), f = (e.source_type ?? "manual").toString(), U = (e.week_offset_entity ?? "").trim().length > 0, R = U && (f === "entity" || f === "legacy" && (e.week_mode ?? "off") !== "off"), S = this.getHeaderDaysFromEntity(e), H = S && S.length >= (e.days?.length ?? 0) ? S : null, et = this.getBaseDate(e), I = this.mondayOfWeek(et);
     return u`
       <ha-card>
         <div class="headerRow">
           <div class="title">${e.title ?? ""}</div>
 
           <div class="headRight">
-            ${p ? u`<div class="weekBadgeInline">Woche <b>${v}</b></div>` : u``}
+            ${p ? u`<div class="weekBadgeInline">Woche <b>${b}</b></div>` : u``}
 
             ${R ? u`
                   <div class="offsetInline">
@@ -1127,20 +1127,20 @@ const k = (q = class extends B {
                 <th class="time">Stunde</th>
                 ${c.map((w, m) => {
       const A = a[m], N = e.highlight_today && A === s ? "today" : "";
-      let b = "";
+      let v = "";
       if (H)
-        b = this.fmtDDMMYYYY(H[A]);
+        v = this.fmtDDMMYYYY(H[A]);
       else {
         const it = Ve(w);
         if (it) {
           const st = new Date(I);
-          st.setDate(I.getDate() + (it - 1)), b = this.fmtDDMMYYYY(st);
+          st.setDate(I.getDate() + (it - 1)), v = this.fmtDDMMYYYY(st);
         }
       }
       return u`
-                    <th class=${N} style=${`--sp-hl:${_};`}>
+                    <th class=${N} style=${`--sp-hl:${d};`}>
                       <div>${w}</div>
-                      <div class="thDate">${b}</div>
+                      <div class="thDate">${v}</div>
                     </th>
                   `;
     })}
@@ -1151,17 +1151,17 @@ const k = (q = class extends B {
               ${this._noData ? u`<tr class="nodata"><td class="nodataCell" colspan=${c.length + 1}>${this._noDataMsg}</td></tr>` : t.map((w) => {
       if (yt(w)) {
         const Y = ot(w.time), rt = !!Y.start && !!Y.end && this.isNowBetween(Y.start, Y.end), L = !!e.highlight_breaks && rt;
-        let z = `--sp-hl:${d};`, nt = "";
-        return L && (z += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", nt += `--sp-hl:${d}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), L && e.highlight_current_time_text && h && (z += `color:${h};`), u`
+        let z = `--sp-hl:${g};`, nt = "";
+        return L && (z += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", nt += `--sp-hl:${g}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), L && e.highlight_current_time_text && h && (z += `color:${h};`), u`
                     <tr class="break">
                       <td class="time" style=${z}>${w.time}</td>
                       <td colspan=${c.length} style=${nt}>${w.label ?? ""}</td>
                     </tr>
                   `;
       }
-      const m = w, A = m.cells ?? [], N = m.cell_styles ?? [], b = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), it = s >= 0 ? A[s] ?? "" : "", st = s >= 0 ? this.filterCellText(it, e) : "", ce = s >= 0 ? xt(st) : !1, bt = !(e.free_only_column_highlight && ce), Nt = ot(m.time), he = !!(Nt.start && Nt.end), Ot = !he && m.start && m.end ? `${m.start}–${m.end}` : "";
-      let $t = `--sp-hl:${d};`;
-      return bt && e.highlight_current && b && ($t += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), bt && b && e.highlight_current_time_text && h && ($t += `color:${h};`), u`
+      const m = w, A = m.cells ?? [], N = m.cell_styles ?? [], v = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), it = s >= 0 ? A[s] ?? "" : "", st = s >= 0 ? this.filterCellText(it, e) : "", ce = s >= 0 ? xt(st) : !1, vt = !(e.free_only_column_highlight && ce), Nt = ot(m.time), he = !!(Nt.start && Nt.end), Ot = !he && m.start && m.end ? `${m.start}–${m.end}` : "";
+      let $t = `--sp-hl:${g};`;
+      return vt && e.highlight_current && v && ($t += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), vt && v && e.highlight_current_time_text && h && ($t += `color:${h};`), u`
                   <tr>
                     <td class="time" style=${$t}>
                       <div class="timeWrap">
@@ -1172,9 +1172,9 @@ const k = (q = class extends B {
 
                     ${c.map((Y, rt) => {
         const L = a[rt], z = this.filterCellText(A[L] ?? "", e), nt = N[L] ?? null, ue = e.highlight_today && L === s ? "today" : "";
-        let Wt = `--sp-hl:${_};` + ze(nt, l);
+        let Wt = `--sp-hl:${d};` + ze(nt, l);
         const de = !xt(z);
-        return bt && de && b && e.highlight_current_text && g && s >= 0 && rt === s && (Wt += `color:${g};`), u`<td class=${ue} style=${Wt}>${this.renderCell(z, e)}</td>`;
+        return vt && de && v && e.highlight_current_text && _ && s >= 0 && rt === s && (Wt += `color:${_};`), u`<td class=${ue} style=${Wt}>${this.renderCell(z, e)}</td>`;
       })}
                   </tr>
                 `;
@@ -1452,7 +1452,7 @@ function Ye(e) {
 }
 const At = class extends B {
   constructor() {
-    super(...arguments), this._open = {
+    super(...arguments), this._unsubEntities = null, this._didSubEntities = !1, this._open = {
       general: !1,
       highlights: !1,
       colors: !1,
@@ -1466,7 +1466,27 @@ const At = class extends B {
     };
   }
   connectedCallback() {
-    super.connectedCallback(), this.ensureUiLoaded();
+    super.connectedCallback(), this.ensureUiLoaded(), this.ensureEntitySubscription();
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    try {
+      this._unsubEntities?.();
+    } catch {
+    }
+    this._unsubEntities = null, this._didSubEntities = !1;
+  }
+  async ensureEntitySubscription() {
+    if (this._didSubEntities) return;
+    const t = this.hass;
+    if (!(!t || !t.connection))
+      try {
+        const s = t.connection.subscribeEntities;
+        typeof s == "function" && (this._didSubEntities = !0, this._unsubEntities = await s(() => {
+        }));
+      } catch {
+        this._didSubEntities = !0, this._unsubEntities = null;
+      }
   }
   async ensureUiLoaded() {
     if (!this._uiLoaded) {
@@ -1475,7 +1495,7 @@ const At = class extends B {
         await window.loadCardHelpers?.();
       } catch {
       }
-      setTimeout(() => this.requestUpdate(), 0);
+      setTimeout(() => this.requestUpdate(), 0), this.ensureEntitySubscription();
     }
   }
   setConfig(t) {

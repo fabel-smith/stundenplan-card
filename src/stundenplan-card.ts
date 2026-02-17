@@ -693,7 +693,7 @@ const v = (D = class extends U {
       const n = (i ?? "").toString().trim();
       n && e.add(n);
     };
-    return s(t.week_offset_entity), s(t.source_entity), s(t.source_entity_a), s(t.source_entity_b), s(t.week_map_entity), Array.from(e);
+    return s(t.week_offset_entity), s(t.source_entity), s(t.source_entity_integration), s(t.source_entity_legacy), s(t.source_entity_a), s(t.source_entity_b), s(t.week_map_entity), Array.from(e);
   }
   getEntitySig(t) {
     const e = this.hass?.states?.[t];
@@ -1010,7 +1010,13 @@ const v = (D = class extends U {
   }
   // Prefer meta.days from source_entity for header dates (YYYYMMDD)
   getHeaderDaysFromEntity(t) {
-    const e = (t.source_entity ?? "").toString().trim();
+    const e = (
+      (t.source_type ?? "manual") === "entity"
+        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        : (t.source_type ?? "manual") === "legacy"
+          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
+          : (t.source_entity ?? "")
+    ).toString().trim();
     if (!e || !this.hass?.states?.[e]) return null;
     const i = this.hass.states[e].attributes ?? {}, n = i?.meta_ha?.days ?? i?.meta?.days ?? i?.days ?? (typeof i?.meta_json == "string" ? this.parseAnyJson(i.meta_json)?.days : null) ?? null;
     if (!Array.isArray(n) || n.length < 3) return null;
@@ -1025,6 +1031,14 @@ const v = (D = class extends U {
   }
   getRowsResolved(t) {
     const e = t.source_type ?? "manual";
+    const effEntity = (
+      e === "entity"
+        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        : e === "legacy"
+          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
+          : (t.source_entity ?? "")
+    ).toString().trim();
+
     if (e === "manual")
       return t.rows ?? [];
     if (e === "json")
@@ -1035,10 +1049,10 @@ const v = (D = class extends U {
         return this.getRowsFromEntity(t, n, l) ?? [];
       if (i === "B" && o)
         return this.getRowsFromEntity(t, o, a) ?? [];
-      const c = (t.source_entity ?? "").trim();
+      const c = effEntity;
       return c ? this.getRowsFromEntity(t, c, (t.source_attribute_legacy ?? "").trim()) ?? [] : [];
     }
-    const s = (t.source_entity ?? "").toString().trim();
+    const s = effEntity;
     return s ? this.getRowsFromEntity(t, s, (t.source_attribute_legacy ?? "").toString().trim()) ?? [] : [];
   }
   recomputeRows() {
@@ -1488,7 +1502,10 @@ function Ne(r) {
 }
 const ut = class ut extends U {
   constructor() {
-    super(...arguments), this._open = {
+    super(...arguments);
+    this._unsubEntities = null;
+    this._didSubEntities = !1;
+    this._open = {
       general: !1,
       highlights: !1,
       colors: !1,
@@ -1502,7 +1519,35 @@ const ut = class ut extends U {
     };
   }
   connectedCallback() {
-    super.connectedCallback(), this.ensureUiLoaded();
+    super.connectedCallback();
+    this.ensureUiLoaded();
+    this.ensureEntitySubscription();
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    try {
+      this._unsubEntities?.();
+    } catch {
+    }
+    this._unsubEntities = null;
+    this._didSubEntities = !1;
+  }
+  async ensureEntitySubscription() {
+    if (this._didSubEntities) return;
+    const hass = this.hass;
+    if (!hass || !hass.connection) return;
+    try {
+      const sub = hass.connection.subscribeEntities;
+      if (typeof sub === "function") {
+        this._didSubEntities = !0;
+        this._unsubEntities = await sub(() => {
+          // no-op
+        });
+      }
+    } catch {
+      this._didSubEntities = !0;
+      this._unsubEntities = null;
+    }
   }
   async ensureUiLoaded() {
     if (!this._uiLoaded) {
@@ -1512,6 +1557,7 @@ const ut = class ut extends U {
       } catch {
       }
       setTimeout(() => this.requestUpdate(), 0);
+      this.ensureEntitySubscription();
     }
   }
   setConfig(t) {
