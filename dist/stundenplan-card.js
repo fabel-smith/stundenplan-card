@@ -814,7 +814,7 @@ const k = (q = class extends B {
       if (f === "manual" || f === "entity" || f === "json" || f === "legacy") return f;
       const U = ((e.source_entity ?? t.source_entity) + "").toString().trim();
       if (U) {
-        const R = ((e.source_attribute_legacy ?? "") + "").toString().trim(), S = ((e.source_time_key_legacy ?? "") + "").toString().trim();
+        const R = ((e.source_attribute ?? "") + "").toString().trim(), S = ((e.source_time_key ?? "") + "").toString().trim();
         return !(/_woche$/i.test(U) && (R === "" || R === "rows_table") && (S === "" || S === "time")) && (R || S) ? "legacy" : "entity";
       }
       return "manual";
@@ -838,8 +838,8 @@ const k = (q = class extends B {
       source_entity: b,
       source_entity_integration: h || "",
       source_entity_legacy: p || "",
-      source_attribute: g === "entity" ? "rows_table" : ((e.source_attribute_legacy ?? e.source_attribute ?? "") + "").toString().trim() || "plan",
-      source_time_key: g === "entity" ? "time" : ((e.source_time_key_legacy ?? e.source_time_key ?? "") + "").toString().trim() || "Stunde",
+      source_attribute: g === "entity" ? "rows_table" : ((e.source_attribute ?? "") + "").toString().trim() || "plan",
+      source_time_key: g === "entity" ? "time" : ((e.source_time_key ?? "") + "").toString().trim() || "Stunde",
       source_type: g,
       json_url: (e.json_url ?? "").toString(),
       week_offset_entity: $,
@@ -1900,8 +1900,8 @@ placeholder="sensor.stundenplan"
                   ></ha-textfield>
 
                   <div class="grid2">
-                    <ha-textfield label="Attribut" .value=${t.source_attribute_legacy ?? ""} @value-changed=${(s) => this.onText(s, "source_attribute_legacy")} placeholder="plan"></ha-textfield>
-                    <ha-textfield label="Time-Key" .value=${t.source_time_key_legacy ?? ""} @value-changed=${(s) => this.onText(s, "source_time_key_legacy")} placeholder="Stunde"></ha-textfield>
+                    <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @value-changed=${(s) => this.onText(s, "source_attribute")} placeholder="plan"></ha-textfield>
+                    <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @value-changed=${(s) => this.onText(s, "source_time_key")} placeholder="Stunde"></ha-textfield>
                   </div>
                   <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
 
