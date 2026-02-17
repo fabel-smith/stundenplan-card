@@ -693,7 +693,7 @@ const v = (D = class extends U {
       const n = (i ?? "").toString().trim();
       n && e.add(n);
     };
-    return s(t.week_offset_entity), s(t.source_entity), s(t.source_entity_a), s(t.source_entity_b), s(t.week_map_entity), Array.from(e);
+    return s(t.week_offset_entity), s(t.source_entity), s(t.source_entity_integration), s(t.source_entity_legacy), s(t.source_entity_a), s(t.source_entity_b), s(t.week_map_entity), Array.from(e);
   }
   getEntitySig(t) {
     const e = this.hass?.states?.[t];
@@ -931,65 +931,25 @@ const v = (D = class extends U {
     return n.length ? n : null;
   }
   getRowsFromEntity(t, e, s) {
-    // Robust entity reader:
-    // - supports arrays directly (rows)
-    // - supports objects like { plan:[...]} or { rows:[...]}
-    // - supports REST sensors that store the array under json_attributes
-    // - falls back to "first reasonable array attribute" if config attribute is wrong/missing
-    const entId = (e ?? "").toString().trim();
-    if (!entId || !this.hass?.states?.[entId]) return null;
+    let i = this.readEntityJson(e, s);
+    // Common REST patterns
+    if (i == null && s && (s + "").toString().trim() && (s + "").toString().trim() !== "plan") {
+      i = this.readEntityJson(e, "plan");
+    }
+    if (i == null) i = this.readEntityJson(e, "rows_ha");
+    if (i == null) i = this.readEntityJson(e, "rows");
+    if (i == null) i = this.readEntityJson(e, "rows_table");
+    if (i == null) i = this.readEntityJson(e, "rows_json");
 
-    const wantedAttr = (s ?? "").toString().trim();
-
-    const tryUnwrap = (val) => {
-      const v = this.parseAnyJson(val);
-      if (Array.isArray(v)) return v;
-      if (v && typeof v === "object") {
-        const plan = v.plan;
-        const rows = v.rows ?? v.rows_table ?? v.rows_ha ?? v.rows_json;
-        if (Array.isArray(plan)) return plan;
-        if (Array.isArray(rows)) return rows;
-      }
-      return null;
-    };
-
-    const st = this.hass.states[entId];
-    const attrs = st.attributes ?? {};
-
-    // 1) explicit attribute (if provided)
-    let arr = null;
-    if (wantedAttr) {
-      arr = tryUnwrap(attrs[wantedAttr]);
-      if (!arr) arr = tryUnwrap(st.state); // some sensors put JSON in state
+    // Unwrap object envelopes: { plan: [...] } or { rows: [...] }
+    if (i && typeof i === "object" && !Array.isArray(i)) {
+      const maybePlan = i.plan;
+      const maybeRows = i.rows;
+      if (Array.isArray(maybePlan)) i = maybePlan;
+      else if (Array.isArray(maybeRows)) i = maybeRows;
     }
 
-    // 2) common defaults / legacy REST sensors
-    if (!arr) arr = tryUnwrap(attrs.plan);
-    if (!arr) arr = tryUnwrap(attrs.rows_table);
-    if (!arr) arr = tryUnwrap(attrs.rows_ha);
-    if (!arr) arr = tryUnwrap(attrs.rows);
-    if (!arr) arr = tryUnwrap(attrs.rows_json);
-
-    // 3) as a last resort: pick the first array attribute that looks like rows
-    if (!arr) {
-      for (const [k, v] of Object.entries(attrs)) {
-        const candidate = tryUnwrap(v);
-        if (!candidate) continue;
-        const first = candidate[0];
-        if (first && typeof first === "object") {
-          const dayKeys = (t.days ?? []).map((d) => (d ?? "").toString());
-          if (dayKeys.some((dk) => dk in first) || "time" in first || "Stunde" in first) {
-            arr = candidate;
-            break;
-          }
-        } else if (candidate.length > 0) {
-          arr = candidate;
-          break;
-        }
-      }
-    }
-
-    return Array.isArray(arr) ? this.buildRowsFromArray(t, arr) : null;
+    return Array.isArray(i) ? this.buildRowsFromArray(t, i) : null;
   }
   async loadJsonRows(t, e) {
     const s = (e ?? "").toString().trim();
@@ -1050,7 +1010,13 @@ const v = (D = class extends U {
   }
   // Prefer meta.days from source_entity for header dates (YYYYMMDD)
   getHeaderDaysFromEntity(t) {
-    const e = (t.source_entity ?? "").toString().trim();
+    const e = (
+      (t.source_type ?? "manual") === "entity"
+        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        : (t.source_type ?? "manual") === "legacy"
+          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
+          : (t.source_entity ?? "")
+    ).toString().trim();
     if (!e || !this.hass?.states?.[e]) return null;
     const i = this.hass.states[e].attributes ?? {}, n = i?.meta_ha?.days ?? i?.meta?.days ?? i?.days ?? (typeof i?.meta_json == "string" ? this.parseAnyJson(i.meta_json)?.days : null) ?? null;
     if (!Array.isArray(n) || n.length < 3) return null;
@@ -1065,6 +1031,14 @@ const v = (D = class extends U {
   }
   getRowsResolved(t) {
     const e = t.source_type ?? "manual";
+    const effEntity = (
+      e === "entity"
+        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        : e === "legacy"
+          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
+          : (t.source_entity ?? "")
+    ).toString().trim();
+
     if (e === "manual")
       return t.rows ?? [];
     if (e === "json")
@@ -1075,11 +1049,11 @@ const v = (D = class extends U {
         return this.getRowsFromEntity(t, n, l) ?? [];
       if (i === "B" && o)
         return this.getRowsFromEntity(t, o, a) ?? [];
-      const c = (t.source_entity ?? "").trim();
-      return c ? this.getRowsFromEntity(t, c, (t.source_attribute_legacy ?? "").trim()) ?? [] : [];
+      const c = effEntity;
+      return c ? this.getRowsFromEntity(t, c, (t.source_attribute ?? "").toString().trim()) ?? [] : [];
     }
-    const s = (t.source_entity ?? "").toString().trim();
-    return s ? this.getRowsFromEntity(t, s, (t.source_attribute_legacy ?? "").toString().trim()) ?? [] : [];
+    const s = effEntity;
+    return s ? this.getRowsFromEntity(t, s, (t.source_attribute ?? "").toString().trim()) ?? [] : [];
   }
   recomputeRows() {
     if (!this.config) {
@@ -1528,7 +1502,10 @@ function Ne(r) {
 }
 const ut = class ut extends U {
   constructor() {
-    super(...arguments), this._open = {
+    super(...arguments);
+    this._unsubEntities = null;
+    this._didSubEntities = !1;
+    this._open = {
       general: !1,
       highlights: !1,
       colors: !1,
@@ -1542,7 +1519,35 @@ const ut = class ut extends U {
     };
   }
   connectedCallback() {
-    super.connectedCallback(), this.ensureUiLoaded();
+    super.connectedCallback();
+    this.ensureUiLoaded();
+    this.ensureEntitySubscription();
+  }
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    try {
+      this._unsubEntities?.();
+    } catch {
+    }
+    this._unsubEntities = null;
+    this._didSubEntities = !1;
+  }
+  async ensureEntitySubscription() {
+    if (this._didSubEntities) return;
+    const hass = this.hass;
+    if (!hass || !hass.connection) return;
+    try {
+      const sub = hass.connection.subscribeEntities;
+      if (typeof sub === "function") {
+        this._didSubEntities = !0;
+        this._unsubEntities = await sub(() => {
+          // no-op
+        });
+      }
+    } catch {
+      this._didSubEntities = !0;
+      this._unsubEntities = null;
+    }
   }
   async ensureUiLoaded() {
     if (!this._uiLoaded) {
@@ -1552,6 +1557,7 @@ const ut = class ut extends U {
       } catch {
       }
       setTimeout(() => this.requestUpdate(), 0);
+      this.ensureEntitySubscription();
     }
   }
   setConfig(t) {
@@ -2173,11 +2179,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
+window.__STUNDENPLAN_CARD_VERSION = "v2026-02-16.2";
+console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
+
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan mit Wochenblättern (Offset Helper auto) + Stundenplan24 Notes-Layout + Zeiten",
+  description: "Stundenplan Card v2026-02-16.2 (marker: STUNDENPLAN_CARD_v2026-02-16.2)",
   preview: !0
 });
 export {
