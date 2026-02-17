@@ -1665,10 +1665,21 @@ const ut = class ut extends U {
     const s = !!t?.target?.checked;
     this.setValue(e, s);
   }
-  onText(t, e) {
-    const s = (t?.detail?.value ?? t?.target?.value ?? t?.currentTarget?.value ?? "").toString();
-    this.setValue(e, s);
-  }
+  onText(ev, key) {
+  if (!this._config) return;
+
+  const value =
+    ev?.detail?.value ??
+    ev?.target?.value ??
+    ev?.currentTarget?.value ??
+    ev?.target?.checked ??
+    "";
+
+  this.emit({
+    ...this._config,
+    [key]: value
+  });
+}
   addManualRow() {
     if (!this._config) return;
     const t = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"], e = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [], s = { time: `${e.length + 1}.`, cells: Array.from({ length: t.length }, () => "") };
@@ -1950,7 +1961,7 @@ const ut = class ut extends U {
                   <ha-textfield
                     label="Stundenplan24 Entity-ID (manuell)"
                     .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
-                    @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
+                    @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
 placeholder="sensor.05b_woche"
                   ></ha-textfield>
                 ` : d``}
@@ -1987,13 +1998,13 @@ placeholder="sensor.05b_woche"
                   <ha-textfield
                     label="Single-Source Entity-ID (manuell)"
                     .value=${(t.source_entity_legacy ?? t.source_entity ?? "")}
-                    @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
+                    @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
 placeholder="sensor.stundenplan"
                   ></ha-textfield>
 
                   <div class="grid2">
-                    <ha-textfield label="Attribut" .value=${t.source_attribute_legacy ?? ""} @input=${(e) => this.onText(e, "source_attribute_legacy")} @change=${(e) => this.onText(e, "source_attribute_legacy")} @value-changed=${(e) => this.onText(e, "source_attribute_legacy")} placeholder="plan"></ha-textfield>
-                    <ha-textfield label="Time-Key" .value=${t.source_time_key_legacy ?? ""} @input=${(e) => this.onText(e, "source_time_key_legacy")} @change=${(e) => this.onText(e, "source_time_key_legacy")} @value-changed=${(e) => this.onText(e, "source_time_key_legacy")} placeholder="Stunde"></ha-textfield>
+                    <ha-textfield label="Attribut" .value=${t.source_attribute_legacy ?? ""} @value-changed=${(e) => this.onText(e, "source_attribute_legacy")} placeholder="plan"></ha-textfield>
+                    <ha-textfield label="Time-Key" .value=${t.source_time_key_legacy ?? ""} @value-changed=${(e) => this.onText(e, "source_time_key_legacy")} placeholder="Stunde"></ha-textfield>
                   </div>
                   <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
 
