@@ -780,7 +780,8 @@ const k = (q = class extends B {
       filter_main_only: !0,
       filter_allow_prefixes: [],
       filter_exclude: [],
-      rows: []
+      rows: [],
+      debug: !1
     };
   }
   static getConfigElement() {
@@ -855,7 +856,8 @@ const k = (q = class extends B {
       filter_main_only: e.filter_main_only ?? !0,
       filter_allow_prefixes: Array.isArray(e.filter_allow_prefixes) ? e.filter_allow_prefixes.map(String) : [],
       filter_exclude: Array.isArray(e.filter_exclude) ? e.filter_exclude.map(String) : [],
-      rows: r
+      rows: r,
+      debug: e.debug ?? !1
     };
   }
   getTodayIndex(e) {
@@ -1101,11 +1103,14 @@ const k = (q = class extends B {
   }
   render() {
     if (!this.config) return u``;
-    const e = this.config, t = this._rowsCache, s = this.getTodayIndex(e.days ?? []), r = (e.view_mode ?? "week").toString(), n = Number(e.days_ahead), o = Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0, a = r === "rolling" && s >= 0 ? Array.from({ length: Math.min((e.days?.length ?? 0) - s, o + 1) }, (w, m) => s + m) : Array.from({ length: e.days?.length ?? 0 }, (w, m) => m), c = a.map((w) => e.days[w]), l = "1px solid var(--divider-color)", d = Kt(e.highlight_today_color ?? "", 0.12), g = Kt(e.highlight_current_color ?? "", 0.18), _ = (e.highlight_current_text_color ?? "").toString().trim(), h = (e.highlight_current_time_text_color ?? "").toString().trim(), p = e.week_mode !== "off", b = p ? this.getActiveWeek(e) : null, $ = this.getWeekOffsetValue(e), f = (e.source_type ?? "manual").toString(), U = (e.week_offset_entity ?? "").trim().length > 0, R = U && (f === "entity" || f === "legacy" && (e.week_mode ?? "off") !== "off"), S = this.getHeaderDaysFromEntity(e), H = S && S.length >= (e.days?.length ?? 0) ? S : null, et = this.getBaseDate(e), I = this.mondayOfWeek(et);
-    return u`
+    try {
+      const e = this.config, t = this._rowsCache, s = this.getTodayIndex(e.days ?? []), r = (e.view_mode ?? "week").toString(), n = Number(e.days_ahead), o = Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0, a = r === "rolling" && s >= 0 ? Array.from({ length: Math.min((e.days?.length ?? 0) - s, o + 1) }, (w, m) => s + m) : Array.from({ length: e.days?.length ?? 0 }, (w, m) => m), c = a.map((w) => e.days[w]), l = "1px solid var(--divider-color)", d = Kt(e.highlight_today_color ?? "", 0.12), g = Kt(e.highlight_current_color ?? "", 0.18), _ = (e.highlight_current_text_color ?? "").toString().trim(), h = (e.highlight_current_time_text_color ?? "").toString().trim(), p = e.week_mode !== "off", b = p ? this.getActiveWeek(e) : null, $ = this.getWeekOffsetValue(e), f = (e.source_type ?? "manual").toString(), U = (e.week_offset_entity ?? "").trim().length > 0, R = U && (f === "entity" || f === "legacy" && (e.week_mode ?? "off") !== "off"), S = this.getHeaderDaysFromEntity(e), H = S && S.length >= (e.days?.length ?? 0) ? S : null, et = this.getBaseDate(e), I = this.mondayOfWeek(et);
+      return u`
       <ha-card>
         <div class="headerRow">
           <div class="title">${e.title ?? ""}</div>
+
+          ${e.debug ? u`<div class="hint" style="margin-top:4px;">mode=${e.source_type ?? "manual"} · entity=${e.source_type === "entity" ? e.source_entity_integration || e.source_entity || "" : e.source_type === "legacy" ? e.source_entity_legacy || e.source_entity || "" : e.source_entity || ""} · attr=${e.source_type === "legacy" ? e.source_attribute_legacy || e.source_attribute || "" : e.source_attribute || ""} · timeKey=${e.source_type === "legacy" ? e.source_time_key_legacy || e.source_time_key || "" : e.source_time_key || ""} · rows=${this._rowsCache?.length ?? 0} · noData=${this._noData}</div>` : u``}
 
           <div class="headRight">
             ${p ? u`<div class="weekBadgeInline">Woche <b>${b}</b></div>` : u``}
@@ -1126,42 +1131,42 @@ const k = (q = class extends B {
               <tr>
                 <th class="time">Stunde</th>
                 ${c.map((w, m) => {
-      const A = a[m], N = e.highlight_today && A === s ? "today" : "";
-      let v = "";
-      if (H)
-        v = this.fmtDDMMYYYY(H[A]);
-      else {
-        const it = Ve(w);
-        if (it) {
-          const st = new Date(I);
-          st.setDate(I.getDate() + (it - 1)), v = this.fmtDDMMYYYY(st);
+        const A = a[m], N = e.highlight_today && A === s ? "today" : "";
+        let v = "";
+        if (H)
+          v = this.fmtDDMMYYYY(H[A]);
+        else {
+          const it = Ve(w);
+          if (it) {
+            const st = new Date(I);
+            st.setDate(I.getDate() + (it - 1)), v = this.fmtDDMMYYYY(st);
+          }
         }
-      }
-      return u`
+        return u`
                     <th class=${N} style=${`--sp-hl:${d};`}>
                       <div>${w}</div>
                       <div class="thDate">${v}</div>
                     </th>
                   `;
-    })}
+      })}
               </tr>
             </thead>
 
             <tbody>
               ${this._noData ? u`<tr class="nodata"><td class="nodataCell" colspan=${c.length + 1}>${this._noDataMsg}</td></tr>` : t.map((w) => {
-      if (yt(w)) {
-        const Y = ot(w.time), rt = !!Y.start && !!Y.end && this.isNowBetween(Y.start, Y.end), L = !!e.highlight_breaks && rt;
-        let z = `--sp-hl:${g};`, nt = "";
-        return L && (z += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", nt += `--sp-hl:${g}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), L && e.highlight_current_time_text && h && (z += `color:${h};`), u`
+        if (yt(w)) {
+          const Y = ot(w.time), rt = !!Y.start && !!Y.end && this.isNowBetween(Y.start, Y.end), L = !!e.highlight_breaks && rt;
+          let z = `--sp-hl:${g};`, nt = "";
+          return L && (z += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", nt += `--sp-hl:${g}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), L && e.highlight_current_time_text && h && (z += `color:${h};`), u`
                     <tr class="break">
                       <td class="time" style=${z}>${w.time}</td>
                       <td colspan=${c.length} style=${nt}>${w.label ?? ""}</td>
                     </tr>
                   `;
-      }
-      const m = w, A = m.cells ?? [], N = m.cell_styles ?? [], v = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), it = s >= 0 ? A[s] ?? "" : "", st = s >= 0 ? this.filterCellText(it, e) : "", ce = s >= 0 ? xt(st) : !1, vt = !(e.free_only_column_highlight && ce), Nt = ot(m.time), he = !!(Nt.start && Nt.end), Ot = !he && m.start && m.end ? `${m.start}–${m.end}` : "";
-      let $t = `--sp-hl:${g};`;
-      return vt && e.highlight_current && v && ($t += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), vt && v && e.highlight_current_time_text && h && ($t += `color:${h};`), u`
+        }
+        const m = w, A = m.cells ?? [], N = m.cell_styles ?? [], v = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), it = s >= 0 ? A[s] ?? "" : "", st = s >= 0 ? this.filterCellText(it, e) : "", ce = s >= 0 ? xt(st) : !1, vt = !(e.free_only_column_highlight && ce), Nt = ot(m.time), he = !!(Nt.start && Nt.end), Ot = !he && m.start && m.end ? `${m.start}–${m.end}` : "";
+        let $t = `--sp-hl:${g};`;
+        return vt && e.highlight_current && v && ($t += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), vt && v && e.highlight_current_time_text && h && ($t += `color:${h};`), u`
                   <tr>
                     <td class="time" style=${$t}>
                       <div class="timeWrap">
@@ -1171,19 +1176,24 @@ const k = (q = class extends B {
                     </td>
 
                     ${c.map((Y, rt) => {
-        const L = a[rt], z = this.filterCellText(A[L] ?? "", e), nt = N[L] ?? null, ue = e.highlight_today && L === s ? "today" : "";
-        let Wt = `--sp-hl:${d};` + ze(nt, l);
-        const de = !xt(z);
-        return vt && de && v && e.highlight_current_text && _ && s >= 0 && rt === s && (Wt += `color:${_};`), u`<td class=${ue} style=${Wt}>${this.renderCell(z, e)}</td>`;
-      })}
+          const L = a[rt], z = this.filterCellText(A[L] ?? "", e), nt = N[L] ?? null, ue = e.highlight_today && L === s ? "today" : "";
+          let Wt = `--sp-hl:${d};` + ze(nt, l);
+          const de = !xt(z);
+          return vt && de && v && e.highlight_current_text && _ && s >= 0 && rt === s && (Wt += `color:${_};`), u`<td class=${ue} style=${Wt}>${this.renderCell(z, e)}</td>`;
+        })}
                   </tr>
                 `;
-    })}
+      })}
             </tbody>
           </table>
         </div>
       </ha-card>
     `;
+    } catch (e) {
+      console.error("stundenplan-card render error", e);
+      const t = e && (e.message || e.toString()) ? e.message || e.toString() : "unknown error", s = e && e.stack ? String(e.stack) : "";
+      return u`<ha-card><div style="padding:12px; color: var(--error-color); font-weight:700;">Stundenplan-Card Fehler</div><div style="padding:0 12px 12px 12px; font-family: var(--code-font-family, monospace); white-space: pre-wrap; overflow-wrap:anywhere; font-size:12px;">${t}\n${s}</div></ha-card>`;
+    }
   }
 }, q.styles = Qt`
     :host {

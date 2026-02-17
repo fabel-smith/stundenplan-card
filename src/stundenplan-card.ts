@@ -782,7 +782,8 @@ const v = (D = class extends U {
       filter_main_only: !0,
       filter_allow_prefixes: [],
       filter_exclude: [],
-      rows: []
+      rows: [],
+      debug: !1
     };
   }
   static getConfigElement() {
@@ -869,7 +870,8 @@ const v = (D = class extends U {
       filter_main_only: t.filter_main_only ?? !0,
       filter_allow_prefixes: Array.isArray(t.filter_allow_prefixes) ? t.filter_allow_prefixes.map(String) : [],
       filter_exclude: Array.isArray(t.filter_exclude) ? t.filter_exclude.map(String) : [],
-      rows: n
+      rows: n,
+      debug: t.debug ?? !1
     };
   }
   getTodayIndex(t) {
@@ -1145,8 +1147,10 @@ const v = (D = class extends U {
         </div>
       ` : d`<span class="cellText">${i}</span>`;
   }
+
   render() {
     if (!this.config) return d``;
+    try {
     const t = this.config, e = this._rowsCache, s = this.getTodayIndex(t.days ?? []), vm = (t.view_mode ?? "week").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, idxs = vm === "rolling" && s >= 0 ? Array.from({ length: Math.min((t.days?.length ?? 0) - s, daysAhead + 1) }, (y, m) => s + m) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m), daysVis = idxs.map((y) => t.days[y]), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(),
         p = (t.week_offset_entity ?? "").trim().length > 0,
         showPager = p && (sourceType === "entity" || (sourceType === "legacy" && (t.week_mode ?? "off") !== "off")), u = this.getHeaderDaysFromEntity(t), g = u && u.length >= (t.days?.length ?? 0) ? u : null, O = this.getBaseDate(t), B = this.mondayOfWeek(O);
@@ -1154,6 +1158,8 @@ const v = (D = class extends U {
       <ha-card>
         <div class="headerRow">
           <div class="title">${t.title ?? ""}</div>
+
+          ${t.debug ? d`<div class="hint" style="margin-top:4px;">mode=${t.source_type ?? "manual"} · entity=${(t.source_type==="entity"? (t.source_entity_integration||t.source_entity||"") : t.source_type==="legacy" ? (t.source_entity_legacy||t.source_entity||"") : (t.source_entity||""))} · attr=${(t.source_type==="legacy"? (t.source_attribute_legacy||t.source_attribute||"") : (t.source_attribute||""))} · timeKey=${(t.source_type==="legacy"? (t.source_time_key_legacy||t.source_time_key||"") : (t.source_time_key||""))} · rows=${(this._rowsCache?.length ?? 0)} · noData=${this._noData}</div>` : d``}
 
           <div class="headRight">
             ${c ? d`<div class="weekBadgeInline">Woche <b>${_}</b></div>` : d``}
@@ -1234,6 +1240,12 @@ const v = (D = class extends U {
         </div>
       </ha-card>
     `;
+    } catch (e) {
+      console.error('stundenplan-card render error', e);
+      const msg = (e && (e.message || e.toString())) ? (e.message || e.toString()) : 'unknown error';
+      const stack = (e && e.stack) ? String(e.stack) : '';
+      return d`<ha-card><div style="padding:12px; color: var(--error-color); font-weight:700;">Stundenplan-Card Fehler</div><div style="padding:0 12px 12px 12px; font-family: var(--code-font-family, monospace); white-space: pre-wrap; overflow-wrap:anywhere; font-size:12px;">${msg}\n${stack}</div></ha-card>`;
+    }
   }
 }, D.styles = It`
     :host {
