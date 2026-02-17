@@ -1961,7 +1961,7 @@ const ut = class ut extends U {
                   <ha-textfield
                     label="Stundenplan24 Entity-ID (manuell)"
                     .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
-                    @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
+                    @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
 placeholder="sensor.05b_woche"
                   ></ha-textfield>
                 ` : d``}
@@ -1998,13 +1998,13 @@ placeholder="sensor.05b_woche"
                   <ha-textfield
                     label="Single-Source Entity-ID (manuell)"
                     .value=${(t.source_entity_legacy ?? t.source_entity ?? "")}
-                    @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
+                    @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
 placeholder="sensor.stundenplan"
                   ></ha-textfield>
 
                   <div class="grid2">
-                    <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @value-changed=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-textfield>
-                    <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @value-changed=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-textfield>
+                    <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} @change=${(e) => this.onText(e, "source_attribute")} @value-changed=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-textfield>
+                    <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} @change=${(e) => this.onText(e, "source_time_key")} @value-changed=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-textfield>
                   </div>
                   <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
 

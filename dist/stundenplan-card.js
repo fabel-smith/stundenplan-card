@@ -246,11 +246,11 @@ let F = class extends HTMLElement {
   }
 };
 F.elementStyles = [], F.shadowRootOptions = { mode: "open" }, F[Z("elementProperties")] = /* @__PURE__ */ new Map(), F[Z("finalized")] = /* @__PURE__ */ new Map(), $e?.({ ReactiveElement: F }), (wt.reactiveElementVersions ??= []).push("2.1.2");
-const Dt = globalThis, zt = (e) => e, mt = Dt.trustedTypes, Ft = mt ? mt.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, Xt = "$lit$", T = `lit$${Math.random().toFixed(9).slice(2)}$`, te = "?" + T, Se = `<${te}>`, P = document, G = () => P.createComment(""), Q = (e) => e === null || typeof e != "object" && typeof e != "function", Tt = Array.isArray, xe = (e) => Tt(e) || typeof e?.[Symbol.iterator] == "function", St = `[ 	
+const Tt = globalThis, zt = (e) => e, mt = Tt.trustedTypes, Ft = mt ? mt.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, Xt = "$lit$", D = `lit$${Math.random().toFixed(9).slice(2)}$`, te = "?" + D, Se = `<${te}>`, P = document, G = () => P.createComment(""), Q = (e) => e === null || typeof e != "object" && typeof e != "function", Dt = Array.isArray, xe = (e) => Dt(e) || typeof e?.[Symbol.iterator] == "function", St = `[ 	
 \f\r]`, K = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, Bt = /-->/g, Jt = />/g, O = RegExp(`>|${St}(?:([^\\s"'>=/]+)(${St}*=${St}*(?:[^ 	
 \f\r"'\`<>=]|("|')|))|$)`, "g"), Vt = /'/g, It = /"/g, ee = /^(?:script|style|textarea|title)$/i, ke = (e) => (t, ...s) => ({ _$litType$: e, strings: t, values: s }), u = ke(1), J = /* @__PURE__ */ Symbol.for("lit-noChange"), y = /* @__PURE__ */ Symbol.for("lit-nothing"), Yt = /* @__PURE__ */ new WeakMap(), W = P.createTreeWalker(P, 129);
 function ie(e, t) {
-  if (!Tt(e) || !e.hasOwnProperty("raw")) throw Error("invalid template strings array");
+  if (!Dt(e) || !e.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return Ft !== void 0 ? Ft.createHTML(t) : t;
 }
 const Ae = (e, t) => {
@@ -261,7 +261,7 @@ const Ae = (e, t) => {
     let d, g, _ = -1, h = 0;
     for (; h < l.length && (a.lastIndex = h, g = a.exec(l), g !== null); ) h = a.lastIndex, a === K ? g[1] === "!--" ? a = Bt : g[1] !== void 0 ? a = Jt : g[2] !== void 0 ? (ee.test(g[2]) && (n = RegExp("</" + g[2], "g")), a = O) : g[3] !== void 0 && (a = O) : a === O ? g[0] === ">" ? (a = n ?? K, _ = -1) : g[1] === void 0 ? _ = -2 : (_ = a.lastIndex - g[2].length, d = g[1], a = g[3] === void 0 ? O : g[3] === '"' ? It : Vt) : a === It || a === Vt ? a = O : a === Bt || a === Jt ? a = K : (a = O, n = void 0);
     const p = a === O && e[c + 1].startsWith("/>") ? " " : "";
-    o += a === K ? l + Se : _ >= 0 ? (r.push(d), l.slice(0, _) + Xt + l.slice(_) + T + p) : l + T + (_ === -2 ? c : p);
+    o += a === K ? l + Se : _ >= 0 ? (r.push(d), l.slice(0, _) + Xt + l.slice(_) + D + p) : l + D + (_ === -2 ? c : p);
   }
   return [ie(e, o + (e[s] || "<?>") + (t === 2 ? "</svg>" : t === 3 ? "</math>" : "")), r];
 };
@@ -278,11 +278,11 @@ class X {
     for (; (n = W.nextNode()) !== null && l.length < c; ) {
       if (n.nodeType === 1) {
         if (n.hasAttributes()) for (const _ of n.getAttributeNames()) if (_.endsWith(Xt)) {
-          const h = g[a++], p = n.getAttribute(_).split(T), b = /([.?@])?(.*)/.exec(h);
-          l.push({ type: 1, index: o, name: b[2], strings: p, ctor: b[1] === "." ? Ce : b[1] === "?" ? Me : b[1] === "@" ? De : bt }), n.removeAttribute(_);
-        } else _.startsWith(T) && (l.push({ type: 6, index: o }), n.removeAttribute(_));
+          const h = g[a++], p = n.getAttribute(_).split(D), b = /([.?@])?(.*)/.exec(h);
+          l.push({ type: 1, index: o, name: b[2], strings: p, ctor: b[1] === "." ? Ce : b[1] === "?" ? Me : b[1] === "@" ? Te : bt }), n.removeAttribute(_);
+        } else _.startsWith(D) && (l.push({ type: 6, index: o }), n.removeAttribute(_));
         if (ee.test(n.tagName)) {
-          const _ = n.textContent.split(T), h = _.length - 1;
+          const _ = n.textContent.split(D), h = _.length - 1;
           if (h > 0) {
             n.textContent = mt ? mt.emptyScript : "";
             for (let p = 0; p < h; p++) n.append(_[p], G()), W.nextNode(), l.push({ type: 2, index: ++o });
@@ -292,7 +292,7 @@ class X {
       } else if (n.nodeType === 8) if (n.data === te) l.push({ type: 2, index: o });
       else {
         let _ = -1;
-        for (; (_ = n.data.indexOf(T, _ + 1)) !== -1; ) l.push({ type: 7, index: o }), _ += T.length - 1;
+        for (; (_ = n.data.indexOf(D, _ + 1)) !== -1; ) l.push({ type: 7, index: o }), _ += D.length - 1;
       }
       o++;
     }
@@ -325,7 +325,7 @@ class Ee {
     for (; l !== void 0; ) {
       if (a === l.index) {
         let d;
-        l.type === 2 ? d = new tt(o, o.nextSibling, this, t) : l.type === 1 ? d = new l.ctor(o, l.name, l.strings, this, t) : l.type === 6 && (d = new Te(o, this, t)), this._$AV.push(d), l = r[++c];
+        l.type === 2 ? d = new tt(o, o.nextSibling, this, t) : l.type === 1 ? d = new l.ctor(o, l.name, l.strings, this, t) : l.type === 6 && (d = new De(o, this, t)), this._$AV.push(d), l = r[++c];
       }
       a !== l?.index && (o = W.nextNode(), a++);
     }
@@ -379,7 +379,7 @@ class tt {
     return s === void 0 && Yt.set(t.strings, s = new X(t)), s;
   }
   k(t) {
-    Tt(this._$AH) || (this._$AH = [], this._$AR());
+    Dt(this._$AH) || (this._$AH = [], this._$AR());
     const s = this._$AH;
     let r, n = 0;
     for (const o of t) n === s.length ? s.push(r = new tt(this.O(G()), this.O(G()), this, this.options)) : r = s[n], r._$AI(o), n++;
@@ -436,7 +436,7 @@ class Me extends bt {
     this.element.toggleAttribute(this.name, !!t && t !== y);
   }
 }
-class De extends bt {
+class Te extends bt {
   constructor(t, s, r, n, o) {
     super(t, s, r, n, o), this.type = 5;
   }
@@ -449,7 +449,7 @@ class De extends bt {
     typeof this._$AH == "function" ? this._$AH.call(this.options?.host ?? this.element, t) : this._$AH.handleEvent(t);
   }
 }
-class Te {
+class De {
   constructor(t, s, r) {
     this.element = t, this.type = 6, this._$AN = void 0, this._$AM = s, this.options = r;
   }
@@ -460,8 +460,8 @@ class Te {
     V(this, t);
   }
 }
-const je = Dt.litHtmlPolyfillSupport;
-je?.(X, tt), (Dt.litHtmlVersions ??= []).push("3.3.2");
+const je = Tt.litHtmlPolyfillSupport;
+je?.(X, tt), (Tt.litHtmlVersions ??= []).push("3.3.2");
 const Re = (e, t, s) => {
   const r = s?.renderBefore ?? t;
   let n = r._$litPart$;
@@ -1438,7 +1438,7 @@ function Ve(e, t, s) {
     })
   );
 }
-function D(e, t = !1) {
+function T(e, t = !1) {
   if (typeof e == "boolean") return e;
   if (e == null) return t;
   const s = String(e).trim().toLowerCase();
@@ -1753,30 +1753,30 @@ const At = class extends B {
       "highlights",
       u`
             <div class="grid3">
-              <ha-switch .checked=${D(t.highlight_today, !0)} @change=${(s) => this.onToggle(s, "highlight_today")}></ha-switch>
+              <ha-switch .checked=${T(t.highlight_today, !0)} @change=${(s) => this.onToggle(s, "highlight_today")}></ha-switch>
               <div class="switchLabel">Heute-Spalte hervorheben</div>
               <div></div>
 
-              <ha-switch .checked=${D(t.highlight_current, !0)} @change=${(s) => this.onToggle(s, "highlight_current")}></ha-switch>
+              <ha-switch .checked=${T(t.highlight_current, !0)} @change=${(s) => this.onToggle(s, "highlight_current")}></ha-switch>
               <div class="switchLabel">Aktuelle Stunde hervorheben</div>
               <div></div>
 
-              <ha-switch .checked=${D(t.highlight_breaks, !1)} @change=${(s) => this.onToggle(s, "highlight_breaks")}></ha-switch>
+              <ha-switch .checked=${T(t.highlight_breaks, !1)} @change=${(s) => this.onToggle(s, "highlight_breaks")}></ha-switch>
               <div class="switchLabel">Pause hervorheben</div>
               <div></div>
 
               <ha-switch
-                .checked=${D(t.free_only_column_highlight, !0)}
+                .checked=${T(t.free_only_column_highlight, !0)}
                 @change=${(s) => this.onToggle(s, "free_only_column_highlight")}
               ></ha-switch>
               <div class="switchLabel">Nur wenn heute-Spalte nicht frei</div>
               <div></div>
 
-              <ha-switch .checked=${D(t.highlight_current_text, !1)} @change=${(s) => this.onToggle(s, "highlight_current_text")}></ha-switch>
+              <ha-switch .checked=${T(t.highlight_current_text, !1)} @change=${(s) => this.onToggle(s, "highlight_current_text")}></ha-switch>
               <div class="switchLabel">Textfarbe in aktueller Stunde</div>
               <ha-textfield label="Textfarbe" .value=${t.highlight_current_text_color ?? ""} @input=${(s) => this.onText(s, "highlight_current_text_color")}></ha-textfield>
 
-              <ha-switch .checked=${D(t.highlight_current_time_text, !1)} @change=${(s) => this.onToggle(s, "highlight_current_time_text")}></ha-switch>
+              <ha-switch .checked=${T(t.highlight_current_time_text, !1)} @change=${(s) => this.onToggle(s, "highlight_current_time_text")}></ha-switch>
               <div class="switchLabel">Zeitspalte Textfarbe (aktuell)</div>
               <ha-textfield label="Zeitfarbe" .value=${t.highlight_current_time_text_color ?? ""} @input=${(s) => this.onText(s, "highlight_current_time_text_color")}></ha-textfield>
             </div>
@@ -1863,7 +1863,7 @@ const At = class extends B {
                   <ha-textfield
                     label="Stundenplan24 Entity-ID (manuell)"
                     .value=${t.source_entity_integration ?? t.source_entity ?? ""}
-                    @value-changed=${(s) => this.setSourceEntity(s?.detail?.value ?? s?.target?.value ?? s?.currentTarget?.value)}
+                    @input=${(s) => this.setSourceEntity(s?.detail?.value ?? s?.target?.value ?? s?.currentTarget?.value)} @change=${(s) => this.setSourceEntity(s?.detail?.value ?? s?.target?.value ?? s?.currentTarget?.value)} @value-changed=${(s) => this.setSourceEntity(s?.detail?.value ?? s?.target?.value ?? s?.currentTarget?.value)}
 placeholder="sensor.05b_woche"
                   ></ha-textfield>
                 ` : u``}
@@ -1895,13 +1895,13 @@ placeholder="sensor.05b_woche"
                   <ha-textfield
                     label="Single-Source Entity-ID (manuell)"
                     .value=${t.source_entity_legacy ?? t.source_entity ?? ""}
-                    @value-changed=${(s) => this.setSourceEntity(s?.detail?.value ?? s?.target?.value ?? s?.currentTarget?.value)}
+                    @input=${(s) => this.setSourceEntity(s?.detail?.value ?? s?.target?.value ?? s?.currentTarget?.value)} @change=${(s) => this.setSourceEntity(s?.detail?.value ?? s?.target?.value ?? s?.currentTarget?.value)} @value-changed=${(s) => this.setSourceEntity(s?.detail?.value ?? s?.target?.value ?? s?.currentTarget?.value)}
 placeholder="sensor.stundenplan"
                   ></ha-textfield>
 
                   <div class="grid2">
-                    <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @value-changed=${(s) => this.onText(s, "source_attribute")} placeholder="plan"></ha-textfield>
-                    <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @value-changed=${(s) => this.onText(s, "source_time_key")} placeholder="Stunde"></ha-textfield>
+                    <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @input=${(s) => this.onText(s, "source_attribute")} @change=${(s) => this.onText(s, "source_attribute")} @value-changed=${(s) => this.onText(s, "source_attribute")} placeholder="plan"></ha-textfield>
+                    <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(s) => this.onText(s, "source_time_key")} @change=${(s) => this.onText(s, "source_time_key")} @value-changed=${(s) => this.onText(s, "source_time_key")} placeholder="Stunde"></ha-textfield>
                   </div>
                   <div class="hint">Legacy: REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
 
@@ -1914,7 +1914,7 @@ placeholder="sensor.stundenplan"
                       .hass=${this.hass}
                       .data=${{
         week_mode: t.week_mode ?? "off",
-        week_a_is_even_kw: D(t.week_a_is_even_kw, !0)
+        week_a_is_even_kw: T(t.week_a_is_even_kw, !0)
       }}
                       .schema=${[
         {
@@ -1949,7 +1949,7 @@ placeholder="sensor.stundenplan"
           const r = s?.detail?.value ?? {}, n = r.week_mode ?? t.week_mode ?? "off";
           n !== (t.week_mode ?? "off") && this.setValue("week_mode", n);
           const o = r.week_a_is_even_kw;
-          typeof o == "boolean" && o !== D(t.week_a_is_even_kw, !0) && this.setValue("week_a_is_even_kw", o);
+          typeof o == "boolean" && o !== T(t.week_a_is_even_kw, !0) && this.setValue("week_a_is_even_kw", o);
         } catch (r) {
           console.error("stundenplan-card editor: week settings change failed", r);
         }
