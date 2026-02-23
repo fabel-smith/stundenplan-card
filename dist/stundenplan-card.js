@@ -247,7 +247,7 @@ let J = class extends HTMLElement {
 };
 J.elementStyles = [], J.shadowRootOptions = { mode: "open" }, J[G("elementProperties")] = /* @__PURE__ */ new Map(), J[G("finalized")] = /* @__PURE__ */ new Map(), $e?.({ ReactiveElement: J }), (P.reactiveElementVersions ?? (P.reactiveElementVersions = [])).push("2.1.2");
 const Q = globalThis, zt = (e) => e, $t = Q.trustedTypes, Lt = $t ? $t.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, Xt = "$lit$", N = `lit$${Math.random().toFixed(9).slice(2)}$`, te = "?" + N, xe = `<${te}>`, z = document, et = () => z.createComment(""), it = (e) => e === null || typeof e != "object" && typeof e != "function", jt = Array.isArray, Se = (e) => jt(e) || typeof e?.[Symbol.iterator] == "function", At = `[ 	
-\f\r]`, Z = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, Ft = /-->/g, Jt = />/g, H = RegExp(`>|${At}(?:([^\\s"'>=/]+)(${At}*=${At}*(?:[^ 	
+\f\r]`, K = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, Ft = /-->/g, Jt = />/g, H = RegExp(`>|${At}(?:([^\\s"'>=/]+)(${At}*=${At}*(?:[^ 	
 \f\r"'\`<>=]|("|')|))|$)`, "g"), It = /'/g, Vt = /"/g, ee = /^(?:script|style|textarea|title)$/i, ke = (e) => (t, ...i) => ({ _$litType$: e, strings: t, values: i }), h = ke(1), V = /* @__PURE__ */ Symbol.for("lit-noChange"), w = /* @__PURE__ */ Symbol.for("lit-nothing"), Yt = /* @__PURE__ */ new WeakMap(), B = z.createTreeWalker(z, 129);
 function ie(e, t) {
   if (!jt(e) || !e.hasOwnProperty("raw")) throw Error("invalid template strings array");
@@ -255,13 +255,13 @@ function ie(e, t) {
 }
 const Ae = (e, t) => {
   const i = e.length - 1, s = [];
-  let r, n = t === 2 ? "<svg>" : t === 3 ? "<math>" : "", o = Z;
+  let r, n = t === 2 ? "<svg>" : t === 3 ? "<math>" : "", o = K;
   for (let l = 0; l < i; l++) {
     const a = e[l];
     let u, d, g = -1, c = 0;
-    for (; c < a.length && (o.lastIndex = c, d = o.exec(a), d !== null); ) c = o.lastIndex, o === Z ? d[1] === "!--" ? o = Ft : d[1] !== void 0 ? o = Jt : d[2] !== void 0 ? (ee.test(d[2]) && (r = RegExp("</" + d[2], "g")), o = H) : d[3] !== void 0 && (o = H) : o === H ? d[0] === ">" ? (o = r ?? Z, g = -1) : d[1] === void 0 ? g = -2 : (g = o.lastIndex - d[2].length, u = d[1], o = d[3] === void 0 ? H : d[3] === '"' ? Vt : It) : o === Vt || o === It ? o = H : o === Ft || o === Jt ? o = Z : (o = H, r = void 0);
+    for (; c < a.length && (o.lastIndex = c, d = o.exec(a), d !== null); ) c = o.lastIndex, o === K ? d[1] === "!--" ? o = Ft : d[1] !== void 0 ? o = Jt : d[2] !== void 0 ? (ee.test(d[2]) && (r = RegExp("</" + d[2], "g")), o = H) : d[3] !== void 0 && (o = H) : o === H ? d[0] === ">" ? (o = r ?? K, g = -1) : d[1] === void 0 ? g = -2 : (g = o.lastIndex - d[2].length, u = d[1], o = d[3] === void 0 ? H : d[3] === '"' ? Vt : It) : o === Vt || o === It ? o = H : o === Ft || o === Jt ? o = K : (o = H, r = void 0);
     const p = o === H && e[l + 1].startsWith("/>") ? " " : "";
-    n += o === Z ? a + xe : g >= 0 ? (s.push(u), a.slice(0, g) + Xt + a.slice(g) + N + p) : a + N + (g === -2 ? l : p);
+    n += o === K ? a + xe : g >= 0 ? (s.push(u), a.slice(0, g) + Xt + a.slice(g) + N + p) : a + N + (g === -2 ? l : p);
   }
   return [ie(e, n + (e[i] || "<?>") + (t === 2 ? "</svg>" : t === 3 ? "</math>" : "")), s];
 };
@@ -566,7 +566,7 @@ function ze(e, t) {
   const i = [], s = Be(e);
   return s && i.push(`background:${s}`), e?.color && i.push(`color:${e.color}`), i.push(`border:${e?.border ?? t}`), i.join(";") + ";";
 }
-function Kt(e, t) {
+function Zt(e, t) {
   const i = (e ?? "").toString().trim();
   if (!i) return `rgba(0,0,0,${t})`;
   if (i.startsWith("rgba(") || i.startsWith("rgb(") || i.startsWith("var(")) return i;
@@ -603,7 +603,7 @@ function Le(e) {
       return [];
   }
 }
-function Zt(e) {
+function Kt(e) {
   const t = new Date(Date.UTC(e.getFullYear(), e.getMonth(), e.getDate())), i = t.getUTCDay() === 0 ? 7 : t.getUTCDay();
   t.setUTCDate(t.getUTCDate() + 4 - i);
   const s = t.getUTCFullYear(), r = new Date(Date.UTC(s, 0, 1)), n = r.getUTCDay() === 0 ? 7 : r.getUTCDay(), o = new Date(r);
@@ -954,7 +954,7 @@ const M = (q = class extends I {
         return {
           break: !0,
           time: (l?.time ?? l?.[s] ?? l?.[r] ?? l?.[n] ?? "").toString(),
-          label: (l?.label ?? "Pause").toString()
+          label: (l.label ?? "Pause").toString()
         };
       const a = (l?.time ?? l?.[s] ?? l?.[r] ?? l?.[n] ?? "").toString(), u = ht(a), d = Array.from({ length: i.length }, (p, m) => {
         const f = (i[m] ?? "").toString();
@@ -995,7 +995,7 @@ const M = (q = class extends I {
     t === this._jsonUrlLast && this._jsonStatus !== "error" || (t !== this._jsonUrlLast && (this._jsonUrlLast = t, this._jsonRows = null, this._jsonStatus = "idle", this._jsonError = ""), this._jsonStatus === "idle" && t && this.loadJsonRows(e, t));
   }
   weekFromParity(e) {
-    const { isoWeek: t } = Zt(/* @__PURE__ */ new Date()), i = t % 2 === 0, s = !!e.week_a_is_even_kw;
+    const { isoWeek: t } = Kt(/* @__PURE__ */ new Date()), i = t % 2 === 0, s = !!e.week_a_is_even_kw;
     return i === s ? "A" : "B";
   }
   weekFromMap(e) {
@@ -1003,7 +1003,7 @@ const M = (q = class extends I {
     if (!t) return null;
     const i = (e.week_map_attribute ?? "").toString().trim(), s = this.readEntityJson(t, i);
     if (!s || typeof s != "object") return null;
-    const { isoWeek: r, isoYear: n } = Zt(/* @__PURE__ */ new Date()), o = String(r), l = String(n);
+    const { isoWeek: r, isoYear: n } = Kt(/* @__PURE__ */ new Date()), o = String(r), l = String(n);
     if (s?.[l] && typeof s[l] == "object") {
       const u = qt(s[l][o]);
       if (u) return u;
@@ -1248,7 +1248,7 @@ const M = (q = class extends I {
   }
   render() {
     if (!this.config) return h``;
-    const e = this.config, t = this._rowsCache, i = this.getHeaderDaysFromEntity(e), s = this.getTodayIndex(e.days ?? [], i), r = (e.view_mode ?? "week").toString(), n = Number(e.days_ahead), o = Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0, l = r === "rolling" && s >= 0 ? Array.from({ length: Math.min((e.days?.length ?? 0) - s, o + 1) }, (x, b) => s + b) : Array.from({ length: e.days?.length ?? 0 }, (x, b) => b), a = l.map((x) => e.days[x]), u = "1px solid var(--divider-color)", d = Kt(e.highlight_today_color ?? "", 0.12), g = Kt(e.highlight_current_color ?? "", 0.18), c = (e.highlight_current_text_color ?? "").toString().trim(), p = (e.highlight_current_time_text_color ?? "").toString().trim(), m = e.week_mode !== "off", f = m ? this.getActiveWeek(e) : null, _ = this.getWeekOffsetValue(e), v = (e.source_type ?? "manual").toString(), $ = (e.week_offset_entity ?? "").trim().length > 0, S = $ && (v === "entity" || v === "sensor" && (e.week_mode ?? "off") !== "off"), y = i && i.length >= (e.days?.length ?? 0) ? i : null, A = this.getHeaderUpdatedFromEntity(e), C = this.getBaseDate(e), nt = this.mondayOfWeek(C);
+    const e = this.config, t = this._rowsCache, i = this.getHeaderDaysFromEntity(e), s = this.getTodayIndex(e.days ?? [], i), r = (e.view_mode ?? "week").toString(), n = Number(e.days_ahead), o = Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0, l = r === "rolling" && s >= 0 ? Array.from({ length: Math.min((e.days?.length ?? 0) - s, o + 1) }, (x, b) => s + b) : Array.from({ length: e.days?.length ?? 0 }, (x, b) => b), a = l.map((x) => e.days[x]), u = "1px solid var(--divider-color)", d = Zt(e.highlight_today_color ?? "", 0.12), g = Zt(e.highlight_current_color ?? "", 0.18), c = (e.highlight_current_text_color ?? "").toString().trim(), p = (e.highlight_current_time_text_color ?? "").toString().trim(), m = e.week_mode !== "off", f = m ? this.getActiveWeek(e) : null, _ = this.getWeekOffsetValue(e), v = (e.source_type ?? "manual").toString(), $ = (e.week_offset_entity ?? "").trim().length > 0, S = $ && (v === "entity" || v === "sensor" && (e.week_mode ?? "off") !== "off"), y = i && i.length >= (e.days?.length ?? 0) ? i : null, A = this.getHeaderUpdatedFromEntity(e), C = this.getBaseDate(e), nt = this.mondayOfWeek(C);
     return h`
       <ha-card>
         <div class="headerRow">
@@ -1298,7 +1298,7 @@ const M = (q = class extends I {
             <tbody>
               ${this._noData ? h`<tr class="nodata"><td class="nodataCell" colspan=${a.length + 1}>${this._noDataMsg}</td></tr>` : t.map((x) => {
       if (tt(x)) {
-        const K = ht(x.time), lt = !!K.start && !!K.end && this.isNowBetween(K.start, K.end), L = !!e.highlight_breaks && lt;
+        const Z = ht(x.time), lt = !!Z.start && !!Z.end && this.isNowBetween(Z.start, Z.end), L = !!e.highlight_breaks && lt;
         let F = `--sp-hl:${g};`, ct = "";
         return L && (F += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", ct += `--sp-hl:${g}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), L && e.highlight_current_time_text && p && (F += `color:${p};`), h`
                     <tr class="break">
@@ -1318,7 +1318,7 @@ const M = (q = class extends I {
                       </div>
                     </td>
 
-                    ${a.map((K, lt) => {
+                    ${a.map((Z, lt) => {
         const L = l[lt], F = this.filterCellText(k[L] ?? "", e), ct = W[L] ?? null, ue = e.highlight_today && L === s ? "today" : "";
         let Ot = `--sp-hl:${d};` + ze(ct, u);
         const de = !ut(F);

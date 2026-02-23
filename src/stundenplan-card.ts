@@ -998,31 +998,19 @@ const v = (D = class extends U {
     const tkCfg = (t.source_time_key ?? "time").toString().trim();
     const tkAlt1 = "Stunde";
     const tkAlt2 = "time";
-const n = e.map((o) => {
-  // Break row (Pause)
-  if (o?.break === true) {
-    const timeStr = (o?.time ?? o?.[tkCfg] ?? o?.[tkAlt1] ?? o?.[tkAlt2] ?? "").toString();
-    return {
-      break: true,
-      time: timeStr,
-      label: (o?.label ?? "Pause").toString(),
-    };
-  }
-
-  // Normal row
-  const timeStr = (o?.time ?? o?.[tkCfg] ?? o?.[tkAlt1] ?? o?.[tkAlt2] ?? "").toString();
-  const parsed = mt(timeStr);
-
-  const cells = Array.from({ length: s.length }, (_u, g) => {
-    const dayKey = (s[g] ?? "").toString();
-    return (o?.[dayKey] ?? "").toString();
-  });
-
-  const start = (o?.start ?? "").toString().trim() || parsed.start;
-  const end = (o?.end ?? "").toString().trim() || parsed.end;
-
-  return { time: timeStr, start: start || void 0, end: end || void 0, cells };
-});
+    const n = e.map((o) => {
+      if (o?.break === !0)
+        return {
+          break: !0,
+          time: (o?.time ?? o?.[tkCfg] ?? o?.[tkAlt1] ?? o?.[tkAlt2] ?? "").toString(),
+          label: (o.label ?? "Pause").toString()
+        };
+      const l = (o?.time ?? o?.[tkCfg] ?? o?.[tkAlt1] ?? o?.[tkAlt2] ?? "").toString(), a = mt(l), c = Array.from({ length: s.length }, (u, g) => {
+        const O = (s[g] ?? "").toString();
+        return (o?.[O] ?? "").toString();
+      }), _ = (o?.start ?? "").toString().trim() || a.start, h = (o?.end ?? "").toString().trim() || a.end;
+      return { time: l, start: _ || void 0, end: h || void 0, cells: c };
+    });
     return n.length ? n : null;
   }
   getRowsFromEntity(t, e, s) {
