@@ -618,7 +618,8 @@ function zt(r) {
 }
 function yt(r) {
   const t = (r ?? "").toString().trim();
-  return !!(!t || t === "-" || t === "–" || t === "---" || /^(—|\-|–|---|\s)+$/.test(t));
+  // Treat single dash variants as empty, but keep "---" (used by Indiware as a visible placeholder).
+  return !!(!t || t === "-" || t === "–" || t === "—" || /^(—|\-|–|\s)+$/.test(t));
 }
 function je(r) {
   const t = (r ?? "").toString().trim();
@@ -645,6 +646,68 @@ const v = (D = class extends U {
   }
   set hass(t) {
     A(this, X, t);
+
+    // Autokick für Stundenplan24: wenn der Wochensensor noch "Kein Plan"/leer ist,
+    // einmal den passenden week_offset (number.*_woche_offset) "antippen" und Sensor aktualisieren.
+    try {
+      const cfg = this.config;
+      const st = (cfg?.source_type ?? "manual").toString();
+      if (st === "entity") {
+        // "Heute"-Ansicht (rolling + days_ahead=0): erzwinge aktuelle Woche (week_offset=0)
+        // damit "days_ahead: 0" zuverlässig "heute" zeigt.
+        try {
+          const vm = (cfg?.view_mode ?? "week").toString();
+          const da = Number(cfg?.days_ahead);
+          const daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0;
+          if (vm === "rolling" && daysAhead === 0) {
+            const offEnt = ((cfg?.week_offset_entity ?? "") + "").toString().trim();
+            if (offEnt && t?.states?.[offEnt]) {
+              const cur = Number(t.states[offEnt].state);
+              if (Number.isFinite(cur) && cur !== 0) {
+                t.callService("number", "set_value", { entity_id: offEnt, value: 0 }).catch?.(() => {});
+                window.setTimeout(() => {
+                  try {
+                    const sensorId2 = ((cfg?.source_entity_integration ?? cfg?.source_entity ?? "") + "").toString().trim();
+                    if (sensorId2) this.hass?.callService("homeassistant", "update_entity", { entity_id: sensorId2 });
+                  } catch {}
+                }, 400);
+              }
+            }
+          }
+        } catch {}
+
+        const sensorId = ((cfg?.source_entity_integration ?? cfg?.source_entity ?? "") + "").toString().trim();
+        const hass = t;
+        const sensorState = sensorId ? hass?.states?.[sensorId] : void 0;
+        const a = sensorState?.attributes ?? {};
+        const isEmpty =
+          a?.no_plan === !0 ||
+          (Array.isArray(a?.rows_table_json) && a.rows_table_json.length === 0) ||
+          (Array.isArray(a?.rows_json) && a.rows_json.length === 0);
+
+        if (sensorId && isEmpty) {
+          let offEnt = ((cfg?.week_offset_entity ?? "") + "").toString().trim();
+          if (!offEnt) offEnt = sensorId.replace(/^sensor\./, "number.") + "_offset";
+          const hasOff = offEnt && hass?.states && offEnt in hass.states;
+          const sig = sensorId + "|" + offEnt;
+
+          if (hasOff && this.__autokickSig !== sig) {
+            this.__autokickSig = sig;
+
+            const curRaw = hass.states[offEnt]?.state;
+            const cur = Number(curRaw);
+            const value = Number.isFinite(cur) ? cur : 0;
+
+            hass.callService("number", "set_value", { entity_id: offEnt, value }).catch?.(() => {});
+            window.setTimeout(() => {
+              try {
+                this.hass?.callService("homeassistant", "update_entity", { entity_id: sensorId });
+              } catch {}
+            }, 600);
+          }
+        }
+      }
+    } catch {}
   }
   get config() {
     return k(this, tt);
@@ -872,8 +935,28 @@ const v = (D = class extends U {
       rows: n
     };
   }
-  getTodayIndex(t) {
-    const e = (/* @__PURE__ */ new Date()).getDay(), s = new Set(Re(e).map(wt));
+  getTodayIndex(t, metaDays) {
+    const today = (/* @__PURE__ */ new Date());
+    const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+    // If meta-days are provided by an integration, they may be either
+    // - strings in YYYYMMDD (preferred), or
+    // - strings in YYYY-MM-DD, or
+    // - Date objects (this card uses Date objects for header rendering).
+    // Make the comparison robust so the today-column highlight works reliably.
+    if (Array.isArray(metaDays) && metaDays.length) {
+      const n = metaDays.map((o) => {
+        if (o instanceof Date && !Number.isNaN(o.getTime())) {
+          return `${o.getFullYear()}${String(o.getMonth() + 1).padStart(2, "0")}${String(o.getDate()).padStart(2, "0")}`;
+        }
+        const s = (o ?? "").toString().trim();
+        const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (m) return `${m[1]}${m[2]}${m[3]}`;
+        return s;
+      });
+      const i = n.indexOf(ymd);
+      return i >= 0 ? i : -1;
+    }
+    const e = today.getDay(), s = new Set(Re(e).map(wt));
     if (!s.size) return -1;
     const i = (t ?? []).map((n) => wt(n));
     for (let n = 0; n < i.length; n++) if (s.has(i[n])) return n;
@@ -1029,7 +1112,47 @@ const v = (D = class extends U {
     }
     return o.length ? o : null;
   }
-  getRowsResolved(t) {
+  
+  // Extract "aktualisiert" timestamps from Stundenplan24 integration (wplan HTML),
+  // exposed via sensor attributes meta / meta_ha / meta_json.
+  // Returns either one value per day (Mo..Fr) or null.
+  getHeaderUpdatedFromEntity(t) {
+    const e = (
+      (t.source_type ?? "manual") === "entity"
+        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        : (t.source_type ?? "manual") === "sensor"
+          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
+          : (t.source_entity ?? "")
+    ).toString().trim();
+    if (!e || !this.hass?.states?.[e]) return null;
+
+    const a = this.hass.states[e].attributes ?? {};
+    const meta =
+      a?.meta_ha ??
+      a?.meta ??
+      (typeof a?.meta_json === "string" ? this.parseAnyJson(a.meta_json) : null) ??
+      null;
+
+    if (!meta) return null;
+
+    const daysLen = (t.days?.length ?? 0) || 5;
+
+    const updDays = meta?.updated_days;
+    if (Array.isArray(updDays) && updDays.length) {
+      // Normalize to at least daysLen, pad with first value
+      const first = (updDays[0] ?? "").toString().trim();
+      const norm = Array.from({ length: daysLen }, (_, i) => (updDays[i] ?? first ?? "").toString().trim());
+      return norm;
+    }
+
+    const updRaw = (meta?.updated_raw ?? meta?.updated ?? "").toString().trim();
+    if (updRaw) {
+      return Array.from({ length: daysLen }, () => updRaw);
+    }
+
+    return null;
+  }
+getRowsResolved(t) {
     const e = t.source_type ?? "manual";
     const effEntity = (
       e === "entity"
@@ -1079,7 +1202,24 @@ const v = (D = class extends U {
     if (/^(—|\-|–|---|\s)+$/.test(i)) return null;
     const n = s[0];
     if (/^(—|\-|–|---)$/.test(n)) return null;
-    const o = (u) => /^[🟠🔴🟡🟢⚪️🟣🟤]/.test(u) || /\bfällt\s+aus\b/i.test(u) || /\bverlegt\b/i.test(u) || /\bentfällt\b/i.test(u) || /\bvertretung\b/i.test(u), l = (u) => /^\d{1,4}$/.test(u) || /^[A-ZÄÖÜ]{1,4}\d{1,3}$/i.test(u), a = s.slice(1);
+    const o = (u) => {
+      const x = (u ?? "").toString().trim();
+      return /^[🟠🔴🟡🟢⚪️🟣🟤]/.test(x)
+        || /\bfällt\s+aus\b/i.test(x)
+        || /\bverlegt\b/i.test(x)
+        || /\bentfällt\b/i.test(x)
+        || /\bvertretung\b/i.test(x)
+        || /\bstatt\b/i.test(x)
+        || /\bgehalten\b/i.test(x)
+        || /\bAufgaben\b/i.test(x)
+        || /^für\b/i.test(x);
+    }, l = (u) => {
+      const x = (u ?? "").toString().trim();
+      // Räume: reine Nummern (222), alphanumerisch kurz (SH2-B, SH2-A), oder "044 Aula"
+      return /^\d{1,4}$/.test(x)
+        || /^[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}$/i.test(x)
+        || /^\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12}$/.test(x);
+    }, a = s.slice(1);
     let c = -1;
     for (let u = 0; u < a.length; u++)
       if (!o(a[u]) && l(a[u])) {
@@ -1111,45 +1251,187 @@ const v = (D = class extends U {
     return { fach: n, raum: _, lehrer: h, notes: p.length ? p : void 0 };
   }
   renderCell(t, e) {
-    const s = (t ?? "").toString(), i = this.filterCellText(s, e);
-    if (yt(i)) return d``;
-    const n = this.parseCellTriplet(i);
-    if (n?.fach && n?.raum && n?.lehrer)
+    const raw = (t ?? "").toString();
+    const filtered0 = this.filterCellText(raw, e);
+    if (yt(filtered0)) return d``;
+
+    // Platzhalter-Zeilen wie "—" am Anfang entfernen ("---" soll sichtbar bleiben)
+    // WICHTIG: Leerzeilen NICHT entfernen – sie trennen gesplittete Unterzellen (z.B. 07INFd1 <blank> 07INFd2)
+    const filtered = (() => {
+      let ls = filtered0
+        .replace(/\r/g, "")
+        .split(`\n`)
+        .map((c) => (c ?? "").toString().trim());
+
+      // führende reine Platzhalter entfernen (nicht "---")
+      while (ls.length && /^(—|–|-)$/.test(ls[0])) ls.shift();
+
+      // Mehrfach-Leerzeilen auf eine reduzieren, aber Leerzeilen behalten
+      const out: string[] = [];
+      for (const line of ls) {
+        const isBlank = line.length === 0;
+        const isDashOnly = /^(—|–|-)$/.test(line);
+        if (isDashOnly) continue; // mittige Platzhalter raus
+        if (isBlank) {
+          if (out.length === 0) continue; // keine führende Leerzeile
+          if (out[out.length - 1] === "") continue; // keine doppelten Leerzeilen
+          out.push("");
+          continue;
+        }
+        out.push(line);
+      }
+      // keine trailing Leerzeile
+      while (out.length && out[out.length - 1] === "") out.pop();
+      return out.join("\n");
+    })();
+
+    if (yt(filtered)) return d``;
+
+    const partsByBlank = filtered.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+
+    const parsed = this.parseCellTriplet(filtered);
+
+    // Helfer: Note-Klasse bestimmen (Emoji oder Keywords)
+    const noteClass = (line) => {
+      if (line.startsWith("🔴")) return "note noteRed";
+      if (line.startsWith("🟠")) return "note noteOrange";
+      if (line.startsWith("🟡")) return "note noteYellow";
+      const x = line;
+      if (/\bfällt\s+aus\b/i.test(x) || /\bverlegt\b/i.test(x) || /\bstatt\b/i.test(x) || /\bgehalten\b/i.test(x) || /\bentfällt\b/i.test(x)) {
+        return "note noteRed";
+      }
+      return "note";
+    };
+
+    const noteText = (line) =>
+      (line ?? "")
+        .toString()
+        // führende Emojis/Icons entfernen (verhindert "�" / Fragezeichen-Raute)
+        .replace(/^\p{Extended_Pictographic}+\s*/u, "")
+        // manchmal bleibt ein Replacement-Char übrig
+        .replace(/^[�]+\s*/, "")
+        .trim();
+
+    if (partsByBlank.length === 1 && parsed?.fach && parsed?.raum && parsed?.lehrer) {
       return d`
         <div class="cellWrap">
-          <div class="fach">${n.fach}</div>
-          <div class="lehrer">${n.lehrer}</div>
-          <div class="raum">${n.raum}</div>
+          <div class="fach">${parsed.fach}</div>
+          <div class="lehrer">${parsed.lehrer}</div>
+          <div class="raum">${parsed.raum}</div>
 
-          ${n.notes?.length ? d`
+          ${parsed.notes?.length
+            ? d`
                 <div class="notes">
-                  ${n.notes.map((c) => {
-        const _ = c.startsWith("🔴") ? "note noteRed" : c.startsWith("🟠") ? "note noteOrange" : c.startsWith("🟡") ? "note noteYellow" : "note", h = c.replace(/^[🟠🔴🟡🟢⚪️🟣🟤]\s*/g, "").trim();
-        return d`<div class=${_}><span class="dot">${c.slice(0, 2).trim()}</span><span class="txt">${h}</span></div>`;
-      })}
+                  ${parsed.notes.map((line) => {
+                    const cls = noteClass(line);
+                    const txt = noteText(line) || line;
+                    return d`<div class=${cls}><span class="txt">${txt}</span></div>`;
+                  })}
                 </div>
-              ` : d``}
+              `
+            : d``}
         </div>
       `;
-    const o = i.replace(/\r/g, "").split(`
-`).map((c) => c.trim()).filter(Boolean), l = (o[0] ?? "").trim(), a = o.slice(1);
-    return l && a.length ? d`
-        <div class="cellWrap">
-          <div class="fach">${l}</div>
-          <div class="notes">
-            ${a.map((c) => {
-      const _ = c.startsWith("🔴") ? "note noteRed" : c.startsWith("🟠") ? "note noteOrange" : c.startsWith("🟡") ? "note noteYellow" : "note", h = c.replace(/^[🟠🔴🟡🟢⚪️🟣🟤]\s*/g, "").trim(), p = /^[🟠🔴🟡🟢⚪️🟣🟤]/.test(c) ? c.slice(0, 2).trim() : "•";
-      return d`<div class=${_}><span class="dot">${p}</span><span class="txt">${h || c}</span></div>`;
-    })}
+    }
+
+    // Multi-Block (z.B. geteilte Gruppen nebeneinander): entweder durch Leerzeile getrennt
+    // oder als 3er-Gruppen (Fach / Raum / Lehrer) hintereinander.
+    const renderOne = (val: string) => {
+      const v = (val ?? "").toString().trim();
+      if (!v) return d``;
+
+      // Erst normal versuchen (Fach + Lehrer + Raum + Notes)
+      const p = this.parseCellTriplet(v);
+      if (p?.fach && p?.raum && p?.lehrer) {
+        return d`
+          <div class="cellWrap">
+            <div class="fach">${p.fach}</div>
+            <div class="lehrer">${p.lehrer}</div>
+            <div class="raum">${p.raum}</div>
+
+            ${p.notes?.length
+              ? d`
+                  <div class="notes">
+                    ${p.notes.map((line) => {
+                      const cls = noteClass(line);
+                      const txt = noteText(line) || line;
+                      return d`<div class=${cls}><span class="txt">${txt}</span></div>`;
+                    })}
+                  </div>
+                `
+              : d``}
           </div>
-        </div>
-      ` : d`<span class="cellText">${i}</span>`;
+        `;
+      }
+
+      // Fallback: erste Zeile als Fach, Rest als Notes
+      const lines = v.split(`\n`).map((c) => c.trim()).filter(Boolean);
+      const head = (lines[0] ?? "").trim();
+      const rest = lines.slice(1);
+
+      if (head && rest.length) {
+        return d`
+          <div class="cellWrap">
+            <div class="fach">${head}</div>
+            <div class="notes">
+              ${rest.map((line) => {
+                const cls = noteClass(line);
+                const txt = noteText(line) || line;
+                return d`<div class=${cls}><span class="txt">${txt}</span></div>`;
+              })}
+            </div>
+          </div>
+        `;
+      }
+
+      return d`<span class="cellText">${v}</span>`;
+    };
+
+    if (partsByBlank.length > 1) {
+      return d`<div class="cellMulti">${partsByBlank.map((p) => renderOne(p))}</div>`;
+    }
+
+    // Heuristik: 6/9/12… Zeilen ohne Notes => als 2+ Spalten rendern (typisch: Fach/Raum/Lehrer je Block)
+    const flatLines = (filtered ?? "").split(`\n`).map((c) => c.trim()).filter(Boolean);
+    const roomRe = /^\d{1,4}$/;
+    const teacherRe = /^[A-ZÄÖÜ]{2,6}$/;
+    const looksLikeSubject = (s: string) => {
+      const x = (s ?? "").trim();
+      if (!x) return false;
+      if (roomRe.test(x) || teacherRe.test(x)) return false;
+      const lx = x.toLowerCase();
+      if (lx.startsWith("statt ") || lx.includes("fällt aus") || lx.includes("verlegt") || lx.includes("gehalten")) return false;
+      // Icons/Marker eher Notes
+      if (/^[🔴🟠🟡🟢🟣🟤🟦🟥🟧🟨🟩🟪🟫]/.test(x)) return false;
+      return /[a-z0-9äöü]/i.test(x);
+    };
+
+    if (flatLines.length >= 6 && flatLines.length % 3 === 0) {
+      const blocks: string[] = [];
+      for (let i = 0; i < flatLines.length; i += 3) {
+        const a = flatLines[i] ?? "";
+        const b = flatLines[i + 1] ?? "";
+        const c = flatLines[i + 2] ?? "";
+        if (!looksLikeSubject(a) || !roomRe.test(b) || !teacherRe.test(c)) {
+          blocks.length = 0;
+          break;
+        }
+        blocks.push([a, b, c].join(`\n`));
+      }
+      if (blocks.length >= 2) {
+        return d`<div class="cellMulti">${blocks.map((p) => renderOne(p))}</div>`;
+      }
+    }
+
+    // Default: single block
+    return renderOne(filtered);
   }
+
   render() {
     if (!this.config) return d``;
-    const t = this.config, e = this._rowsCache, s = this.getTodayIndex(t.days ?? []), vm = (t.view_mode ?? "week").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, idxs = vm === "rolling" && s >= 0 ? Array.from({ length: Math.min((t.days?.length ?? 0) - s, daysAhead + 1) }, (y, m) => s + m) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m), daysVis = idxs.map((y) => t.days[y]), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(),
+    const t = this.config, e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], u), vm = (t.view_mode ?? "week").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, idxs = vm === "rolling" && s >= 0 ? Array.from({ length: Math.min((t.days?.length ?? 0) - s, daysAhead + 1) }, (y, m) => s + m) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m), daysVis = idxs.map((y) => t.days[y]), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(),
         p = (t.week_offset_entity ?? "").trim().length > 0,
-        showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), u = this.getHeaderDaysFromEntity(t), g = u && u.length >= (t.days?.length ?? 0) ? u : null, O = this.getBaseDate(t), B = this.mondayOfWeek(O);
+        showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), g = u && u.length >= (t.days?.length ?? 0) ? u : null, upd = this.getHeaderUpdatedFromEntity(t), O = this.getBaseDate(t), B = this.mondayOfWeek(O);
     return d`
       <ha-card>
         <div class="headerRow">
@@ -1189,6 +1471,7 @@ const v = (D = class extends U {
                     <th class=${W} style=${`--sp-hl:${n};`}>
                       <div>${y}</div>
                       <div class="thDate">${b}</div>
+                      ${upd?.[orig] ? d`<div class="thUpdated">(aktualisiert: ${upd[orig]})</div>` : d``}
                     </th>
                   `;
     })}
@@ -1337,6 +1620,12 @@ const v = (D = class extends U {
       font-weight: 600;
       white-space: nowrap;
     }
+    .thUpdated {
+      font-size: 10px;
+      opacity: 0.7;
+      margin-top: 1px;
+      white-space: nowrap;
+    }
 
     .time {
       font-weight: 700;
@@ -1375,6 +1664,20 @@ const v = (D = class extends U {
       justify-items: center;
       line-height: 1.15;
     }
+    .cellMulti {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .cellMulti > * + * {
+      border-left: 1px solid var(--divider-color);
+      padding-left: 10px;
+    }
+    .cellMulti .cellWrap {
+      flex: 1 1 0;
+      min-width: 0;
+    }
     .fach {
       font-weight: 800;
       font-size: 14px;
@@ -1392,15 +1695,13 @@ const v = (D = class extends U {
       margin-top: 4px;
       display: grid;
       gap: 3px;
-      justify-items: stretch;
+      justify-items: center;
       width: 100%;
-      text-align: left;
+      text-align: center;
     }
     .note {
-      display: grid;
-      grid-template-columns: 16px 1fr;
-      gap: 6px;
-      align-items: start;
+      display: block;
+      text-align: center;
       font-size: 11px;
       line-height: 1.25;
       opacity: 0.92;
@@ -1517,6 +1818,8 @@ const ut = class ut extends U {
       } catch {
       }
     };
+    this._rowOpen = {};
+    this._showCellStyles = !1;
   }
   connectedCallback() {
     super.connectedCallback();
@@ -1626,13 +1929,23 @@ const ut = class ut extends U {
 
     if (st === "entity") {
       // Stundenplan24 (Integration): keep its own field + fixed attr/time + effective source_entity
+      // Zusätzlich: passenden week_offset_entity automatisch ableiten (sensor.X_woche -> number.X_woche_offset),
+      // damit Blättern immer funktioniert.
+      const sid = (e ?? "").toString().trim();
+      let derivedOffset = "";
+      if (sid) {
+        // sensor.07d_woche -> number.07d_woche_offset
+        derivedOffset = sid.replace(/^sensor\./, "number.") + "_offset";
+      }
+
       this.emit({
         ...this._config,
         source_type: "entity",
         source_entity: e,
         source_entity_integration: e,
         source_attribute: "rows_table",
-        source_time_key: "time"
+        source_time_key: "time",
+        week_offset_entity: derivedOffset
       });
       return;
     }
@@ -1686,6 +1999,21 @@ const ut = class ut extends U {
     const t = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"], e = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [], s = { time: `${e.length + 1}.`, cells: Array.from({ length: t.length }, () => "") };
     e.push(s), this.emit({ ...this._config, rows: e });
   }
+  insertManualRowBelow(t) {
+    if (!this._config) return;
+    const days = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"];
+    const rows = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
+    const newRow = { time: `${t + 2}.`, start: "", end: "", cells: Array.from({ length: days.length }, () => "") };
+    rows.splice(t + 1, 0, newRow);
+    this.emit({ ...this._config, rows });
+  }
+  insertManualBreakBelow(t) {
+    if (!this._config) return;
+    const rows = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
+    rows.splice(t + 1, 0, { break: !0, time: "", label: "Pause" });
+    this.emit({ ...this._config, rows });
+  }
+
   removeManualRow(t) {
     if (!this._config) return;
     const e = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
@@ -1703,69 +2031,203 @@ const ut = class ut extends U {
     const o = n, l = Array.isArray(o.cells) ? o.cells.slice() : [];
     l[e] = s, i[t] = { ...o, cells: l }, this.emit({ ...this._config, rows: i });
   }
+
+  addLessonRow() {
+    this.addManualRow();
+  }
+  addBreakRow() {
+    if (!this._config) return;
+    const e = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
+    e.push({ break: !0, time: "", label: "Pause" });
+    this.emit({ ...this._config, rows: e });
+  }
+  toggleManualBreak(t, e) {
+    if (!this._config) return;
+    const s = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"];
+    const i = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
+    const n = i[t];
+    if (!n) return;
+    if (e) {
+      const time = (n.time ?? "").toString();
+      const label = (n.label ?? "Pause").toString();
+      i[t] = { break: !0, time, label };
+    } else {
+      const time = (n.time ?? "").toString();
+      i[t] = { time, start: "", end: "", cells: Array.from({ length: s.length }, () => "") };
+    }
+    this.emit({ ...this._config, rows: i });
+  }
+  updateManualCellStyle(t, e, s) {
+    if (!this._config) return;
+    const i = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
+    const n = i[t];
+    if (!n || ct(n)) return;
+    const o = n;
+    const l = Array.isArray(o.cell_styles) ? o.cell_styles.slice() : [];
+    const a = l[e] ?? {};
+    l[e] = { ...a, ...s };
+    i[t] = { ...o, cell_styles: l };
+    this.emit({ ...this._config, rows: i });
+  }
+  
   renderManualRows() {
     if (!this._config) return d``;
-    const t = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"], e = Array.isArray(this._config.rows) ? this._config.rows : [];
+    const c = this._config;
+    const days = c.days ?? ["Mo", "Di", "Mi", "Do", "Fr"];
+    const rows = Array.isArray(c.rows) ? c.rows : [];
     return d`
-      <div class="rowActions">
-        <mwc-button outlined @click=${this.addManualRow}>+ Zeile</mwc-button>
+      <div class="rowsTop">
+        <div class="rowsTitle">Stundenplan (Zeilen)</div>
+
+        <div class="btnBar">
+          <div class="toggleInline">
+            <div class="toggleText">Cell-Styles</div>
+            <ha-switch
+              .checked=${!!this._showCellStyles}
+              @change=${(e) => {
+                this._showCellStyles = !!e?.target?.checked;
+                this.requestUpdate();
+              }}
+            ></ha-switch>
+          </div>
+
+          <mwc-button outlined @click=${this.addLessonRow}>+ Stunde</mwc-button>
+          <mwc-button outlined @click=${this.addBreakRow}>+ Pause</mwc-button>
+        </div>
       </div>
 
-      ${e.map((s, i) => {
-      if (ct(s))
+      <div class="sub" style="margin-bottom:10px;">
+        Pro Zeile: Zeit + optional Start/Ende. Per Klick in der Vorschau springst du zur passenden Zelle.
+      </div>
+
+      ${rows.map((r, idx) => {
+        const isBreak = ct(r);
+        const header = isBreak ? `Pause · ${(r.time ?? "").toString()}` : `Stunde · ${(r.time ?? "").toString()}`;
+        const lr = r;
+        const start = (lr.start ?? "").toString();
+        const end = (lr.end ?? "").toString();
+        const label = (r.label ?? "Pause").toString();
+
         return d`
-            <div class="rowCard">
+          <details
+            class="rowPanel"
+            ?open=${this._rowOpen?.[idx] ?? !1}
+            @toggle=${(e) => {
+              try {
+                this._rowOpen[idx] = !!e?.target?.open;
+              } catch {}
+            }}
+          >
+            <summary>
               <div class="rowHead">
-                <div class="rowTitle">Pause</div>
-                <mwc-button dense @click=${() => this.removeManualRow(i)}>Entfernen</mwc-button>
+                <div class="rowHeadTitle">${header || `Zeile ${idx + 1}`}</div>
+                <div class="rowHeadMeta">${isBreak ? label : `${start || "Start?"} – ${end || "Ende?"}`}</div>
               </div>
+            </summary>
+
+            <div class="rowBody">
               <div class="grid2">
-                <ha-textfield label="Zeit" .value=${s.time ?? ""} @input=${(o) => this.updateManualRow(i, { time: o.target.value })}></ha-textfield>
                 <ha-textfield
-                  label="Label"
-                  .value=${s.label ?? "Pause"}
-                  @input=${(o) => this.updateManualRow(i, { label: o.target.value })}
+                  label="Zeit / Stunde"
+                  .value=${(r.time ?? "").toString()}
+                  placeholder="z. B. 1. 08:00–08:45"
+                  @input=${(e) => this.updateManualRow(idx, { time: e?.target?.value ?? "" })}
                 ></ha-textfield>
-              </div>
-            </div>
-          `;
-      const n = s;
-      return d`
-          <div class="rowCard">
-            <div class="rowHead">
-              <div class="rowTitle">Zeile ${i + 1}</div>
-              <div class="rowHeadBtns">
-                <mwc-button dense @click=${() => this.updateManualRow(i, { ...n, break: !0, label: "Pause" })}
-                  >Als Pause</mwc-button
-                >
-                <mwc-button dense @click=${() => this.removeManualRow(i)}>Entfernen</mwc-button>
-              </div>
-            </div>
 
-            <div class="grid3">
-              <ha-textfield label="Stunde" .value=${n.time ?? ""} @input=${(o) => this.updateManualRow(i, { time: o.target.value })}></ha-textfield>
-              <ha-textfield label="Start" .value=${n.start ?? ""} @input=${(o) => this.updateManualRow(i, { start: o.target.value })}></ha-textfield>
-              <ha-textfield label="Ende" .value=${n.end ?? ""} @input=${(o) => this.updateManualRow(i, { end: o.target.value })}></ha-textfield>
-            </div>
-
-            <div class="cellsGrid" style=${`grid-template-columns: repeat(${t.length}, minmax(0, 1fr));`}>
-              ${t.map(
-        (o, l) => d`
-                  <div class="cellEditor">
-                    <div class="cellEditorHead">${o}</div>
-                    <ha-textarea
-                      .value=${(n.cells?.[l] ?? "").toString()}
-                      @input=${(a) => this.updateManualCell(i, l, a.target.value)}
-                      placeholder="Fach\nRaum\nLehrer + Info-Zeilen"
-                      autosize
-                    ></ha-textarea>
+                <div class="optRow">
+                  <div>
+                    <div class="optTitle">Pause</div>
+                    <div class="sub">Zeile als Pause rendern (colspan).</div>
                   </div>
-                `
-      )}
+                  <ha-switch .checked=${isBreak} @change=${(e) => this.toggleManualBreak(idx, !!e?.target?.checked)}></ha-switch>
+                </div>
+              </div>
+
+              ${isBreak
+                ? d`
+                    <ha-textfield
+                      label="Pausentext"
+                      .value=${label}
+                      placeholder="z. B. Große Pause"
+                      @input=${(e) => this.updateManualRow(idx, { label: e?.target?.value ?? "" })}
+                    ></ha-textfield>
+                  `
+                : d`
+                    <div class="grid2" style="margin-top:10px;">
+                      <ha-textfield
+                        label="Start (HH:MM)"
+                        .value=${start}
+                        @input=${(e) => this.updateManualRow(idx, { start: e?.target?.value ?? "" })}
+                      ></ha-textfield>
+                      <ha-textfield
+                        label="Ende (HH:MM)"
+                        .value=${end}
+                        @input=${(e) => this.updateManualRow(idx, { end: e?.target?.value ?? "" })}
+                      ></ha-textfield>
+                    </div>
+
+                    <div class="cellsGrid" style=${`grid-template-columns: repeat(${days.length}, minmax(220px, 1fr));`}>
+                      ${days.map((day, i) => {
+                        const val = (lr.cells?.[i] ?? "").toString();
+                        const st = (Array.isArray(lr.cell_styles) ? lr.cell_styles?.[i] : void 0) ?? {};
+                        const bg = (st?.bg ?? "#000000").toString();
+                        const a = typeof st?.bg_alpha === "number" && !Number.isNaN(st.bg_alpha) ? st.bg_alpha : 0.18;
+                        const alphaPct = Math.round(a * 100);
+                        const tx = (st?.color ?? "#ffffff").toString();
+
+                        return d`
+                          <div class="cellEditor">
+                            <div class="cellEditorHead">${day}</div>
+
+                            <textarea
+                              class="lessonArea" rows="2"
+                              .value=${val}
+                              @input=${(e) => this.updateManualCell(idx, i, e?.target?.value ?? "")}
+                              placeholder="Fach&#10;Raum&#10;Lehrer + Info-Zeilen"
+                            ></textarea>
+
+                            <div class=${this._showCellStyles ? "cellStyles" : "cellStyles cellStyles--hidden"}>
+                              <div class="styleLine">
+                                <div class="styleLbl">Hintergrund</div>
+                                <input class="col" type="color" .value=${bg} @input=${(e) => this.updateManualCellStyle(idx, i, { bg: e?.target?.value })} />
+                              </div>
+
+                              <div class="styleLine">
+                                <div class="styleLbl">Transparenz</div>
+                                <div class="range">
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    .value=${String(alphaPct)}
+                                    @input=${(e) => this.updateManualCellStyle(idx, i, { bg_alpha: Number(e?.target?.value ?? 0) / 100 })}
+                                  />
+                                  <div class="pct">${alphaPct}%</div>
+                                </div>
+                              </div>
+
+                              <div class="styleLine">
+                                <div class="styleLbl">Text</div>
+                                <input class="col" type="color" .value=${tx} @input=${(e) => this.updateManualCellStyle(idx, i, { color: e?.target?.value })} />
+                              </div>
+                            </div>
+                          </div>
+                        `;
+                      })}
+                    </div>
+                  `}
+
+              <div class="rowFoot">
+                <div class="rowActions">
+                  <button type="button" class="spBtn" @click=${() => this.insertManualRowBelow(idx)}>+ Stunde darunter</button>
+                  <button type="button" class="spBtn" @click=${() => this.insertManualBreakBelow(idx)}>+ Pause darunter</button>
+                </div>
+                <button type="button" class="spBtn spBtnDanger" @click=${() => this.removeManualRow(idx)}>Löschen</button>
+              </div>
             </div>
-          </div>
+          </details>
         `;
-    })}
+      })}
     `;
   }
   isHaEntityPickerAvailable() {
@@ -2161,6 +2623,8 @@ ut.properties = {
     .cellsGrid {
       display: grid;
       gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 6px;
     }
     .cellEditor {
       border: 1px solid var(--divider-color);
@@ -2169,11 +2633,27 @@ ut.properties = {
       background: var(--card-background-color);
       display: grid;
       gap: 8px;
+      min-width: 220px;
+      box-sizing: border-box;
     }
     .cellEditorHead {
       font-weight: 700;
       opacity: 0.9;
       font-size: 12px;
+    }
+
+    .lessonArea {
+      width: 100%;
+      min-height: 44px;
+      resize: vertical;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--divider-color);
+      background: rgba(0,0,0,0.12);
+      color: var(--primary-text-color);
+      font-family: inherit;
+      font-size: 14px;
+      box-sizing: border-box;
     }
 
     @media (max-width: 900px) {
@@ -2183,6 +2663,204 @@ ut.properties = {
       .grid3 {
         grid-template-columns: 1fr;
       }
+    }
+
+    /* ---- Manual Rows Editor (classic accordion UI) ---- */
+    .rowsTop {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-top: 6px;
+    }
+    .rowsTitle {
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .btnBar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .toggleInline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .toggleText {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    details.rowPanel {
+      margin: 6px 0;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    details.rowPanel > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      user-select: none;
+    }
+    details.rowPanel > summary::-webkit-details-marker {
+      display: none;
+    }
+    .rowHead {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .rowHeadTitle {
+      font-weight: 700;
+    }
+    .rowHeadMeta {
+      opacity: 0.75;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .rowBody {
+      padding: 12px 14px 14px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+    }
+    .optRow {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .optTitle {
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .cellsGrid {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      align-items: start;
+    }
+    .cellEditor {
+      border-radius: 14px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 0;
+    }
+    .cellEditorHead {
+      font-weight: 700;
+      font-size: 12px;
+      opacity: 0.9;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cellStyles {
+      margin-top: 2px;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(255,255,255,0.10);
+      display: grid;
+      gap: 8px;
+    }
+    .cellStyles--hidden { display: none !important; }
+    .styleLine {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .styleLbl {
+      font-size: 12px;
+      opacity: 0.8;
+      min-width: 84px;
+    }
+    input.col {
+      width: 44px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      padding: 0;
+    }
+    .range {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      justify-content: flex-start;
+    }
+    .range input[type="range"] {
+      flex: 1;
+      width: 100%;
+      min-width: 140px;
+    }
+    .pct {
+      width: 42px;
+      text-align: right;
+      opacity: 0.85;
+      font-size: 12px;
+    }
+    .rowFoot {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .rowActions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .spBtn{
+      appearance:none;
+      border:1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.04);
+      color: var(--primary-text-color);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 13px;
+      line-height: 1.2;
+      cursor: pointer;
+      user-select: none;
+      transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
+    }
+    .spBtn:hover{
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.28);
+    }
+    .spBtn:active{
+      transform: translateY(1px);
+    }
+    .spBtn:focus-visible{
+      outline: 2px solid rgba(33,150,243,0.6);
+      outline-offset: 2px;
+    }
+    .spBtnDanger{
+      border-color: rgba(219,68,55,0.55);
+      background: rgba(219,68,55,0.12);
+    }
+    .spBtnDanger:hover{
+      border-color: rgba(219,68,55,0.8);
+      background: rgba(219,68,55,0.18);
     }
   `;
 let ht = ut;

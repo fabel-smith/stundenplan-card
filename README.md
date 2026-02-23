@@ -1,253 +1,168 @@
 # Stundenplan Card (Home Assistant)
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
+[![HACS
+Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 ![Version](https://img.shields.io/github/v/release/fabel-smith/stundenplan-card)
 ![Maintenance](https://img.shields.io/maintenance/yes/2026)
 ![License](https://img.shields.io/github/license/fabel-smith/stundenplan-card)
 
-> **TL;DR**
-> - **Automatischer Stundenplan aus stundenplan24.de?** → installiere die **stundenplan-suite**
-> - **Stundenplan manuell anzeigen?** → nutze die **stundenplan-card**
+> **TL;DR** - **Automatischer Stundenplan aus stundenplan24.de?** →
+> installiere die **stundenplan-suite** - **Stundenplan manuell
+> anzeigen?** → nutze die **stundenplan-card**
 
-Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle – inklusive **visuellem Editor (GUI)**, **Heute-Highlight** und **Hervorhebung des aktuellen Fachs**.
+Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle
+-- inklusive **visuellem Editor (GUI)**, **Heute-Highlight** und
+**Hervorhebung des aktuellen Fachs**.
 
-> **Hinweis:**  
-> Diese Card ist das **Frontend**.  
-> Wenn du deinen Stundenplan automatisch aus *stundenplan24.de* importieren möchtest (Sensoren, A/B-Wochen, Auto-Update), nutze die **stundenplan-suite**:  
+> **Hinweis:**\
+> Diese Card ist das **Frontend**.\
+> Wenn du deinen Stundenplan automatisch aus *stundenplan24.de*
+> importieren möchtest (Sensoren, A/B-Wochen, Auto-Update), nutze die
+> **stundenplan-suite**:\
 > https://github.com/fabel-smith/stundenplan-suite
 
----
+------------------------------------------------------------------------
 
 ## ✨ Features
 
-- Tabellenansicht (Tage × Stunden)
-- Visueller Editor (kein YAML-Zwang)
-- Heute-Highlight (`highlight_today`)
-- Aktuelles Fach hervorheben (`highlight_current`)
-- Pausen-Zeilen (`break: true` + `label`)
-- Zeilen hinzufügen / löschen
-- HACS-kompatibel
+-   Tabellenansicht (Tage × Stunden)
+-   **Kompletter visueller Editor (kein YAML notwendig)**
+-   Manueller Stundenplan direkt im Dialog bearbeitbar
+-   Aufklappbare Stunden (Accordion-Editor)
+-   Fächer je Wochentag editierbar
+-   Pausen-Zeilen (`break: true` + `label`)
+-   **Cell-Styles (pro Fachzelle):**
+    -   Hintergrundfarbe
+    -   Transparenz
+    -   Textfarbe
+-   Heute-Highlight (`highlight_today`)
+-   Aktuelles Fach hervorheben (`highlight_current`)
+-   Stunden untereinander einfügen / Pausen darunter einfügen
+-   Zeilen löschen
+-   A/B-Wochen
+-   HACS-kompatibel
 
----
+------------------------------------------------------------------------
 
 ## 📸 Screenshot
 
 ![Screenshot](https://raw.githubusercontent.com/fabel-smith/stundenplan-card/main/screenshot.png)
 
----
+### Neuer visueller Editor (manueller Stundenplan)
+
+Der Stundenplan kann vollständig direkt im Home-Assistant-Dialog
+erstellt werden ---\
+kein YAML und keine JSON-Dateien notwendig.
+
+-   Stunde anklicken → Details bearbeiten
+-   Fach pro Wochentag eintragen
+-   Farben individuell setzen
+-   Pausen als eigene Zeile definieren
+
+------------------------------------------------------------------------
 
 ## 🧩 Installation
+
 ### Installation über HACS (empfohlen)
 
-HACS öffnen → Frontend
-
-Stundenplan Card installieren
-
+HACS öffnen → Frontend\
+Stundenplan Card installieren\
 Home Assistant neu laden (oder Browser-Cache aktualisieren)
 
 Die Lovelace-Resource wird in der Regel automatisch hinzugefügt.
 
 ### Manuelle Prüfung der Resource (nur falls nötig)
 
-Falls die Card nicht angezeigt wird, prüfe unter:
-
 Einstellungen → Dashboards → Ressourcen
-
-Ob folgende Resource vorhanden ist:
 
 URL:
 
-/local/stundenplan-card/stundenplan-card.js
+    /local/stundenplan-card/stundenplan-card.js
 
 Typ:
 
-JavaScript-Modul
+    JavaScript-Modul
 
-Falls sie fehlt, kannst du sie dort manuell hinzufügen.
+> **Hinweis (Browser-Cache):**\
+> Nach einem Update der Card kann es notwendig sein den Browser-Cache zu
+> leeren (`STRG + F5`), da Home Assistant Custom Cards aggressiv cached.
 
-Hinweis:
-Nach Änderungen ggf. Browser-Cache leeren (Strg + F5).
-
-### Wichtig zur Nutzung mit der stundenplan-suite
-
-Wenn du die stundenplan-suite verwendest, musst du keine JSON-Dateien
-und keine REST-Sensoren anlegen.
-
-Die Suite stellt den Stundenplan automatisch als Sensor bereit –
-diese Card übernimmt ausschließlich die Darstellung.
-
+------------------------------------------------------------------------
 
 ## 🔁 Wechselwochen (A/B)
 
 Die Card unterstützt Schulen mit **A/B-Wochenmodell**.
 
-Empfohlener Standardfall:
-- Umschaltung **rein nach Kalenderwoche (gerade / ungerade KW)**
-- keine Ferienlogik erforderlich
+Empfohlener Standardfall: - Umschaltung rein nach Kalenderwoche (gerade
+/ ungerade KW) - keine Ferienlogik erforderlich
 
----
+------------------------------------------------------------------------
 
-## Nutzung ohne stundenplan-suite (manuelle Daten)
+## 🧑‍🏫 Manueller Stundenplan (ohne Sensoren, ohne JSON)
 
-> Dieser Abschnitt ist **nur relevant**, wenn du **nicht** die stundenplan-suite verwendest  
-> und deinen Stundenplan selbst bereitstellst.
+Du kannst den Stundenplan komplett direkt in der Card pflegen.
 
-Die Daten werden als JSON-Dateien im `www`-Ordner abgelegt und über einen REST-Sensor in Home Assistant eingebunden.
+Vorgehen:
 
----
+1.  Card zum Dashboard hinzufügen
+2.  Bearbeiten öffnen
+3.  Abschnitt **„Manuell (rows)"** aufklappen
+4.  **+ Stunde** oder **+ Pause** hinzufügen
+5.  Stunde anklicken → Details bearbeiten
 
-### JSON-Dateien im www-Ordner
+### Einstellbar pro Stunde
 
-Lege zwei Dateien für A- und B-Woche an:
+-   Start- und Endzeit
+-   Fach pro Wochentag (Mo--Fr)
+-   Pause (colspan-Zeile)
+-   Hintergrundfarbe je Fach
+-   Transparenz
+-   Textfarbe
 
-- `/config/www/stundenplan/stundenplan_a.json`
-- `/config/www/stundenplan/stundenplan_b.json`
+Mit **„+ Stunde darunter"** oder **„+ Pause darunter"** kannst du den
+Plan sehr schnell aufbauen.
 
-Die Datei muss ein Objekt mit dem Schlüssel `plan` enthalten.
+Diese Methode benötigt: - keine REST-Sensoren - keine JSON-Dateien -
+keine externe Integration
 
-**Beispiel:**
+------------------------------------------------------------------------
 
-```json
-{
-  "plan": [
-    {
-      "Stunde": "1. 07:45 - 08:30",
-      "Mo": "Mathe",
-      "Di": "Deutsch",
-      "Mi": "Englisch",
-      "Do": "Sport",
-      "Fr": "Bio"
-    },
-    {
-      "break": true,
-      "Stunde": "09:20 - 09:35",
-      "label": "Pause"
-    }
-  ]
-}
-```
+## ⚠️ Wichtiger Hinweis zur Nutzung mit stundenplan24
 
----
+Die Nutzung der *stundenplan-suite* bzw. der automatischen
+Datenübernahme aus **stundenplan24.de** erfolgt **auf eigene
+Verantwortung**.
 
-### REST-Sensor in Home Assistant
+Die dargestellten Daten können: - verspätet sein - unvollständig sein -
+fehlerhaft übertragen werden
 
-Die JSON-Dateien werden über einen REST-Sensor als Entity verfügbar gemacht:
+Diese Card ist **kein offizielles System der Schule** und kein
+verlässlicher Ersatz für: - den offiziellen Vertretungsplan - schulische
+Mitteilungen - Lehrerankündigungen
 
-```yaml
-rest:
-  - resource: http://localhost:8123/local/stundenplan/stundenplan_a.json
-    scan_interval: 3600
-    sensor:
-      - name: stundenplan_a
-        value_template: "OK"
-        json_attributes:
-          - plan
+Bitte den Stundenplan **regelmäßig mit den offiziellen Quellen der
+Schule abgleichen**.\
+Verlasse dich nicht ausschließlich auf die Anzeige in Home Assistant,
+insbesondere bei: - Vertretungen - Raumänderungen - Ausfällen
 
-  - resource: http://localhost:8123/local/stundenplan/stundenplan_b.json
-    scan_interval: 3600
-    sensor:
-      - name: stundenplan_b
-        value_template: "OK"
-        json_attributes:
-          - plan
-```
+Ziel ist eine komfortable Anzeige -- **nicht eine garantierte
+Richtigkeit**.\
+Ich übernehme keine Haftung dafür, dass Termine korrekt oder vollständig
+dargestellt werden.
 
-Danach **Home Assistant neu starten**.
+------------------------------------------------------------------------
 
----
+## 🔄 Update-Hinweise (v3.1.0)
 
-### Card konfigurieren (Visueller Editor)
+Version **3.1.0** führt einen komplett überarbeiteten manuellen Editor
+ein.
 
-Im Editor der Card:
+Bestehende Konfigurationen funktionieren weiterhin unverändert.\
+Du kannst jederzeit zusätzlich den manuellen Editor nutzen oder darauf
+umsteigen.
 
-- **Wechselwochen aktivieren**
-- Modus **„KW gerade / ungerade“** wählen
-- festlegen, ob **A-Woche = gerade** oder **ungerade**
-- Datenquelle setzen:
-  - `source_entity_a` → `sensor.stundenplan_a`
-  - `source_attribute_a` → `plan`
-  - `source_entity_b` → `sensor.stundenplan_b`
-  - `source_attribute_b` → `plan`
-- `source_time_key` → `Stunde` (Standard)
+------------------------------------------------------------------------
 
-Die Card schaltet nun automatisch zwischen A- und B-Woche.
-
----
-
-## Optional: Abweichende A/B-Zuordnung per Mapping-Datei
-
-Falls die Schule **nicht strikt gerade/ungerade Kalenderwochen** nutzt, kann die Umschaltung über eine Mapping-Datei erfolgen.
-
-### Mapping-Datei
-
-`/config/www/stundenplan/wechselwochen.json`
-
-```json
-{
-  "2026": {
-    "1": "A",
-    "2": "B",
-    "3": "A",
-    "4": "B"
-  }
-}
-```
-
-### REST-Sensor für Mapping
-
-```yaml
-rest:
-  - resource: http://localhost:8123/local/stundenplan/wechselwochen.json
-    scan_interval: 3600
-    sensor:
-      - name: wechselwochen_map
-        value_template: "OK"
-        json_attributes:
-          - "2026"
-```
-
-### Mapping in der Card aktivieren
-
-Im Editor:
-
-- Modus **„Mapping-Datei“**
-- `week_map_entity` → `sensor.wechselwochen_map`
-- `week_map_attribute` → `2026`
-
-Ist die aktuelle KW im Mapping enthalten, wird sie verwendet.  
-Andernfalls kann optional auf gerade/ungerade KW zurückgefallen werden.
-
----
-
-## 🔄 Migration zur stundenplan-suite (optional)
-
-Du nutzt aktuell die **stundenplan-card** mit manuellen JSON-Dateien  
-und möchtest auf eine **automatische Lösung** umsteigen?
-
-Dann ist die **stundenplan-suite** der empfohlene Weg.
-
-### Was ändert sich?
-- ❌ keine manuellen JSON-Dateien mehr
-- ❌ keine REST-Sensoren mehr
-- ✅ Stundenplan kommt automatisch von **stundenplan24.de**
-- ✅ Sensoren werden von Home Assistant bereitgestellt
-- ✅ Darstellung in der Card bleibt gleich
-
-### Vorgehen (kurz & sicher)
-1. **stundenplan-suite** über HACS installieren  
-2. Home Assistant neu starten  
-3. Integration einrichten (Dialog folgen)  
-4. In der **stundenplan-card** statt eigener Sensoren  
-   den von der Suite erzeugten Sensor auswählen
-
-### Was kannst du danach löschen?
-- `/config/www/stundenplan/*.json`
-- REST-Sensoren aus der `configuration.yaml` (optional)
-
-> **Hinweis:**  
-> Die Card selbst bleibt unverändert –  
-> sie zeigt weiterhin nur an, woher die Daten kommen, ist egal.
-
-<a href="https://www.buymeacoffee.com/fabelsmith" target="_blank">
-  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="45" alt="Buy Me a Coffee">
-</a>
+`<a href="https://www.buymeacoffee.com/fabelsmith" target="_blank">`{=html}
+`<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="45" alt="Buy Me a Coffee">`{=html}
+`</a>`{=html}
