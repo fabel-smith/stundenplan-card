@@ -174,6 +174,8 @@ umsteigen.
 
 ------------------------------------------------------------------------
 
-`<a href="https://www.buymeacoffee.com/fabelsmith" target="_blank">`{=html}
-`<img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="45" alt="Buy Me a Coffee">`{=html}
-`</a>`{=html}
+## ☕ Unterstützung
+
+Wenn dir die Card hilft oder dir Zeit spart, freue ich mich über Unterstützung:
+
+[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/fabelsmith)
