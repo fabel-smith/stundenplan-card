@@ -30,6 +30,9 @@ Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle
 -   Manueller Stundenplan direkt im Dialog bearbeitbar
 -   Aufklappbare Stunden (Accordion-Editor)
 -   Fächer je Wochentag editierbar
+-   Fach kann um Lehrer und Raum ergänzt werden
+-   Mehrere Einträge pro Stunde möglich (Zellen teilbar / Leerzeile)
+-   Kompletter Stundenplan direkt im UI pflegbar
 -   Pausen-Zeilen (`break: true` + `label`)
 -   **Cell-Styles (pro Fachzelle):**
     -   Hintergrundfarbe
@@ -56,6 +59,7 @@ kein YAML und keine JSON-Dateien notwendig.
 
 -   Stunde anklicken → Details bearbeiten
 -   Fach pro Wochentag eintragen
+-   Lehrer und Raum optional ergänzen
 -   Farben individuell setzen
 -   Pausen als eigene Zeile definieren
 
@@ -112,6 +116,9 @@ Vorgehen:
 
 ### Einstellbar pro Stunde
 
+-   Fachbezeichnung
+-   Lehrer (optional)
+-   Raum (optional)
 -   Start- und Endzeit
 -   Fach pro Wochentag (Mo--Fr)
 -   Pause (colspan-Zeile)
@@ -122,8 +129,20 @@ Vorgehen:
 Mit **„+ Stunde darunter"** oder **„+ Pause darunter"** kannst du den
 Plan sehr schnell aufbauen.
 
+Mehrere Fächer innerhalb einer Stunde sind möglich (z. B.
+Gruppenunterricht / AG / Teilung).\
+Durch eine Leerzeile kann eine Stunde mehrfach unterteilt werden.
+
 Diese Methode benötigt: - keine REST-Sensoren - keine JSON-Dateien -
 keine externe Integration
+
+------------------------------------------------------------------------
+
+## 🔌 Nutzung mit der stundenplan-suite
+
+Die Card dient sowohl als Anzeige für automatisch importierte Daten
+(*stundenplan-suite*) als auch als vollständig eigenständig gepflegter
+Stundenplan.
 
 ------------------------------------------------------------------------
 
@@ -133,22 +152,14 @@ Die Nutzung der *stundenplan-suite* bzw. der automatischen
 Datenübernahme aus **stundenplan24.de** erfolgt **auf eigene
 Verantwortung**.
 
-Die dargestellten Daten können: - verspätet sein - unvollständig sein -
-fehlerhaft übertragen werden
+Diese Anzeige ist kein offizielles System der Schule.\
+Sie dient ausschließlich der komfortablen Darstellung.
 
-Diese Card ist **kein offizielles System der Schule** und kein
-verlässlicher Ersatz für: - den offiziellen Vertretungsplan - schulische
-Mitteilungen - Lehrerankündigungen
-
-Bitte den Stundenplan **regelmäßig mit den offiziellen Quellen der
-Schule abgleichen**.\
-Verlasse dich nicht ausschließlich auf die Anzeige in Home Assistant,
-insbesondere bei: - Vertretungen - Raumänderungen - Ausfällen
-
-Ziel ist eine komfortable Anzeige -- **nicht eine garantierte
-Richtigkeit**.\
-Ich übernehme keine Haftung dafür, dass Termine korrekt oder vollständig
-dargestellt werden.
+Für die Richtigkeit, Vollständigkeit oder Aktualität der Daten wird
+keine Gewähr übernommen.\
+Bitte regelmäßig mit den offiziellen Schulquellen abgleichen und nicht
+ausschließlich darauf verlassen, insbesondere bei Vertretungen,
+Raumänderungen oder Unterrichtsausfall.
 
 ------------------------------------------------------------------------
 

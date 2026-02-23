@@ -2,17 +2,24 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   build: {
+    target: "es2020",
+    minify: true,
+    sourcemap: false,
+
     lib: {
       entry: "src/stundenplan-card.ts",
       formats: ["es"],
-      fileName: () => "stundenplan-card.js",
+      fileName: () => "stundenplan-card.js"
     },
-    outDir: "dist",
-    emptyOutDir: true,
-    sourcemap: true,
+
     rollupOptions: {
-      // Home Assistant liefert seine eigenen Web Components; wir bundlen kein Lit o.ä.
-      external: [],
+      output: {
+        inlineDynamicImports: true,
+        manualChunks: undefined
+      }
     },
-  },
+
+    emptyOutDir: true,
+    outDir: "dist"
+  }
 });

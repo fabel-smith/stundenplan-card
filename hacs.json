@@ -1,6 +1,6 @@
 {
   "name": "Stundenplan Card",
-  "content_in_root": false,
+  "content_in_root": true,
   "render_readme": true,
   "filename": "stundenplan-card.js",
   "country": "DE",
