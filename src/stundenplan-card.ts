@@ -913,10 +913,10 @@ const v = (D = class extends U {
       source_entity_legacy: a_leg || "",
       source_attribute: (f === "entity")
       ? "rows_table"
-      : (((t.source_attribute ?? "") + "").toString().trim() || "plan"),
+      : ((t.source_attribute ?? e.source_attribute ?? "plan") + "").toString(),
       source_time_key: (f === "entity")
       ? "time"
-      : (((t.source_time_key ?? "") + "").toString().trim() || "Stunde"),
+      : ((t.source_time_key ?? e.source_time_key ?? "Stunde") + "").toString(),
       source_type: f,
       json_url: (t.json_url ?? "").toString(),
       week_offset_entity: _,
@@ -1173,10 +1173,10 @@ getRowsResolved(t) {
       if (i === "B" && o)
         return this.getRowsFromEntity(t, o, a) ?? [];
       const c = effEntity;
-      return c ? this.getRowsFromEntity(t, c, (t.source_attribute ?? "").toString().trim()) ?? [] : [];
+      return c ? this.getRowsFromEntity(t, c, ((t.source_attribute ?? "") + "").toString().trim() || "plan") ?? [] : [];
     }
     const s = effEntity;
-    return s ? this.getRowsFromEntity(t, s, (t.source_attribute ?? "").toString().trim()) ?? [] : [];
+    return s ? this.getRowsFromEntity(t, s, ((t.source_attribute ?? "") + "").toString().trim() || "plan") ?? [] : [];
   }
   recomputeRows() {
     if (!this.config) {
@@ -1507,7 +1507,7 @@ getRowsResolved(t) {
         const F = this.filterCellText(W[orig] ?? "", t), I = b[orig] ?? null, G = t.highlight_today && orig === s ? "today" : "";
         let Ct = `--sp-hl:${n};` + Te(I, i);
         const se = !yt(F);
-        return pt && se && w && t.highlight_current_text && l && s >= 0 && P === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(F, t)}</td>`;
+        return pt && se && w && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(F, t)}</td>`;
       })}
                   </tr>
                 `;
