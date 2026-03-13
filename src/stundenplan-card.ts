@@ -1442,16 +1442,19 @@ getRowsResolved(t) {
   // Parse to Fach (bold) + Raum + Lehrer + Info/Notes
   parseCellTriplet(t) {
     const e = (t ?? "").toString().replace(/\r/g, "").trim();
+    const RED_MARKER = "[[sp-red]]";
+    const stripMarker = (u) => (u ?? "").toString().replaceAll(RED_MARKER, "").trim();
+    const hasMarker = (u) => (u ?? "").toString().includes(RED_MARKER);
     if (!e) return null;
     const s = e.split(`
 `).map((u) => u.trim()).filter((u) => u.length > 0);
     if (!s.length) return null;
-    const i = s.join(" ").trim();
+    const i = s.map((u) => stripMarker(u)).join(" ").trim();
     if (/^(—|\-|–|---|\s)+$/.test(i)) return null;
-    const n = s[0];
+    const n = stripMarker(s[0]);
     if (/^(—|\-|–|---)$/.test(n)) return null;
     const o = (u) => {
-      const x = (u ?? "").toString().trim();
+      const x = stripMarker(u);
       return /^[🟠🔴🟡🟢⚪️🟣🟤]/.test(x)
         || /\bfällt\s+aus\b/i.test(x)
         || /\bverlegt\b/i.test(x)
@@ -1462,7 +1465,7 @@ getRowsResolved(t) {
         || /\bAufgaben\b/i.test(x)
         || /^für\b/i.test(x);
     }, l = (u) => {
-      const x = (u ?? "").toString().trim();
+      const x = stripMarker(u);
       // Räume: reine Nummern (222), alphanumerisch kurz (SH2-B, SH2-A), oder "044 Aula"
       return /^\d{1,4}$/.test(x)
         || /^[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}$/i.test(x)
@@ -1482,29 +1485,36 @@ getRowsResolved(t) {
         }
     }
     if (c < 0) return null;
-    const _ = a[c];
+    const _ = stripMarker(a[c]);
+    const roomChanged = hasMarker(a[c]);
     let h;
+    let teacherChanged = false;
+    let teacherIdx = -1;
     for (let u = c + 1; u < a.length; u++) {
       const g = a[u];
       if (!o(g) && !l(g)) {
-        h = g;
+        h = stripMarker(g);
+        teacherChanged = hasMarker(g);
+        teacherIdx = u;
         break;
       }
     }
     if (!h) {
       const u = a.filter((g) => !o(g) && !l(g));
-      h = u.length ? u[u.length - 1] : void 0;
+      h = u.length ? stripMarker(u[u.length - 1]) : void 0;
+      if (h) teacherChanged = hasMarker(u[u.length - 1]);
+      if (h) teacherIdx = a.lastIndexOf(u[u.length - 1]);
     }
-    const p = s.slice(1).filter((u) => o(u));
+    const p = a.filter((u, idx) => idx !== c && idx !== teacherIdx && (o(u) || !l(u)));
     // Duplikate in Notizen entfernen (z.B. "Frau Johne" vs "JOH" bei gleicher Aussage)
-    const normNote = (u: string) => (u ?? "")
+    const normNote = (u: string) => stripMarker((u ?? "")
       .toString()
       .replace(/^[🟠🔴🟡🟢⚪️🟣🟤]\s*/u, "")
       .replace(/\b(Frau|Herr)\s+[\p{L}\-]+\b/giu, "")
       .replace(/\b[A-ZÄÖÜ]{2,4}\b/g, "")
       .replace(/\s+/g, " ")
       .trim()
-      .toLowerCase();
+      .toLowerCase());
     const deduped: string[] = [];
     const seen = new Set<string>();
     for (const line of p) {
@@ -1512,9 +1522,17 @@ getRowsResolved(t) {
       if (!k) continue;
       if (seen.has(k)) continue;
       seen.add(k);
-      deduped.push(line);
+      deduped.push(stripMarker(line));
     }
-    return { fach: n, raum: _, lehrer: h, notes: deduped.length ? deduped : void 0 };
+    return {
+      fach: n,
+      fachChanged: hasMarker(s[0]),
+      raum: _,
+      roomChanged,
+      lehrer: h,
+      teacherChanged,
+      notes: deduped.length ? deduped : void 0
+    };
   }
   renderCell(t, e) {
     const raw = (t ?? "").toString();
@@ -1559,6 +1577,7 @@ getRowsResolved(t) {
 
     // Helfer: Note-Klasse bestimmen (Emoji oder Keywords)
     const noteClass = (line) => {
+      if (/^\s*---\s*$/.test(line)) return "note noteRed noteDash";
       if (line.startsWith("🔴")) return "note noteRed";
       if (line.startsWith("🟠")) return "note noteOrange";
       if (line.startsWith("🟡")) return "note noteYellow";
@@ -1566,24 +1585,74 @@ getRowsResolved(t) {
       if (/\bfällt\s+aus\b/i.test(x) || /\bverlegt\b/i.test(x) || /\bstatt\b/i.test(x) || /\bgehalten\b/i.test(x) || /\bentfällt\b/i.test(x)) {
         return "note noteRed";
       }
-      return "note";
+      return "note noteNeutral";
     };
 
     const noteText = (line) =>
       (line ?? "")
         .toString()
+        .replaceAll("[[sp-red]]", "")
         // führende Emojis/Icons entfernen (verhindert "�" / Fragezeichen-Raute)
         .replace(/^\p{Extended_Pictographic}+\s*/u, "")
         // manchmal bleibt ein Replacement-Char übrig
         .replace(/^[�]+\s*/, "")
         .trim();
 
+    const rawLines = filtered0
+      .replace(/\r/g, "")
+      .split(`\n`)
+      .map((line) => (line ?? "").toString().trim());
+    const placeholderIndexes = rawLines
+      .map((line, idx) => (/^(?:\[\[sp-red\]\])?\s*(?:---|—|–)\s*$/.test(line) ? idx : -1))
+      .filter((idx) => idx >= 0);
+    if (placeholderIndexes.length) {
+      const cutAt = placeholderIndexes[placeholderIndexes.length - 1] + 1;
+      const overlayLines = rawLines
+        .slice(cutAt)
+        .map((line) => noteText(line))
+        .filter(Boolean);
+      const overlayParsed = this.parseCellTriplet(overlayLines.join("\n"));
+      if (overlayParsed?.fach && overlayParsed?.raum && overlayParsed?.lehrer) {
+        return d`
+          <div class="cellWrap">
+            <div class=${`fach${overlayParsed.fachChanged ? " changedText" : ""}`}>${overlayParsed.fach}</div>
+            <div class=${`lehrer${overlayParsed.teacherChanged ? " changedText" : ""}`}>${overlayParsed.lehrer}</div>
+            <div class=${`raum${overlayParsed.roomChanged ? " changedText" : ""}`}>${overlayParsed.raum}</div>
+
+            ${overlayParsed.notes?.length
+              ? d`
+                  <div class="notes">
+                    ${overlayParsed.notes.map((line) => {
+                      const cls = noteClass(line);
+                      const txt = noteText(line) || line;
+                      return d`<div class=${cls}><span class="txt">${txt}</span></div>`;
+                    })}
+                  </div>
+                `
+              : d``}
+          </div>
+        `;
+      }
+      const overlayOnly = ["---", ...overlayLines];
+      if (!overlayOnly.length) return d``;
+      return d`
+        <div class="cellWrap">
+          <div class="notes">
+            ${overlayOnly.map((line) => {
+              const cls = noteClass(line);
+              return d`<div class=${cls}><span class="txt">${line}</span></div>`;
+            })}
+          </div>
+        </div>
+      `;
+    }
+
     if (partsByBlank.length === 1 && parsed?.fach && parsed?.raum && parsed?.lehrer) {
       return d`
         <div class="cellWrap">
-          <div class="fach">${parsed.fach}</div>
-          <div class="lehrer">${parsed.lehrer}</div>
-          <div class="raum">${parsed.raum}</div>
+          <div class=${`fach${parsed.fachChanged ? " changedText" : ""}`}>${parsed.fach}</div>
+          <div class=${`lehrer${parsed.teacherChanged ? " changedText" : ""}`}>${parsed.lehrer}</div>
+          <div class=${`raum${parsed.roomChanged ? " changedText" : ""}`}>${parsed.raum}</div>
 
           ${parsed.notes?.length
             ? d`
@@ -1611,9 +1680,9 @@ getRowsResolved(t) {
       if (p?.fach && p?.raum && p?.lehrer) {
         return d`
           <div class="cellWrap">
-            <div class="fach">${p.fach}</div>
-            <div class="lehrer">${p.lehrer}</div>
-            <div class="raum">${p.raum}</div>
+            <div class=${`fach${p.fachChanged ? " changedText" : ""}`}>${p.fach}</div>
+            <div class=${`lehrer${p.teacherChanged ? " changedText" : ""}`}>${p.lehrer}</div>
+            <div class=${`raum${p.roomChanged ? " changedText" : ""}`}>${p.raum}</div>
 
             ${p.notes?.length
               ? d`
@@ -1632,8 +1701,8 @@ getRowsResolved(t) {
 
       // Fallback: erste Zeile als Fach, Rest als Notes
       const lines = v.split(`\n`).map((c) => c.trim()).filter(Boolean);
-      const head = (lines[0] ?? "").trim();
-      const rest = lines.slice(1);
+      const head = ((lines[0] ?? "").trim()).replaceAll("[[sp-red]]", "");
+      const rest = lines.slice(1).map((line) => line.replaceAll("[[sp-red]]", ""));
 
       if (head && rest.length) {
         return d`
@@ -1650,7 +1719,7 @@ getRowsResolved(t) {
         `;
       }
 
-      return d`<span class="cellText">${v}</span>`;
+      return d`<span class="cellText">${v.replaceAll("[[sp-red]]", "")}</span>`;
     };
 
     if (partsByBlank.length > 1) {
@@ -2003,6 +2072,14 @@ getRowsResolved(t) {
       opacity: 0.9;
       white-space: nowrap;
     }
+    .changedText {
+      display: inline-block;
+      padding: 2px 5px;
+      border-radius: 8px;
+      background: rgba(244, 67, 54, 0.12);
+      color: #ff8d86;
+      opacity: 1;
+    }
 
     .notes {
       margin-top: 4px;
@@ -2022,8 +2099,19 @@ getRowsResolved(t) {
       border-radius: 8px;
       background: rgba(0, 0, 0, 0.04);
     }
+    .noteNeutral {
+      background: rgba(166, 123, 53, 0.22);
+    }
     .noteRed {
       background: rgba(244, 67, 54, 0.12);
+    }
+    .noteDash {
+      background: transparent;
+      color: #ff8d86;
+      padding: 0;
+      border-radius: 0;
+      line-height: 1;
+      font-weight: 700;
     }
     .noteOrange {
       background: rgba(255, 152, 0, 0.12);
