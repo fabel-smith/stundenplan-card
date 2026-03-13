@@ -1,6 +1,6 @@
 {
   "name": "stundenplan-card",
-  "version": "3.1.5",
+  "version": "3.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,5 +12,8 @@
     "lit": "^3.3.2",
     "typescript": "^5.5.4",
     "vite": "^7.3.1"
+  },
+  "overrides": {
+    "rollup": "^4.59.0"
   }
 }

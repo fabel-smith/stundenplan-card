@@ -636,7 +636,7 @@ function Oe(r) {
 var D;
 const v = (D = class extends U {
   constructor() {
-    super(...arguments), S(this, X), S(this, tt), S(this, et, []), S(this, st, !1), S(this, it, ""), S(this, rt, null), S(this, nt, "idle"), S(this, ot, ""), this._jsonUrlLast = "", this._lastWatchSig = null, this._lastWeekOffset = null;
+    super(...arguments), S(this, X), S(this, tt), S(this, et, []), S(this, st, !1), S(this, it, ""), S(this, rt, null), S(this, nt, "idle"), S(this, ot, ""), this._jsonUrlLast = "", this._lastWatchSig = null, this._lastWeekOffset = null, this._uiWeekOffset = null;
   }
   getGridOptions() {
     return { columns: "full" };
@@ -784,7 +784,7 @@ const v = (D = class extends U {
     if (!s) return;
     const i = this.hass?.states?.[s], n = i?.attributes?.min, o = i?.attributes?.max, l = Number.isFinite(Number(n)) ? Number(n) : -52, a = Number.isFinite(Number(o)) ? Number(o) : 52;
     let c = e;
-    c = Math.max(l, c), c = Math.min(a, c), await this.hass.callService("number", "set_value", { entity_id: s, value: c });
+    c = Math.max(l, c), c = Math.min(a, c); const r = s.split(".")[0] === "input_number" ? "input_number" : "number"; await this.hass.callService(r, "set_value", { entity_id: s, value: c });
   }
   connectedCallback() {
     super.connectedCallback(), this._tick = window.setInterval(() => {
@@ -802,6 +802,7 @@ const v = (D = class extends U {
     if (t.has("hass")) {
       if (this.config) {
         const e = this.getWeekOffsetValue(this.config);
+        this._uiWeekOffset != null && e === this._uiWeekOffset && (this._uiWeekOffset = null);
         e !== this._lastWeekOffset && (this._lastWeekOffset = e);
       }
       this.recomputeRowsIfWatchedChanged();
@@ -814,6 +815,12 @@ const v = (D = class extends U {
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       view_mode: "week",
       days_ahead: 0,
+      next_day_jump_mode: "midnight",
+      rolling_cutoff_time: "",
+      highlight_next_day_after_last_time: !1,
+      show_header_date: !0,
+      font_family: "",
+      font_size: 14,
       highlight_today: !0,
       highlight_current: !0,
       highlight_breaks: !1,
@@ -874,7 +881,19 @@ const v = (D = class extends U {
         cells: u
       };
       return O.some((w) => !!w) && (b.cell_styles = O), b;
-    }), vmRaw = ((t.view_mode ?? "week") + "").toString().trim(), vm = vmRaw === "rolling" ? "rolling" : "week", da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", f = (() => {
+    }), vmRaw = ((t.view_mode ?? "week") + "").toString().trim(), vm = vmRaw === "rolling" ? "rolling" : "week", da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, fontFamilyRaw = (t.font_family ?? e.font_family ?? "").toString().trim(), fontFamilyMap = {
+      'var(--ha-card-header-font-family, var(--primary-font-family, inherit))': "system",
+      '"Segoe UI", Arial, sans-serif': "segoe",
+      'Arial, Helvetica, sans-serif': "arial",
+      'Verdana, Geneva, sans-serif': "verdana",
+      '"Trebuchet MS", Arial, sans-serif': "trebuchet",
+      '"Gill Sans", "Gill Sans MT", Calibri, sans-serif': "gillsans",
+      'Georgia, "Times New Roman", serif': "georgia",
+      '"Palatino Linotype", "Book Antiqua", Palatino, serif': "palatino",
+      '"Courier New", Courier, monospace': "courier"
+    }, normalizedFontFamily = fontFamilyMap[fontFamilyRaw] ?? fontFamilyRaw, jumpModeRaw = ((t.next_day_jump_mode ?? "") + "").toString().trim(), jumpMode = jumpModeRaw === "after_last_lesson" || jumpModeRaw === "fixed_time" || jumpModeRaw === "midnight"
+      ? jumpModeRaw
+      : (t.highlight_next_day_after_last_time ? "after_last_lesson" : ((t.rolling_cutoff_time ?? "").toString().trim() ? "fixed_time" : "midnight")), o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", f = (() => {
       const raw = ((t.source_type ?? "") + "").toString().trim();
       if (raw === "manual" || raw === "entity" || raw === "json" || raw === "sensor") return raw;
       const a_guess = ((t.source_entity ?? e.source_entity) + "").toString().trim();
@@ -898,6 +917,12 @@ const v = (D = class extends U {
       days: s,
       view_mode: vm,
       days_ahead: daysAhead,
+      next_day_jump_mode: jumpMode,
+      rolling_cutoff_time: (t.rolling_cutoff_time ?? e.rolling_cutoff_time ?? "").toString(),
+      highlight_next_day_after_last_time: t.highlight_next_day_after_last_time ?? e.highlight_next_day_after_last_time,
+      show_header_date: t.show_header_date ?? e.show_header_date,
+      font_family: normalizedFontFamily,
+      font_size: Number.isFinite(Number(t.font_size)) ? Math.max(10, Math.min(28, Number(t.font_size))) : e.font_size,
       highlight_today: t.highlight_today ?? e.highlight_today,
       highlight_current: t.highlight_current ?? e.highlight_current,
       highlight_breaks: t.highlight_breaks ?? e.highlight_breaks,
@@ -935,9 +960,43 @@ const v = (D = class extends U {
       rows: n
     };
   }
-  getTodayIndex(t, metaDays) {
-    const today = (/* @__PURE__ */ new Date());
-    const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+  toYmd(t) {
+    return `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, "0")}${String(t.getDate()).padStart(2, "0")}`;
+  }
+  parseClockToMinutes(t) {
+    const e = (t ?? "").toString().trim().match(/^(\d{1,2}):(\d{2})$/);
+    if (!e) return null;
+    const s = Number(e[1]), i = Number(e[2]);
+    return Number.isFinite(s) && Number.isFinite(i) && s >= 0 && s <= 23 && i >= 0 && i <= 59 ? s * 60 + i : null;
+  }
+  getRollingAnchorDate(t, rows = this._rowsCache ?? []) {
+    const weekOffset = this.getWeekOffsetValue(t) ?? 0;
+    if (weekOffset !== 0) {
+      return this.mondayOfWeek(this.getBaseDate(t));
+    }
+    return this.getEffectiveDaySwitchDate(t, rows);
+  }
+  getDataIndexForDate(t, e, s) {
+    const i = this.toYmd(s);
+    if (Array.isArray(e) && e.length) {
+      const n = e.map((o) => {
+        if (o instanceof Date && !Number.isNaN(o.getTime())) return this.toYmd(o);
+        const l = (o ?? "").toString().trim();
+        const a = l.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (a) return `${a[1]}${a[2]}${a[3]}`;
+        return l;
+      });
+      const o = n.indexOf(i);
+      if (o >= 0) return { dataIndex: o, exactMatch: !0 };
+    }
+    const n = s.getDay() === 0 ? 7 : s.getDay();
+    for (let o = 0; o < (t ?? []).length; o++) {
+      if (Oe(t[o]) === n) return { dataIndex: o, exactMatch: !1 };
+    }
+    return { dataIndex: -1, exactMatch: !1 };
+  }
+  getTodayIndex(t, metaDays, refDate = /* @__PURE__ */ new Date()) {
+    const ymd = this.toYmd(refDate);
     // If meta-days are provided by an integration, they may be either
     // - strings in YYYYMMDD (preferred), or
     // - strings in YYYY-MM-DD, or
@@ -945,9 +1004,7 @@ const v = (D = class extends U {
     // Make the comparison robust so the today-column highlight works reliably.
     if (Array.isArray(metaDays) && metaDays.length) {
       const n = metaDays.map((o) => {
-        if (o instanceof Date && !Number.isNaN(o.getTime())) {
-          return `${o.getFullYear()}${String(o.getMonth() + 1).padStart(2, "0")}${String(o.getDate()).padStart(2, "0")}`;
-        }
+        if (o instanceof Date && !Number.isNaN(o.getTime())) return this.toYmd(o);
         const s = (o ?? "").toString().trim();
         const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
         if (m) return `${m[1]}${m[2]}${m[3]}`;
@@ -956,11 +1013,29 @@ const v = (D = class extends U {
       const i = n.indexOf(ymd);
       return i >= 0 ? i : -1;
     }
-    const e = today.getDay(), s = new Set(Re(e).map(wt));
+    const e = refDate.getDay(), s = new Set(Re(e).map(wt));
     if (!s.size) return -1;
     const i = (t ?? []).map((n) => wt(n));
     for (let n = 0; n < i.length; n++) if (s.has(i[n])) return n;
     return -1;
+  }
+  getVisibleDayEntries(t, metaDays) {
+    const e = t.days ?? [];
+    const s = (t.view_mode ?? "week").toString();
+    const i = Number(t.days_ahead);
+    const n = Number.isFinite(i) ? Math.max(0, Math.min(14, Math.floor(i))) : 0;
+    if (s !== "rolling") {
+      return e.map((l, a) => ({ label: l, dataIndex: a, headerDate: null }));
+    }
+    const o = [];
+    const l = this.getRollingAnchorDate(t);
+    for (let a = 0; a < 21 && o.length < n + 1; a++) {
+      const c = new Date(l);
+      c.setDate(l.getDate() + a);
+      const _ = this.getDataIndexForDate(e, metaDays, c);
+      if (_.dataIndex >= 0) o.push({ label: e[_.dataIndex], dataIndex: _.dataIndex, headerDate: c, exactMatch: _.exactMatch });
+    }
+    return o.length ? o : e.map((a, c) => ({ label: a, dataIndex: c, headerDate: null, exactMatch: !0 }));
   }
   toMinutes(t) {
     if (!t) return null;
@@ -1091,13 +1166,144 @@ const v = (D = class extends U {
     const e = String(t.getDate()).padStart(2, "0"), s = String(t.getMonth() + 1).padStart(2, "0"), i = String(t.getFullYear());
     return `${e}.${s}.${i}`;
   }
+  getCardInlineStyle(t) {
+    const e = this.resolveFontFamily((t.font_family ?? "").toString().trim());
+    const s = Number(t.font_size);
+    const i = Number.isFinite(s) ? Math.max(10, Math.min(28, s)) : 14;
+    const n = i / 14;
+    const o = [];
+    e && o.push(`--sp-font-family:${e}`);
+    o.push(`--sp-font-size:${i}px`);
+    o.push(`--sp-font-scale:${n}`);
+    return o.join(";");
+  }
+  resolveFontFamily(t) {
+    const key = (t ?? "").toString().trim();
+    const presets = {
+      "": "",
+      system: 'var(--ha-card-header-font-family, var(--primary-font-family, inherit))',
+      segoe: '"Segoe UI", Arial, sans-serif',
+      arial: 'Arial, Helvetica, sans-serif',
+      verdana: 'Verdana, Geneva, sans-serif',
+      trebuchet: '"Trebuchet MS", Arial, sans-serif',
+      gillsans: '"Gill Sans", "Gill Sans MT", Calibri, sans-serif',
+      georgia: 'Georgia, "Times New Roman", serif',
+      palatino: '"Palatino Linotype", "Book Antiqua", Palatino, serif',
+      courier: '"Courier New", Courier, monospace'
+    };
+    if (key in presets) return presets[key];
+    return key;
+  }
+  getSourceMeta(t) {
+    const e = (
+      (t.source_type ?? "manual") === "entity"
+        ? ((t.source_entity_integration ?? t.source_entity ?? (t.entity ?? "")) ?? "")
+        : (t.source_type ?? "manual") === "sensor"
+          ? ((t.source_entity_legacy ?? t.source_entity ?? (t.entity ?? "")) ?? "")
+          : (t.source_entity ?? "")
+    ).toString().trim();
+    if (!e || !this.hass?.states?.[e]) return null;
+    const s = this.hass.states[e].attributes ?? {};
+    return s?.meta_ha ?? s?.meta ?? (typeof s?.meta_json === "string" ? this.parseAnyJson(s.meta_json) : null) ?? null;
+  }
+  getVplanHintForDate(t, entry) {
+    const meta = this.getSourceMeta(t);
+    if (!meta || !entry?.headerDate) return "";
+    const key = this.toYmd(entry.headerDate);
+    const exactAvailability = meta?.vplan_available_by_date?.[key];
+    if (typeof exactAvailability === "boolean") {
+      return exactAvailability ? "" : "(noch keine Vp-Daten vorhanden)";
+    }
+    return "";
+  }
+  getExactCellForDate(t, entry, row) {
+    const meta = this.getSourceMeta(t);
+    if (!meta || !entry?.headerDate || !row?.time) return null;
+    const key = this.toYmd(entry.headerDate);
+    const byDate = meta?.exact_cells_by_date_time?.[key];
+    if (!byDate || typeof byDate !== "object") return null;
+    const value = byDate?.[row.time];
+    return typeof value === "string" ? value : null;
+  }
+  getExactUpdatedForDate(t, entry) {
+    const meta = this.getSourceMeta(t);
+    if (!meta || !entry?.headerDate) return "";
+    const key = this.toYmd(entry.headerDate);
+    const value = meta?.exact_updated_by_date?.[key];
+    return typeof value === "string" ? value : "";
+  }
+  getCurrentVisibleIndex(dayEntries, refDate = /* @__PURE__ */ new Date()) {
+    const currentKey = this.toYmd(refDate);
+    for (let i = 0; i < (dayEntries ?? []).length; i++) {
+      const entry = dayEntries[i];
+      if (entry?.headerDate && this.toYmd(entry.headerDate) === currentKey) return i;
+    }
+    return -1;
+  }
+  getLastLessonEndMinutes(rows) {
+    let lastEnd = null;
+    for (const row of rows ?? []) {
+      if (ct(row)) continue;
+      const end = this.toMinutes(row?.end ?? "") ?? this.toMinutes(mt(row?.time ?? "").end);
+      if (end == null) continue;
+      lastEnd = lastEnd == null ? end : Math.max(lastEnd, end);
+    }
+    return lastEnd;
+  }
+  getNextConfiguredSchoolDate(days, refDate) {
+    for (let offset = 1; offset <= 14; offset++) {
+      const candidate = new Date(refDate);
+      candidate.setDate(refDate.getDate() + offset);
+      const weekday = candidate.getDay() === 0 ? 7 : candidate.getDay();
+      for (const day of days ?? []) {
+        if (Oe(day) === weekday) return candidate;
+      }
+    }
+    return refDate;
+  }
+  getEffectiveDaySwitchDate(t, rows) {
+    const now = /* @__PURE__ */ new Date();
+    now.setSeconds(0, 0);
+    const mode = ((t?.next_day_jump_mode ?? "midnight") + "").toString().trim();
+    if (mode === "fixed_time") {
+      const cutoff = this.parseClockToMinutes(t?.rolling_cutoff_time ?? "");
+      if (cutoff == null) return now;
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      return nowMinutes >= cutoff ? this.getNextConfiguredSchoolDate(t?.days ?? [], now) : now;
+    }
+    if (mode !== "after_last_lesson") return now;
+    const lastEnd = this.getLastLessonEndMinutes(rows);
+    if (lastEnd == null) return now;
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    if (nowMinutes < lastEnd) return now;
+    return this.getNextConfiguredSchoolDate(t?.days ?? [], now);
+  }
+  getEffectiveHighlightDate(t, rows) {
+    return this.getEffectiveDaySwitchDate(t, rows);
+  }
+  getLastMetaDate(metaDays) {
+    if (!Array.isArray(metaDays) || !metaDays.length) return null;
+    let last = null;
+    for (const item of metaDays) {
+      let d = null;
+      if (item instanceof Date && !Number.isNaN(item.getTime())) {
+        d = new Date(item);
+      } else {
+        const s = (item ?? "").toString().trim();
+        const a = s.match(/^(\d{4})(\d{2})(\d{2})$/) ?? s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (a) d = new Date(Number(a[1]), Number(a[2]) - 1, Number(a[3]), 12, 0, 0, 0);
+      }
+      if (d && !Number.isNaN(d.getTime()) && (!last || d.getTime() > last.getTime())) last = d;
+    }
+    return last;
+  }
   // Prefer meta.days from source_entity for header dates (YYYYMMDD)
   getHeaderDaysFromEntity(t) {
     const e = (
       (t.source_type ?? "manual") === "entity"
-        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        ? ((t.source_entity_integration ?? t.source_entity ?? (t.entity ?? "")) ?? "")
         : (t.source_type ?? "manual") === "sensor"
-          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
+          ? ((t.source_entity_legacy ?? t.source_entity ?? (t.entity ?? "")) ?? "")
           : (t.source_entity ?? "")
     ).toString().trim();
     if (!e || !this.hass?.states?.[e]) return null;
@@ -1119,9 +1325,9 @@ const v = (D = class extends U {
   getHeaderUpdatedFromEntity(t) {
     const e = (
       (t.source_type ?? "manual") === "entity"
-        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        ? ((t.source_entity_integration ?? t.source_entity ?? (t.entity ?? "")) ?? "")
         : (t.source_type ?? "manual") === "sensor"
-          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
+          ? ((t.source_entity_legacy ?? t.source_entity ?? (t.entity ?? "")) ?? "")
           : (t.source_entity ?? "")
     ).toString().trim();
     if (!e || !this.hass?.states?.[e]) return null;
@@ -1152,6 +1358,48 @@ const v = (D = class extends U {
 
     return null;
   }
+
+getHeaderVplanMissingTextFromEntity(t) {
+    const e = (
+      (t.source_type ?? "manual") === "entity"
+        ? ((t.source_entity_integration ?? t.source_entity ?? (t.entity ?? "")) ?? "")
+        : (t.source_type ?? "manual") === "sensor"
+          ? ((t.source_entity_legacy ?? t.source_entity ?? (t.entity ?? "")) ?? "")
+          : (t.source_entity ?? "")
+    ).toString().trim();
+    if (!e || !this.hass?.states?.[e]) return null;
+
+    const a = this.hass.states[e].attributes ?? {};
+    const meta =
+      a?.meta_ha ??
+      a?.meta ??
+      (typeof a?.meta_json === "string" ? this.parseAnyJson(a.meta_json) : null) ??
+      null;
+
+    if (!meta) return null;
+
+    const daysLen = (t.days?.length ?? 0) || 5;
+
+    // Preferred: explicit per-day hint strings
+    const hintDays = meta?.vplan_missing_text_days ?? meta?.vplan_missing_days_text ?? null;
+    if (Array.isArray(hintDays) && hintDays.length) {
+      return Array.from({ length: daysLen }, (_, i) => (hintDays[i] ?? "").toString());
+    }
+    if (typeof hintDays === "string" && hintDays.trim()) {
+      const v = hintDays.toString();
+      return Array.from({ length: daysLen }, () => v);
+    }
+
+    // Fallback: boolean flags -> default text like Stundenplan24
+    const missingDays = meta?.vplan_missing_days ?? null;
+    if (Array.isArray(missingDays) && missingDays.length) {
+      return Array.from({ length: daysLen }, (_, i) => missingDays[i] ? "(noch keine Vp-Daten vorhanden)" : "");
+    }
+
+    return null;
+  }
+
+
 getRowsResolved(t) {
     const e = t.source_type ?? "manual";
     const effEntity = (
@@ -1248,7 +1496,25 @@ getRowsResolved(t) {
       h = u.length ? u[u.length - 1] : void 0;
     }
     const p = s.slice(1).filter((u) => o(u));
-    return { fach: n, raum: _, lehrer: h, notes: p.length ? p : void 0 };
+    // Duplikate in Notizen entfernen (z.B. "Frau Johne" vs "JOH" bei gleicher Aussage)
+    const normNote = (u: string) => (u ?? "")
+      .toString()
+      .replace(/^[🟠🔴🟡🟢⚪️🟣🟤]\s*/u, "")
+      .replace(/\b(Frau|Herr)\s+[\p{L}\-]+\b/giu, "")
+      .replace(/\b[A-ZÄÖÜ]{2,4}\b/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    const deduped: string[] = [];
+    const seen = new Set<string>();
+    for (const line of p) {
+      const k = normNote(line);
+      if (!k) continue;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      deduped.push(line);
+    }
+    return { fach: n, raum: _, lehrer: h, notes: deduped.length ? deduped : void 0 };
   }
   renderCell(t, e) {
     const raw = (t ?? "").toString();
@@ -1429,11 +1695,11 @@ getRowsResolved(t) {
 
   render() {
     if (!this.config) return d``;
-    const t = this.config, e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], u), vm = (t.view_mode ?? "week").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, idxs = vm === "rolling" && s >= 0 ? Array.from({ length: Math.min((t.days?.length ?? 0) - s, daysAhead + 1) }, (y, m) => s + m) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m), daysVis = idxs.map((y) => t.days[y]), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(),
+    const t = this.config, e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), highlightDate = this.getEffectiveHighlightDate(t, e), anchorDate = this.getRollingAnchorDate(t, e), s = this.getTodayIndex(t.days ?? [], u, (t.view_mode ?? "week") === "rolling" ? anchorDate : highlightDate), dayEntries = this.getVisibleDayEntries(t, u), currentVisibleIndex = this.getCurrentVisibleIndex(dayEntries, highlightDate), daysVis = dayEntries.map((y) => y.label), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, hRaw = this.getWeekOffsetValue(t), h = this._uiWeekOffset != null ? this._uiWeekOffset : hRaw, sourceType = (t.source_type ?? "manual").toString(), showHeaderDate = E(t.show_header_date, !0),
         p = (t.week_offset_entity ?? "").trim().length > 0,
-        showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), g = u && u.length >= (t.days?.length ?? 0) ? u : null, upd = this.getHeaderUpdatedFromEntity(t), O = this.getBaseDate(t), B = this.mondayOfWeek(O);
+        showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), g = u && u.length >= (t.days?.length ?? 0) ? u : null, upd = this.getHeaderUpdatedFromEntity(t), vp = this.getHeaderVplanMissingTextFromEntity(t), O = this.getBaseDate(t), B = this.mondayOfWeek(O), cardInlineStyle = this.getCardInlineStyle(t);
     return d`
-      <ha-card>
+      <ha-card style=${cardInlineStyle}>
         <div class="headerRow">
           <div class="title">${t.title ?? ""}</div>
 
@@ -1442,9 +1708,8 @@ getRowsResolved(t) {
 
             ${showPager ? d`
                   <div class="offsetInline">
-                    <button class="btnMini" @click=${() => h != null && this.setWeekOffset(t, h - 1)}>&lt;</button>
-                    <div class="offsetVal">${h ?? "?"}</div>
-                    <button class="btnMini" @click=${() => h != null && this.setWeekOffset(t, h + 1)}>&gt;</button>
+                    <button class="btnMini ${h === 0 ? "active" : ""}" ?disabled=${h == null} @click=${async (ev) => { ev?.preventDefault?.(); ev?.stopPropagation?.(); if (h != null) { try { this._uiWeekOffset = 0; this.requestUpdate(); await this.setWeekOffset(t, 0); this.requestUpdate(); } catch (err) { console.warn("[stundenplan-card] setWeekOffset(0) failed", err); } } }}>Aktuelle Woche</button>
+                    <button class="btnMini ${h === 1 ? "active" : ""}" ?disabled=${h == null} @click=${async (ev) => { ev?.preventDefault?.(); ev?.stopPropagation?.(); if (h != null) { try { this._uiWeekOffset = 1; this.requestUpdate(); await this.setWeekOffset(t, 1); this.requestUpdate(); } catch (err) { console.warn("[stundenplan-card] setWeekOffset(+1) failed", err); } } }}>Nächste Woche</button>
                   </div>
                 ` : d``}
           </div>
@@ -1455,23 +1720,29 @@ getRowsResolved(t) {
             <thead>
               <tr>
                 <th class="time">Stunde</th>
-                ${daysVis.map((y, m) => { const orig = idxs[m];
-      const W = t.highlight_today && orig === s ? "today" : "";
+                ${dayEntries.map((entry, m) => { const y = entry.label, orig = entry.dataIndex;
+      const W = t.highlight_today && ((entry?.headerDate && currentVisibleIndex === m) || (!entry?.headerDate && orig === s)) ? "today" : "";
+      const headerUpdated = this.getExactUpdatedForDate(t, entry) || (entry.exactMatch ? (upd?.[orig] ?? "") : "");
+      const headerVpHint = this.getVplanHintForDate(t, entry) || (entry.exactMatch ? (vp?.[orig] ?? "") : "");
       let b = "";
-      if (g)
-        b = this.fmtDDMMYYYY(g[orig]);
-      else {
-        const w = Oe(y);
-        if (w) {
-          const x = new Date(B);
-          x.setDate(B.getDate() + (w - 1)), b = this.fmtDDMMYYYY(x);
+      if (showHeaderDate)
+        if (entry.headerDate)
+          b = this.fmtDDMMYYYY(entry.headerDate);
+        else if (g && g[orig])
+          b = this.fmtDDMMYYYY(g[orig]);
+        else {
+          const w = Oe(y);
+          if (w) {
+            const x = new Date(B);
+            x.setDate(B.getDate() + (w - 1)), b = this.fmtDDMMYYYY(x);
+          }
         }
-      }
       return d`
                     <th class=${W} style=${`--sp-hl:${n};`}>
                       <div>${y}</div>
-                      <div class="thDate">${b}</div>
-                      ${upd?.[orig] ? d`<div class="thUpdated">(aktualisiert: ${upd[orig]})</div>` : d``}
+                      ${b ? d`<div class="thDate">${b}</div>` : d``}
+                      ${headerUpdated ? d`<div class="thUpdated">(aktualisiert: ${headerUpdated})</div>` : d``}
+                      ${headerVpHint ? d`<div class="thVpHint">${headerVpHint}</div>` : d``}
                     </th>
                   `;
     })}
@@ -1490,7 +1761,7 @@ getRowsResolved(t) {
                     </tr>
                   `;
       }
-      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], w = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), x = s >= 0 ? W[s] ?? "" : "", te = s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), __rng = mt(m.time),
+      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], w = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), currentEntry = currentVisibleIndex >= 0 ? dayEntries[currentVisibleIndex] : null, currentExactCell = currentEntry ? this.getExactCellForDate(t, currentEntry, m) : null, currentOrig = currentEntry?.dataIndex ?? -1, x = currentExactCell != null ? currentExactCell : currentOrig >= 0 ? W[currentOrig] ?? "" : "", te = currentVisibleIndex >= 0 ? this.filterCellText(x, t) : "", ee = currentVisibleIndex >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), __rng = mt(m.time),
       __timeHasRange = !!(__rng.start && __rng.end),
       Et = (!__timeHasRange && m.start && m.end) ? `${m.start}–${m.end}` : "";
       let gt = `--sp-hl:${o};`;
@@ -1503,11 +1774,14 @@ getRowsResolved(t) {
                       </div>
                     </td>
 
-                    ${daysVis.map((z, P) => { const orig = idxs[P];
-        const F = this.filterCellText(W[orig] ?? "", t), I = b[orig] ?? null, G = t.highlight_today && orig === s ? "today" : "";
+                    ${dayEntries.map((entry, P) => { const z = entry.label, orig = entry.dataIndex;
+        const canUseSourceCell = !(sourceType === "entity" && orig < 0);
+        const exactCell = this.getExactCellForDate(t, entry, m);
+        const rawCell = exactCell != null ? exactCell : canUseSourceCell ? W[orig] ?? "" : "";
+        const F = this.filterCellText(rawCell, t), I = exactCell != null ? null : canUseSourceCell ? (b[orig] ?? null) : null, G = t.highlight_today && ((entry?.headerDate && currentVisibleIndex === P) || (!entry?.headerDate && orig === s)) ? "today" : "";
         let Ct = `--sp-hl:${n};` + Te(I, i);
         const se = !yt(F);
-        return pt && se && w && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(F, t)}</td>`;
+        return pt && se && w && t.highlight_current_text && l && ((entry?.headerDate && currentVisibleIndex === P) || (!entry?.headerDate && s >= 0 && orig === s)) && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(F, t)}</td>`;
       })}
                   </tr>
                 `;
@@ -1523,12 +1797,33 @@ getRowsResolved(t) {
       display: block;
       width: 100%;
       max-width: 100%;
+      font-family: var(--sp-font-family, inherit);
+      font-size: var(--sp-font-size, 14px);
     }
     ha-card {
       display: block;
       width: 100%;
       max-width: 100%;
       box-sizing: border-box;
+      font-family: inherit;
+      font-size: inherit;
+    }
+    .card,
+    table,
+    th,
+    td,
+    .weekBadgeInline,
+    .offsetInline,
+    .btnMini,
+    .timeWrap,
+    .cellWrap,
+    .cellText,
+    .fach,
+    .raum,
+    .lehrer,
+    .notes,
+    .note {
+      font-family: var(--sp-font-family, inherit);
     }
 
     .headerRow {
@@ -1539,6 +1834,7 @@ getRowsResolved(t) {
       padding: 14px 14px 8px 14px;
     }
     .title {
+      font-family: var(--primary-font-family, inherit);
       font-size: 20px;
       font-weight: 700;
       line-height: 1.2;
@@ -1555,7 +1851,7 @@ getRowsResolved(t) {
       border: 1px solid var(--divider-color);
       border-radius: 12px;
       background: var(--secondary-background-color);
-      font-size: 13px;
+      font-size: calc(13px * var(--sp-font-scale, 1));
       opacity: 0.95;
       white-space: nowrap;
     }
@@ -1577,7 +1873,12 @@ getRowsResolved(t) {
       padding: 6px 10px;
       cursor: pointer;
     }
-    .btnMini:hover {
+        .btnMini.active {
+      background: var(--primary-color);
+      border-color: var(--primary-color);
+      color: var(--text-primary-color, #fff);
+    }
+.btnMini:hover {
       filter: brightness(1.06);
     }
     .offsetVal {
@@ -1598,6 +1899,7 @@ getRowsResolved(t) {
       width: max-content;
       min-width: 100%;
       border-collapse: collapse;
+      font-size: inherit;
     }
     th,
     td {
@@ -1614,18 +1916,29 @@ getRowsResolved(t) {
     }
 
     .thDate {
-      font-size: 11px;
+      font-size: calc(11px * var(--sp-font-scale, 1));
       opacity: 0.75;
       margin-top: 2px;
       font-weight: 600;
       white-space: nowrap;
     }
     .thUpdated {
-      font-size: 10px;
+      font-size: calc(10px * var(--sp-font-scale, 1));
       opacity: 0.7;
       margin-top: 1px;
       white-space: nowrap;
     }
+
+    .thVpHint {
+      font-size: calc(11px * var(--sp-font-scale, 1));
+      margin-top: 2px;
+      color: var(--error-color);
+      font-style: italic;
+      font-weight: 600;
+      white-space: nowrap;
+      text-align: center;
+    }
+
 
     .time {
       font-weight: 700;
@@ -1639,11 +1952,11 @@ getRowsResolved(t) {
       line-height: 1.1;
     }
     .timeSt {
-      font-size: 13px;
+      font-size: calc(13px * var(--sp-font-scale, 1));
       font-weight: 800;
     }
     .timeHm {
-      font-size: 11px;
+      font-size: calc(11px * var(--sp-font-scale, 1));
       font-weight: 650;
       opacity: 0.85;
     }
@@ -1680,13 +1993,13 @@ getRowsResolved(t) {
     }
     .fach {
       font-weight: 800;
-      font-size: 14px;
+      font-size: calc(14px * var(--sp-font-scale, 1));
       letter-spacing: 0.2px;
       white-space: nowrap;
     }
     .raum,
     .lehrer {
-      font-size: 12px;
+      font-size: calc(12px * var(--sp-font-scale, 1));
       opacity: 0.9;
       white-space: nowrap;
     }
@@ -1702,7 +2015,7 @@ getRowsResolved(t) {
     .note {
       display: block;
       text-align: center;
-      font-size: 11px;
+      font-size: calc(11px * var(--sp-font-scale, 1));
       line-height: 1.25;
       opacity: 0.92;
       padding: 3px 4px;
@@ -1719,7 +2032,7 @@ getRowsResolved(t) {
       background: rgba(255, 235, 59, 0.14);
     }
     .dot {
-      font-size: 12px;
+      font-size: calc(12px * var(--sp-font-scale, 1));
       line-height: 1;
       margin-top: 1px;
       opacity: 0.95;
@@ -1732,6 +2045,9 @@ getRowsResolved(t) {
     .cellText {
       white-space: pre-line;
       display: inline-block;
+      font-size: calc(14px * var(--sp-font-scale, 1));
+      font-weight: 700;
+      line-height: 1.2;
     }
   
 
@@ -1975,6 +2291,15 @@ const ut = class ut extends U {
       </div>
     `;
   }
+  renderSubsection(title, hint, content) {
+    return d`
+      <div class="subSection">
+        <div class="subSectionTitle">${title}</div>
+        ${hint ? d`<div class="subSectionHint">${hint}</div>` : d``}
+        <div class="subSectionBody">${content}</div>
+      </div>
+    `;
+  }
   onToggle(t, e) {
     const s = !!t?.target?.checked;
     this.setValue(e, s);
@@ -2069,6 +2394,84 @@ const ut = class ut extends U {
     i[t] = { ...o, cell_styles: l };
     this.emit({ ...this._config, rows: i });
   }
+  focusManualCell(rowIndex, colIndex) {
+    try {
+      this._rowOpen = { ...(this._rowOpen ?? {}), [rowIndex]: !0 };
+      this.requestUpdate();
+      window.setTimeout(() => {
+        try {
+          const root = this.renderRoot ?? this.shadowRoot;
+          const sel = `textarea[data-row="${rowIndex}"][data-col="${colIndex}"]`;
+          const el = root?.querySelector?.(sel);
+          if (el) {
+            el.focus();
+            const len = (el.value ?? "").length;
+            el.setSelectionRange?.(len, len);
+            el.scrollIntoView?.({ block: "center", behavior: "smooth" });
+          }
+        } catch {}
+      }, 50);
+    } catch {}
+  }
+  renderManualPreview(days, rows) {
+    const lessonRows = rows.filter((r) => !ct(r));
+    if (!lessonRows.length) return d``;
+    return d`
+      <div class="manualPreviewWrap">
+        <div class="manualPreviewTitle">Vorschau</div>
+        <div class="manualPreviewHint">Klicke auf eine Zelle, um direkt das passende Eingabefeld zu öffnen.</div>
+        <div class="manualPreviewTableWrap">
+          <table class="manualPreviewTable">
+            <thead>
+              <tr>
+                <th class="time">Stunde</th>
+                ${days.map((day) => d`<th>${day}</th>`)}
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row, rowIndex) => {
+        if (ct(row)) {
+          return d`
+                    <tr class="manualPreviewBreak">
+                      <td class="time">${(row.time ?? "").toString()}</td>
+                      <td colspan=${days.length}>${(row.label ?? "Pause").toString()}</td>
+                    </tr>
+                  `;
+        }
+        const cells = Array.isArray(row.cells) ? row.cells : [];
+        return d`
+                  <tr>
+                    <td class="time">${(row.time ?? "").toString()}</td>
+                    ${days.map((day, colIndex) => {
+          const value = (cells[colIndex] ?? "").toString().trim();
+          const preview = value ? value.split(/\r?\n/).slice(0, 3) : [];
+          return d`
+                        <td>
+                          <button
+                            type="button"
+                            class="manualPreviewCellBtn"
+                            @click=${() => this.focusManualCell(rowIndex, colIndex)}
+                          >
+                            ${preview.length
+              ? d`
+                                  <span class="manualPreviewLines">
+                                    ${preview.map((line, lineIndex) => d`<span class=${lineIndex === 0 ? "manualPreviewMain" : "manualPreviewSub"}>${line}</span>`)}
+                                  </span>
+                                `
+              : d`<span class="manualPreviewEmpty">Leer</span>`}
+                          </button>
+                        </td>
+                      `;
+        })}
+                  </tr>
+                `;
+      })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
   
   renderManualRows() {
     if (!this._config) return d``;
@@ -2078,26 +2481,28 @@ const ut = class ut extends U {
     return d`
       <div class="rowsTop">
         <div class="rowsTitle">Stundenplan (Zeilen)</div>
-
-        <div class="btnBar">
-          <div class="toggleInline">
-            <div class="toggleText">Cell-Styles</div>
-            <ha-switch
-              .checked=${!!this._showCellStyles}
-              @change=${(e) => {
-                this._showCellStyles = !!e?.target?.checked;
-                this.requestUpdate();
-              }}
-            ></ha-switch>
-          </div>
-
-          <mwc-button outlined @click=${this.addLessonRow}>+ Stunde</mwc-button>
-          <mwc-button outlined @click=${this.addBreakRow}>+ Pause</mwc-button>
-        </div>
       </div>
 
       <div class="sub" style="margin-bottom:10px;">
         Pro Zeile: Zeit + optional Start/Ende. Per Klick in der Vorschau springst du zur passenden Zelle.
+      </div>
+
+      ${this.renderManualPreview(days, rows)}
+
+      <div class="btnBar btnBarManual">
+        <div class="toggleInline">
+          <div class="toggleText">Cell-Styles</div>
+          <ha-switch
+            .checked=${!!this._showCellStyles}
+            @change=${(e) => {
+              this._showCellStyles = !!e?.target?.checked;
+              this.requestUpdate();
+            }}
+          ></ha-switch>
+        </div>
+
+        <button type="button" class="spBtn spBtnPrimary" @click=${this.addLessonRow}>+ Stunde</button>
+        <button type="button" class="spBtn" @click=${this.addBreakRow}>+ Pause</button>
       </div>
 
       ${rows.map((r, idx) => {
@@ -2181,6 +2586,8 @@ const ut = class ut extends U {
 
                             <textarea
                               class="lessonArea" rows="2"
+                              data-row=${String(idx)}
+                              data-col=${String(i)}
                               .value=${val}
                               @input=${(e) => this.updateManualCell(idx, i, e?.target?.value ?? "")}
                               placeholder="Fach&#10;Raum&#10;Lehrer + Info-Zeilen"
@@ -2242,14 +2649,15 @@ const ut = class ut extends U {
       "Allgemein",
       "general",
       d`
+            <div class="hintBox">Lege hier zuerst Titel, Schultage und den gewünschten Ansichtsmodus fest. Diese Einstellungen bestimmen, wie die Karte später aufgebaut wird.</div>
             <div class="grid2">
-              <ha-textfield label="Titel" .value=${t.title ?? ""} @input=${(e) => this.onText(e, "title")}></ha-textfield>
+              <ha-textfield label="Titel der Karte" .value=${t.title ?? ""} @input=${(e) => this.onText(e, "title")}></ha-textfield>
 
               <ha-textfield
-                label="Tage (CSV)"
+                label="Schultage (CSV)"
                 .value=${Ne(t.days ?? [])}
                 @input=${(e) => this.setValue("days", Pe(e.target.value))}
-                helper="z.B. Mo, Di, Mi, Do, Fr"
+                helper="Beispiel: Mo, Di, Mi, Do, Fr"
               ></ha-textfield>
             </div>
 
@@ -2270,7 +2678,7 @@ const ut = class ut extends U {
                     }
                   }
                 ]}
-                .computeLabel=${(e) => e?.name === "view_mode" ? "Ansicht" : e?.name}
+                .computeLabel=${(e) => e?.name === "view_mode" ? "Ansichtsmodus" : e?.name}
                 @value-changed=${(e) => {
                   try {
                     e?.stopPropagation?.();
@@ -2284,66 +2692,168 @@ const ut = class ut extends U {
 
               ${(t.view_mode ?? "week") === "rolling" ? d`
                 <ha-textfield
-                  label="Tage im Voraus (0=heute)"
+                  label="Zusätzliche Tage im Voraus"
                   type="number"
                   .value=${String(t.days_ahead ?? 0)}
+                  helper="0 = nur Starttag, 1 = Starttag + nächster Schultag"
                   @input=${(e) => {
                     const n = Number(e.target.value);
                     this.setValue("days_ahead", Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0);
                   }}
                 ></ha-textfield>
+                <ha-form
+                  .hass=${this.hass}
+                  .data=${{ next_day_jump_mode: (t.next_day_jump_mode ?? "midnight") }}
+                  .schema=${[
+                    {
+                      name: "next_day_jump_mode",
+                      selector: {
+                        select: {
+                          mode: "dropdown",
+                          options: [
+                            { value: "midnight", label: "Ab 00:00 Uhr" },
+                            { value: "after_last_lesson", label: "Nach der letzten Stunde" },
+                            { value: "fixed_time", label: "Feste Umschaltzeit" }
+                          ]
+                        }
+                      }
+                    }
+                  ]}
+                  .computeLabel=${(e) => e?.name === "next_day_jump_mode" ? "Auf nächsten Tag springen" : e?.name}
+                  @value-changed=${(e) => {
+                    try {
+                      e?.stopPropagation?.();
+                      const v = (e?.detail?.value ?? {}).next_day_jump_mode ?? "midnight";
+                      this.setValue("next_day_jump_mode", v);
+                    } catch (s) {
+                      console.error("stundenplan-card editor: next_day_jump_mode change failed", s);
+                    }
+                  }}
+                ></ha-form>
+                ${(t.next_day_jump_mode ?? "midnight") === "fixed_time" ? d`
+                  <ha-textfield
+                    label="Umschaltzeit"
+                    .value=${(t.rolling_cutoff_time ?? "").toString()}
+                    placeholder="z. B. 15:00"
+                    helper="Ab dieser Uhrzeit springt Rolling auf den nächsten Schultag."
+                    @input=${(e) => this.setValue("rolling_cutoff_time", e?.target?.value ?? "")}
+                  ></ha-textfield>
+                ` : d`<div class="hintBox">${(t.next_day_jump_mode ?? "midnight") === "after_last_lesson" ? "Der Sprung erfolgt automatisch nach der letzten Endzeit aus deinem Stundenplan." : "Der Sprung auf den nächsten Schultag erfolgt direkt ab Mitternacht."}</div>`}
               ` : d``}
             </div>
 
-            <div class="hint">„Ab heute“ zeigt nur heute + X Folgetage (innerhalb der konfigurierten Wochenspalten).</div>
+            <div class="hint">„Ab heute (rolling)“ zeigt ab dem Starttag die nächsten passenden Schultage. Beim Blättern in andere Wochen beginnt die Ansicht automatisch am Montag.</div>
           `
     )}
 
         ${this.renderSection(
-      "Highlights",
+      "Highlights & Anzeige",
       "highlights",
       d`
-            <div class="grid3">
-              <ha-switch .checked=${E(t.highlight_today, !0)} @change=${(e) => this.onToggle(e, "highlight_today")}></ha-switch>
-              <div class="switchLabel">Heute-Spalte hervorheben</div>
-              <div></div>
+            ${this.renderSubsection(
+              "Hintergrund & Markierungen",
+              "Diese Optionen steuern, welche Bereiche farbig hinterlegt werden. Die passende Hintergrundfarbe kannst du jeweils direkt daneben festlegen.",
+              d`
+                <div class="grid3">
+                  <ha-switch .checked=${E(t.highlight_today, !0)} @change=${(e) => this.onToggle(e, "highlight_today")}></ha-switch>
+                  <div class="switchLabel">Aktuellen Tag im Hintergrund markieren</div>
+                  <ha-textfield label="Tagesfarbe" helper="z. B. rgba(...) oder #RRGGBB" .value=${t.highlight_today_color ?? ""} @input=${(e) => this.onText(e, "highlight_today_color")}></ha-textfield>
 
-              <ha-switch .checked=${E(t.highlight_current, !0)} @change=${(e) => this.onToggle(e, "highlight_current")}></ha-switch>
-              <div class="switchLabel">Aktuelle Stunde hervorheben</div>
-              <div></div>
+                  <ha-switch .checked=${E(t.highlight_current, !0)} @change=${(e) => this.onToggle(e, "highlight_current")}></ha-switch>
+                  <div class="switchLabel">Laufende Stunde im Hintergrund hervorheben</div>
+                  <ha-textfield label="Stundenfarbe" helper="z. B. rgba(...) oder #RRGGBB" .value=${t.highlight_current_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_color")}></ha-textfield>
 
-              <ha-switch .checked=${E(t.highlight_breaks, !1)} @change=${(e) => this.onToggle(e, "highlight_breaks")}></ha-switch>
-              <div class="switchLabel">Pause hervorheben</div>
-              <div></div>
+                  <ha-switch .checked=${E(t.highlight_breaks, !1)} @change=${(e) => this.onToggle(e, "highlight_breaks")}></ha-switch>
+                  <div class="switchLabel">Pausenzeilen ebenfalls hinterlegen</div>
+                  <div class="switchMeta">Sinnvoll, wenn du Pausen als eigene Zeilen eingetragen hast.</div>
 
-              <ha-switch
-                .checked=${E(t.free_only_column_highlight, !0)}
-                @change=${(e) => this.onToggle(e, "free_only_column_highlight")}
-              ></ha-switch>
-              <div class="switchLabel">Nur wenn heute-Spalte nicht frei</div>
-              <div></div>
+                  <ha-switch
+                    .checked=${E(t.free_only_column_highlight, !0)}
+                    @change=${(e) => this.onToggle(e, "free_only_column_highlight")}
+                  ></ha-switch>
+                  <div class="switchLabel">Nur markieren, wenn die Spalte nicht komplett frei ist</div>
+                  <div class="switchMeta">Verhindert eine farbige Leerspalte.</div>
+                </div>
+              `
+            )}
 
-              <ha-switch .checked=${E(t.highlight_current_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_text")}></ha-switch>
-              <div class="switchLabel">Textfarbe in aktueller Stunde</div>
-              <ha-textfield label="Textfarbe" .value=${t.highlight_current_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_text_color")}></ha-textfield>
+            ${this.renderSubsection(
+              "Text & Zusatzinfos",
+              "Diese Optionen betreffen nur Textdarstellung und Kopfzeile, nicht die Hintergrundfarben.",
+              d`
+                <div class="grid3">
+                  <ha-switch .checked=${E(t.show_header_date, !0)} @change=${(e) => this.onToggle(e, "show_header_date")}></ha-switch>
+                  <div class="switchLabel">Datum unter dem Wochentag anzeigen</div>
+                  <div class="switchMeta">Hilfreich bei Rolling und beim Wochenwechsel.</div>
 
-              <ha-switch .checked=${E(t.highlight_current_time_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_time_text")}></ha-switch>
-              <div class="switchLabel">Zeitspalte Textfarbe (aktuell)</div>
-              <ha-textfield label="Zeitfarbe" .value=${t.highlight_current_time_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_time_text_color")}></ha-textfield>
-            </div>
+                  <ha-switch .checked=${E(t.highlight_current_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_text")}></ha-switch>
+                  <div class="switchLabel">Text in der aktuellen Stunde einfärben</div>
+                  <ha-textfield label="Textfarbe" helper="#RRGGBB oder CSS-Farbe" .value=${t.highlight_current_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_text_color")}></ha-textfield>
+
+                  <ha-switch .checked=${E(t.highlight_current_time_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_time_text")}></ha-switch>
+                  <div class="switchLabel">Zeitspalte der aktuellen Stunde einfärben</div>
+                  <ha-textfield label="Zeitfarbe" helper="#RRGGBB oder CSS-Farbe" .value=${t.highlight_current_time_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_time_text_color")}></ha-textfield>
+                </div>
+              `
+            )}
           `
     )}
 
         ${this.renderSection(
-      "Farben",
-      "colors",
+      "Typografie",
+      "type",
       d`
+            <div class="hintBox">Diese Einstellungen gelten für Tabellenkopf, Zeitspalte und Zellen. Der Kartentitel bleibt bewusst unverändert, damit er immer stabil lesbar bleibt.</div>
             <div class="grid2">
-              <ha-textfield label="Heute Overlay" .value=${t.highlight_today_color ?? ""} @input=${(e) => this.onText(e, "highlight_today_color")}></ha-textfield>
-              <ha-textfield label="Aktuell Overlay" .value=${t.highlight_current_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_color")}></ha-textfield>
+              <ha-form
+                .hass=${this.hass}
+                .data=${{ font_family: (t.font_family ?? "").toString() }}
+                .schema=${[
+                  {
+                    name: "font_family",
+                    selector: {
+                      select: {
+                        mode: "dropdown",
+                        options: [
+                          { value: "system", label: "Home Assistant Standard" },
+                          { value: "segoe", label: "Segoe UI" },
+                          { value: "arial", label: "Arial" },
+                          { value: "verdana", label: "Verdana" },
+                          { value: "trebuchet", label: "Trebuchet MS" },
+                          { value: "gillsans", label: "Gill Sans" },
+                          { value: "georgia", label: "Georgia" },
+                          { value: "palatino", label: "Palatino" },
+                          { value: "courier", label: "Courier New" }
+                        ]
+                      }
+                    }
+                  }
+                ]}
+                .computeLabel=${(e) => e?.name === "font_family" ? "Schriftart" : e?.name}
+                @value-changed=${(e) => {
+                  try {
+                    e?.stopPropagation?.();
+                    const v = (e?.detail?.value ?? {}).font_family ?? "";
+                    this.setValue("font_family", v);
+                  } catch (s) {
+                    console.error("stundenplan-card editor: font_family change failed", s);
+                  }
+                }}
+              ></ha-form>
+              <ha-textfield
+                label="Schriftgröße (px)"
+                type="number"
+                .value=${String(t.font_size ?? 14)}
+                helper="Erlaubter Bereich: 10 bis 28 px"
+                @input=${(e) => {
+                  const n = Number(e?.target?.value);
+                  this.setValue("font_size", Number.isFinite(n) ? Math.max(10, Math.min(28, Math.floor(n))) : 14);
+                }}
+              ></ha-textfield>
             </div>
           `
     )}
+
         ${this.renderSection(
       "Datenquellen",
       "sources",
@@ -2567,6 +3077,27 @@ ut.properties = {
       display: grid;
       gap: 12px;
     }
+    .subSection {
+      display: grid;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.02);
+    }
+    .subSectionTitle {
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .subSectionHint {
+      font-size: 12px;
+      line-height: 1.45;
+      opacity: 0.82;
+    }
+    .subSectionBody {
+      display: grid;
+      gap: 10px;
+    }
     .grid2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -2580,12 +3111,27 @@ ut.properties = {
       align-items: start;
     }
     .switchLabel {
-      opacity: 0.9;
+      opacity: 0.95;
+      line-height: 1.35;
+    }
+    .switchMeta {
+      font-size: 12px;
+      opacity: 0.72;
+      line-height: 1.35;
     }
     .hint {
       font-size: 12px;
       opacity: 0.85;
       line-height: 1.4;
+    }
+    .hintBox {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 163, 255, 0.16);
+      background: rgba(0, 163, 255, 0.07);
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--primary-text-color);
     }
     code {
       font-family: var(--code-font-family, monospace);
@@ -2642,6 +3188,112 @@ ut.properties = {
       font-size: 12px;
     }
 
+    .manualPreviewWrap {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding: 14px;
+      border: 1px solid var(--divider-color);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+    .manualPreviewTitle {
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .manualPreviewHint {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    .manualPreviewTableWrap {
+      overflow-x: auto;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(0,0,0,0.14);
+    }
+    .manualPreviewTable {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .manualPreviewTable th,
+    .manualPreviewTable td {
+      border: 1px solid rgba(255,255,255,0.06);
+      padding: 0;
+      vertical-align: stretch;
+      text-align: center;
+    }
+    .manualPreviewTable th {
+      background: rgba(255,255,255,0.05);
+      font-weight: 700;
+      padding: 10px 8px;
+    }
+    .manualPreviewTable .time {
+      width: 96px;
+      min-width: 96px;
+      white-space: nowrap;
+      background: rgba(255,255,255,0.03);
+      font-weight: 700;
+      font-size: 12px;
+      padding: 10px 8px;
+    }
+    .manualPreviewCellBtn {
+      width: 100%;
+      min-height: 92px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.03));
+      color: var(--primary-text-color);
+      padding: 10px 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: background 120ms ease, box-shadow 120ms ease;
+    }
+    .manualPreviewCellBtn:hover {
+      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.08));
+      box-shadow: inset 0 0 0 9999px rgba(255,255,255,0.02);
+    }
+    .manualPreviewCellBtn:focus-visible {
+      outline: 2px solid rgba(33,150,243,0.6);
+      outline-offset: 2px;
+    }
+    .manualPreviewLines {
+      display: grid;
+      gap: 4px;
+      font-size: 12px;
+      line-height: 1.2;
+      justify-items: center;
+      width: 100%;
+    }
+    .manualPreviewMain {
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+    }
+    .manualPreviewSub {
+      opacity: 0.9;
+      font-size: 11px;
+    }
+    .manualPreviewEmpty {
+      display: block;
+      text-align: center;
+      opacity: 0.55;
+      font-style: italic;
+      font-size: 12px;
+      line-height: 1.25;
+    }
+    .manualPreviewBreak td {
+      opacity: 0.75;
+      font-style: italic;
+      padding: 10px 8px;
+      background: rgba(255,255,255,0.03);
+    }
+
     .lessonArea {
       width: 100%;
       min-height: 44px;
@@ -2682,6 +3334,10 @@ ut.properties = {
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
+    }
+    .btnBarManual {
+      margin: 0 0 14px;
+      justify-content: flex-start;
     }
     .toggleInline {
       display: flex;
@@ -2876,7 +3532,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v2026-02-16.2 (marker: STUNDENPLAN_CARD_v2026-02-16.2)",
+  description: "Stundenplan Card v2026-02-24.2 (marker: STUNDENPLAN_CARD_v2026-02-24.2)",
   preview: !0
 });
 export {
