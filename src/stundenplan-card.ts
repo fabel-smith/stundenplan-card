@@ -636,7 +636,7 @@ function Oe(r) {
 var D;
 const v = (D = class extends U {
   constructor() {
-    super(...arguments), S(this, X), S(this, tt), S(this, et, []), S(this, st, !1), S(this, it, ""), S(this, rt, null), S(this, nt, "idle"), S(this, ot, ""), this._jsonUrlLast = "", this._lastWatchSig = null, this._lastWeekOffset = null, this._uiWeekOffset = null;
+    super(...arguments), S(this, X), S(this, tt), S(this, et, []), S(this, st, !1), S(this, it, ""), S(this, rt, null), S(this, nt, "idle"), S(this, ot, ""), this._jsonUrlLast = "", this._lastWatchSig = null, this._lastWeekOffset = null, this._uiViewMode = null, this._uiPopupOpen = !1;
   }
   getGridOptions() {
     return { columns: "full" };
@@ -784,7 +784,7 @@ const v = (D = class extends U {
     if (!s) return;
     const i = this.hass?.states?.[s], n = i?.attributes?.min, o = i?.attributes?.max, l = Number.isFinite(Number(n)) ? Number(n) : -52, a = Number.isFinite(Number(o)) ? Number(o) : 52;
     let c = e;
-    c = Math.max(l, c), c = Math.min(a, c); const r = s.split(".")[0] === "input_number" ? "input_number" : "number"; await this.hass.callService(r, "set_value", { entity_id: s, value: c });
+    c = Math.max(l, c), c = Math.min(a, c), await this.hass.callService("number", "set_value", { entity_id: s, value: c });
   }
   connectedCallback() {
     super.connectedCallback(), this._tick = window.setInterval(() => {
@@ -802,7 +802,6 @@ const v = (D = class extends U {
     if (t.has("hass")) {
       if (this.config) {
         const e = this.getWeekOffsetValue(this.config);
-        this._uiWeekOffset != null && e === this._uiWeekOffset && (this._uiWeekOffset = null);
         e !== this._lastWeekOffset && (this._lastWeekOffset = e);
       }
       this.recomputeRowsIfWatchedChanged();
@@ -812,15 +811,16 @@ const v = (D = class extends U {
     return {
       type: "custom:stundenplan-card",
       title: "Mein Stundenplan",
+      show_title: !0,
+      title_font_size: 20,
+      title_font_family: "",
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       view_mode: "week",
+      display_mode: "default",
       days_ahead: 0,
-      next_day_jump_mode: "midnight",
-      rolling_cutoff_time: "",
-      highlight_next_day_after_last_time: !1,
-      show_header_date: !0,
-      font_family: "",
-      font_size: 14,
+      rolling_switch_mode: "midnight",
+      rolling_switch_time: "",
+      tap_action: { action: "none" },
       highlight_today: !0,
       highlight_current: !0,
       highlight_breaks: !1,
@@ -870,6 +870,18 @@ const v = (D = class extends U {
     const t = this.config?.rows?.length ?? 3;
     return Math.max(3, t);
   }
+  normalizeTapAction(t) {
+    const e = typeof t == "object" && t ? t : {};
+    const s = ((e.action ?? "none") + "").toString().trim();
+    const i = s === "toggle_view" || s === "popup_week" || s === "navigate" || s === "url" || s === "more-info" ? s : "none";
+    return {
+      action: i,
+      navigation_path: (e.navigation_path ?? "").toString(),
+      url_path: (e.url_path ?? "").toString(),
+      entity: (e.entity ?? "").toString(),
+      target: (e.target ?? "").toString()
+    };
+  }
   normalizeConfig(t) {
     const e = D.getStubConfig(), s = Array.isArray(t.days) && t.days.length ? t.days.map((h) => (h ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], n = (Array.isArray(t.rows) ? t.rows : []).map((h) => {
       if (ct(h))
@@ -881,19 +893,7 @@ const v = (D = class extends U {
         cells: u
       };
       return O.some((w) => !!w) && (b.cell_styles = O), b;
-    }), vmRaw = ((t.view_mode ?? "week") + "").toString().trim(), vm = vmRaw === "rolling" ? "rolling" : "week", da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, fontFamilyRaw = (t.font_family ?? e.font_family ?? "").toString().trim(), fontFamilyMap = {
-      'var(--ha-card-header-font-family, var(--primary-font-family, inherit))': "system",
-      '"Segoe UI", Arial, sans-serif': "segoe",
-      'Arial, Helvetica, sans-serif': "arial",
-      'Verdana, Geneva, sans-serif': "verdana",
-      '"Trebuchet MS", Arial, sans-serif': "trebuchet",
-      '"Gill Sans", "Gill Sans MT", Calibri, sans-serif': "gillsans",
-      'Georgia, "Times New Roman", serif': "georgia",
-      '"Palatino Linotype", "Book Antiqua", Palatino, serif': "palatino",
-      '"Courier New", Courier, monospace': "courier"
-    }, normalizedFontFamily = fontFamilyMap[fontFamilyRaw] ?? fontFamilyRaw, jumpModeRaw = ((t.next_day_jump_mode ?? "") + "").toString().trim(), jumpMode = jumpModeRaw === "after_last_lesson" || jumpModeRaw === "fixed_time" || jumpModeRaw === "midnight"
-      ? jumpModeRaw
-      : (t.highlight_next_day_after_last_time ? "after_last_lesson" : ((t.rolling_cutoff_time ?? "").toString().trim() ? "fixed_time" : "midnight")), o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", f = (() => {
+    }), vmRaw = ((t.view_mode ?? "week") + "").toString().trim(), vm = vmRaw === "rolling" ? "rolling" : "week", displayModeRaw = ((t.display_mode ?? "default") + "").toString().trim(), displayMode = displayModeRaw === "compact" ? "compact" : "default", da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, rollingSwitchRaw = ((t.rolling_switch_mode ?? e.rolling_switch_mode ?? "midnight") + "").toString().trim(), rollingSwitchMode = rollingSwitchRaw === "after_last_lesson" || rollingSwitchRaw === "fixed_time" ? rollingSwitchRaw : "midnight", rollingSwitchTime = ((t.rolling_switch_time ?? e.rolling_switch_time ?? "") + "").toString().trim(), o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", f = (() => {
       const raw = ((t.source_type ?? "") + "").toString().trim();
       if (raw === "manual" || raw === "entity" || raw === "json" || raw === "sensor") return raw;
       const a_guess = ((t.source_entity ?? e.source_entity) + "").toString().trim();
@@ -914,15 +914,16 @@ const v = (D = class extends U {
     return {
       type: (t.type ?? e.type).toString(),
       title: (t.title ?? e.title).toString(),
+      show_title: t.show_title ?? e.show_title,
+      title_font_size: Number.isFinite(Number(t.title_font_size)) ? Math.max(0, Math.min(40, Number(t.title_font_size))) : e.title_font_size,
+      title_font_family: (t.title_font_family ?? e.title_font_family ?? "").toString(),
       days: s,
       view_mode: vm,
+      display_mode: displayMode,
       days_ahead: daysAhead,
-      next_day_jump_mode: jumpMode,
-      rolling_cutoff_time: (t.rolling_cutoff_time ?? e.rolling_cutoff_time ?? "").toString(),
-      highlight_next_day_after_last_time: t.highlight_next_day_after_last_time ?? e.highlight_next_day_after_last_time,
-      show_header_date: t.show_header_date ?? e.show_header_date,
-      font_family: normalizedFontFamily,
-      font_size: Number.isFinite(Number(t.font_size)) ? Math.max(10, Math.min(28, Number(t.font_size))) : e.font_size,
+      rolling_switch_mode: rollingSwitchMode,
+      rolling_switch_time: rollingSwitchTime,
+      tap_action: this.normalizeTapAction(t.tap_action ?? e.tap_action),
       highlight_today: t.highlight_today ?? e.highlight_today,
       highlight_current: t.highlight_current ?? e.highlight_current,
       highlight_breaks: t.highlight_breaks ?? e.highlight_breaks,
@@ -960,43 +961,9 @@ const v = (D = class extends U {
       rows: n
     };
   }
-  toYmd(t) {
-    return `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, "0")}${String(t.getDate()).padStart(2, "0")}`;
-  }
-  parseClockToMinutes(t) {
-    const e = (t ?? "").toString().trim().match(/^(\d{1,2}):(\d{2})$/);
-    if (!e) return null;
-    const s = Number(e[1]), i = Number(e[2]);
-    return Number.isFinite(s) && Number.isFinite(i) && s >= 0 && s <= 23 && i >= 0 && i <= 59 ? s * 60 + i : null;
-  }
-  getRollingAnchorDate(t, rows = this._rowsCache ?? []) {
-    const weekOffset = this.getWeekOffsetValue(t) ?? 0;
-    if (weekOffset !== 0) {
-      return this.mondayOfWeek(this.getBaseDate(t));
-    }
-    return this.getEffectiveDaySwitchDate(t, rows);
-  }
-  getDataIndexForDate(t, e, s) {
-    const i = this.toYmd(s);
-    if (Array.isArray(e) && e.length) {
-      const n = e.map((o) => {
-        if (o instanceof Date && !Number.isNaN(o.getTime())) return this.toYmd(o);
-        const l = (o ?? "").toString().trim();
-        const a = l.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (a) return `${a[1]}${a[2]}${a[3]}`;
-        return l;
-      });
-      const o = n.indexOf(i);
-      if (o >= 0) return { dataIndex: o, exactMatch: !0 };
-    }
-    const n = s.getDay() === 0 ? 7 : s.getDay();
-    for (let o = 0; o < (t ?? []).length; o++) {
-      if (Oe(t[o]) === n) return { dataIndex: o, exactMatch: !1 };
-    }
-    return { dataIndex: -1, exactMatch: !1 };
-  }
-  getTodayIndex(t, metaDays, refDate = /* @__PURE__ */ new Date()) {
-    const ymd = this.toYmd(refDate);
+  getTodayIndex(t, metaDays) {
+    const today = (/* @__PURE__ */ new Date());
+    const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
     // If meta-days are provided by an integration, they may be either
     // - strings in YYYYMMDD (preferred), or
     // - strings in YYYY-MM-DD, or
@@ -1004,7 +971,9 @@ const v = (D = class extends U {
     // Make the comparison robust so the today-column highlight works reliably.
     if (Array.isArray(metaDays) && metaDays.length) {
       const n = metaDays.map((o) => {
-        if (o instanceof Date && !Number.isNaN(o.getTime())) return this.toYmd(o);
+        if (o instanceof Date && !Number.isNaN(o.getTime())) {
+          return `${o.getFullYear()}${String(o.getMonth() + 1).padStart(2, "0")}${String(o.getDate()).padStart(2, "0")}`;
+        }
         const s = (o ?? "").toString().trim();
         const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
         if (m) return `${m[1]}${m[2]}${m[3]}`;
@@ -1013,29 +982,11 @@ const v = (D = class extends U {
       const i = n.indexOf(ymd);
       return i >= 0 ? i : -1;
     }
-    const e = refDate.getDay(), s = new Set(Re(e).map(wt));
+    const e = today.getDay(), s = new Set(Re(e).map(wt));
     if (!s.size) return -1;
     const i = (t ?? []).map((n) => wt(n));
     for (let n = 0; n < i.length; n++) if (s.has(i[n])) return n;
     return -1;
-  }
-  getVisibleDayEntries(t, metaDays) {
-    const e = t.days ?? [];
-    const s = (t.view_mode ?? "week").toString();
-    const i = Number(t.days_ahead);
-    const n = Number.isFinite(i) ? Math.max(0, Math.min(14, Math.floor(i))) : 0;
-    if (s !== "rolling") {
-      return e.map((l, a) => ({ label: l, dataIndex: a, headerDate: null }));
-    }
-    const o = [];
-    const l = this.getRollingAnchorDate(t);
-    for (let a = 0; a < 21 && o.length < n + 1; a++) {
-      const c = new Date(l);
-      c.setDate(l.getDate() + a);
-      const _ = this.getDataIndexForDate(e, metaDays, c);
-      if (_.dataIndex >= 0) o.push({ label: e[_.dataIndex], dataIndex: _.dataIndex, headerDate: c, exactMatch: _.exactMatch });
-    }
-    return o.length ? o : e.map((a, c) => ({ label: a, dataIndex: c, headerDate: null, exactMatch: !0 }));
   }
   toMinutes(t) {
     if (!t) return null;
@@ -1154,6 +1105,117 @@ const v = (D = class extends U {
   filterCellText(t, e) {
     return (t ?? "").toString().trim();
   }
+  getTitleStyle(t) {
+    const e = [];
+    const s = Number(t.title_font_size);
+    Number.isFinite(s) && s > 0 && e.push(`font-size:${Math.max(10, Math.min(40, s))}px`);
+    const i = (t.title_font_family ?? "").toString().trim();
+    i && e.push(`font-family:${i}`);
+    return e.join(";");
+  }
+  fmtYMD(t) {
+    return `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, "0")}${String(t.getDate()).padStart(2, "0")}`;
+  }
+  findConfiguredDayIndexForDate(t, e) {
+    const s = t.getDay() === 0 ? 7 : t.getDay();
+    return (e ?? []).findIndex((i) => Oe(i) === s);
+  }
+  isConfiguredSchoolday(t, e) {
+    return this.findConfiguredDayIndexForDate(t, e) >= 0;
+  }
+  nextConfiguredSchoolday(t, e) {
+    const s = new Date(t);
+    for (let i = 0; i < 14; i++) {
+      s.setDate(s.getDate() + 1);
+      if (this.isConfiguredSchoolday(s, e)) return s;
+    }
+    return s;
+  }
+  getLastLessonEnd() {
+    const t = this._rowsCache ?? [];
+    for (let e = t.length - 1; e >= 0; e--) {
+      const s = t[e];
+      if (!ct(s) && s?.end) return (s.end + "").toString().trim();
+    }
+    return "";
+  }
+  shouldAdvanceRollingDay(t, e) {
+    if (!this.isConfiguredSchoolday(e, t.days ?? [])) return !0;
+    const s = ((t.rolling_switch_mode ?? "midnight") + "").toString();
+    if (s === "after_last_lesson") {
+      const i = this.getLastLessonEnd();
+      if (!i) return !1;
+      const [n, o] = i.split(":").map(Number);
+      return Number.isFinite(n) && Number.isFinite(o) ? (e.getHours() > n || e.getHours() === n && e.getMinutes() >= o) : !1;
+    }
+    if (s === "fixed_time") {
+      const i = ((t.rolling_switch_time ?? "") + "").toString().trim();
+      const [n, o] = i.split(":").map(Number);
+      return Number.isFinite(n) && Number.isFinite(o) ? (e.getHours() > n || e.getHours() === n && e.getMinutes() >= o) : !1;
+    }
+    return !1;
+  }
+  getRollingVisibleSlots(t, e) {
+    const s = t.days ?? [];
+    if (!s.length) return [];
+    const i = new Date();
+    let n = new Date(i.getFullYear(), i.getMonth(), i.getDate(), 12, 0, 0, 0);
+    if (!this.isConfiguredSchoolday(n, s)) {
+      n = this.nextConfiguredSchoolday(n, s);
+    } else if (this.shouldAdvanceRollingDay(t, i)) {
+      n = this.nextConfiguredSchoolday(n, s);
+    }
+    const o = [];
+    const l = Math.max(0, Math.min(6, e));
+    let a = new Date(n);
+    for (let c = 0; c <= l; c++) {
+      const _ = this.findConfiguredDayIndexForDate(a, s);
+      if (_ >= 0) o.push({ orig: _, date: new Date(a) });
+      a = this.nextConfiguredSchoolday(a, s);
+    }
+    return o;
+  }
+  async handleCardAction(t, e) {
+    if (!e || e.defaultPrevented) return;
+    const s = e.composedPath?.() ?? [];
+    if (s.some((l) => l instanceof HTMLElement && (l.closest?.(".offsetInline") || l.closest?.(".btnMini")))) return;
+    const i = this.normalizeTapAction(t.tap_action);
+    if (!i || i.action === "none") return;
+    if (i.action === "toggle_view") {
+      const l = ((this._uiViewMode ?? t.view_mode ?? "week") + "").toString();
+      this._uiViewMode = l === "rolling" ? "week" : "rolling";
+      this.requestUpdate();
+      return;
+    }
+    if (i.action === "popup_week") {
+      this._uiPopupOpen = !0;
+      this.requestUpdate();
+      return;
+    }
+    if (i.action === "navigate") {
+      const l = (i.navigation_path ?? "").toString().trim();
+      if (!l) return;
+      history.pushState(null, "", l);
+      We(window, "location-changed", { replace: !1 });
+      return;
+    }
+    if (i.action === "url") {
+      const l = (i.url_path ?? "").toString().trim();
+      if (!l) return;
+      window.open(l, i.target || "_blank");
+      return;
+    }
+    if (i.action === "more-info") {
+      const l = (i.entity ?? t.source_entity ?? t.source_entity_integration ?? "").toString().trim();
+      if (!l) return;
+      We(this, "hass-more-info", { entityId: l });
+    }
+  }
+  closeWeekPopup(e) {
+    e?.stopPropagation?.();
+    this._uiPopupOpen = !1;
+    this.requestUpdate();
+  }
   getBaseDate(t) {
     const e = this.getWeekOffsetValue(t) ?? 0, s = /* @__PURE__ */ new Date();
     return s.setHours(12, 0, 0, 0), s.setDate(s.getDate() + e * 7), s;
@@ -1166,144 +1228,13 @@ const v = (D = class extends U {
     const e = String(t.getDate()).padStart(2, "0"), s = String(t.getMonth() + 1).padStart(2, "0"), i = String(t.getFullYear());
     return `${e}.${s}.${i}`;
   }
-  getCardInlineStyle(t) {
-    const e = this.resolveFontFamily((t.font_family ?? "").toString().trim());
-    const s = Number(t.font_size);
-    const i = Number.isFinite(s) ? Math.max(10, Math.min(28, s)) : 14;
-    const n = i / 14;
-    const o = [];
-    e && o.push(`--sp-font-family:${e}`);
-    o.push(`--sp-font-size:${i}px`);
-    o.push(`--sp-font-scale:${n}`);
-    return o.join(";");
-  }
-  resolveFontFamily(t) {
-    const key = (t ?? "").toString().trim();
-    const presets = {
-      "": "",
-      system: 'var(--ha-card-header-font-family, var(--primary-font-family, inherit))',
-      segoe: '"Segoe UI", Arial, sans-serif',
-      arial: 'Arial, Helvetica, sans-serif',
-      verdana: 'Verdana, Geneva, sans-serif',
-      trebuchet: '"Trebuchet MS", Arial, sans-serif',
-      gillsans: '"Gill Sans", "Gill Sans MT", Calibri, sans-serif',
-      georgia: 'Georgia, "Times New Roman", serif',
-      palatino: '"Palatino Linotype", "Book Antiqua", Palatino, serif',
-      courier: '"Courier New", Courier, monospace'
-    };
-    if (key in presets) return presets[key];
-    return key;
-  }
-  getSourceMeta(t) {
-    const e = (
-      (t.source_type ?? "manual") === "entity"
-        ? ((t.source_entity_integration ?? t.source_entity ?? (t.entity ?? "")) ?? "")
-        : (t.source_type ?? "manual") === "sensor"
-          ? ((t.source_entity_legacy ?? t.source_entity ?? (t.entity ?? "")) ?? "")
-          : (t.source_entity ?? "")
-    ).toString().trim();
-    if (!e || !this.hass?.states?.[e]) return null;
-    const s = this.hass.states[e].attributes ?? {};
-    return s?.meta_ha ?? s?.meta ?? (typeof s?.meta_json === "string" ? this.parseAnyJson(s.meta_json) : null) ?? null;
-  }
-  getVplanHintForDate(t, entry) {
-    const meta = this.getSourceMeta(t);
-    if (!meta || !entry?.headerDate) return "";
-    const key = this.toYmd(entry.headerDate);
-    const exactAvailability = meta?.vplan_available_by_date?.[key];
-    if (typeof exactAvailability === "boolean") {
-      return exactAvailability ? "" : "(noch keine Vp-Daten vorhanden)";
-    }
-    return "";
-  }
-  getExactCellForDate(t, entry, row) {
-    const meta = this.getSourceMeta(t);
-    if (!meta || !entry?.headerDate || !row?.time) return null;
-    const key = this.toYmd(entry.headerDate);
-    const byDate = meta?.exact_cells_by_date_time?.[key];
-    if (!byDate || typeof byDate !== "object") return null;
-    const value = byDate?.[row.time];
-    return typeof value === "string" ? value : null;
-  }
-  getExactUpdatedForDate(t, entry) {
-    const meta = this.getSourceMeta(t);
-    if (!meta || !entry?.headerDate) return "";
-    const key = this.toYmd(entry.headerDate);
-    const value = meta?.exact_updated_by_date?.[key];
-    return typeof value === "string" ? value : "";
-  }
-  getCurrentVisibleIndex(dayEntries, refDate = /* @__PURE__ */ new Date()) {
-    const currentKey = this.toYmd(refDate);
-    for (let i = 0; i < (dayEntries ?? []).length; i++) {
-      const entry = dayEntries[i];
-      if (entry?.headerDate && this.toYmd(entry.headerDate) === currentKey) return i;
-    }
-    return -1;
-  }
-  getLastLessonEndMinutes(rows) {
-    let lastEnd = null;
-    for (const row of rows ?? []) {
-      if (ct(row)) continue;
-      const end = this.toMinutes(row?.end ?? "") ?? this.toMinutes(mt(row?.time ?? "").end);
-      if (end == null) continue;
-      lastEnd = lastEnd == null ? end : Math.max(lastEnd, end);
-    }
-    return lastEnd;
-  }
-  getNextConfiguredSchoolDate(days, refDate) {
-    for (let offset = 1; offset <= 14; offset++) {
-      const candidate = new Date(refDate);
-      candidate.setDate(refDate.getDate() + offset);
-      const weekday = candidate.getDay() === 0 ? 7 : candidate.getDay();
-      for (const day of days ?? []) {
-        if (Oe(day) === weekday) return candidate;
-      }
-    }
-    return refDate;
-  }
-  getEffectiveDaySwitchDate(t, rows) {
-    const now = /* @__PURE__ */ new Date();
-    now.setSeconds(0, 0);
-    const mode = ((t?.next_day_jump_mode ?? "midnight") + "").toString().trim();
-    if (mode === "fixed_time") {
-      const cutoff = this.parseClockToMinutes(t?.rolling_cutoff_time ?? "");
-      if (cutoff == null) return now;
-      const nowMinutes = now.getHours() * 60 + now.getMinutes();
-      return nowMinutes >= cutoff ? this.getNextConfiguredSchoolDate(t?.days ?? [], now) : now;
-    }
-    if (mode !== "after_last_lesson") return now;
-    const lastEnd = this.getLastLessonEndMinutes(rows);
-    if (lastEnd == null) return now;
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    if (nowMinutes < lastEnd) return now;
-    return this.getNextConfiguredSchoolDate(t?.days ?? [], now);
-  }
-  getEffectiveHighlightDate(t, rows) {
-    return this.getEffectiveDaySwitchDate(t, rows);
-  }
-  getLastMetaDate(metaDays) {
-    if (!Array.isArray(metaDays) || !metaDays.length) return null;
-    let last = null;
-    for (const item of metaDays) {
-      let d = null;
-      if (item instanceof Date && !Number.isNaN(item.getTime())) {
-        d = new Date(item);
-      } else {
-        const s = (item ?? "").toString().trim();
-        const a = s.match(/^(\d{4})(\d{2})(\d{2})$/) ?? s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (a) d = new Date(Number(a[1]), Number(a[2]) - 1, Number(a[3]), 12, 0, 0, 0);
-      }
-      if (d && !Number.isNaN(d.getTime()) && (!last || d.getTime() > last.getTime())) last = d;
-    }
-    return last;
-  }
   // Prefer meta.days from source_entity for header dates (YYYYMMDD)
   getHeaderDaysFromEntity(t) {
     const e = (
       (t.source_type ?? "manual") === "entity"
-        ? ((t.source_entity_integration ?? t.source_entity ?? (t.entity ?? "")) ?? "")
+        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
         : (t.source_type ?? "manual") === "sensor"
-          ? ((t.source_entity_legacy ?? t.source_entity ?? (t.entity ?? "")) ?? "")
+          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
           : (t.source_entity ?? "")
     ).toString().trim();
     if (!e || !this.hass?.states?.[e]) return null;
@@ -1323,11 +1254,13 @@ const v = (D = class extends U {
   // exposed via sensor attributes meta / meta_ha / meta_json.
   // Returns either one value per day (Mo..Fr) or null.
   getHeaderUpdatedFromEntity(t) {
+    const sourceType = ((t.source_type ?? "manual") + "").toString().trim();
+    if (sourceType !== "entity" && sourceType !== "sensor") return null;
     const e = (
-      (t.source_type ?? "manual") === "entity"
-        ? ((t.source_entity_integration ?? t.source_entity ?? (t.entity ?? "")) ?? "")
-        : (t.source_type ?? "manual") === "sensor"
-          ? ((t.source_entity_legacy ?? t.source_entity ?? (t.entity ?? "")) ?? "")
+      sourceType === "entity"
+        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        : sourceType === "sensor"
+          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
           : (t.source_entity ?? "")
     ).toString().trim();
     if (!e || !this.hass?.states?.[e]) return null;
@@ -1358,48 +1291,6 @@ const v = (D = class extends U {
 
     return null;
   }
-
-getHeaderVplanMissingTextFromEntity(t) {
-    const e = (
-      (t.source_type ?? "manual") === "entity"
-        ? ((t.source_entity_integration ?? t.source_entity ?? (t.entity ?? "")) ?? "")
-        : (t.source_type ?? "manual") === "sensor"
-          ? ((t.source_entity_legacy ?? t.source_entity ?? (t.entity ?? "")) ?? "")
-          : (t.source_entity ?? "")
-    ).toString().trim();
-    if (!e || !this.hass?.states?.[e]) return null;
-
-    const a = this.hass.states[e].attributes ?? {};
-    const meta =
-      a?.meta_ha ??
-      a?.meta ??
-      (typeof a?.meta_json === "string" ? this.parseAnyJson(a.meta_json) : null) ??
-      null;
-
-    if (!meta) return null;
-
-    const daysLen = (t.days?.length ?? 0) || 5;
-
-    // Preferred: explicit per-day hint strings
-    const hintDays = meta?.vplan_missing_text_days ?? meta?.vplan_missing_days_text ?? null;
-    if (Array.isArray(hintDays) && hintDays.length) {
-      return Array.from({ length: daysLen }, (_, i) => (hintDays[i] ?? "").toString());
-    }
-    if (typeof hintDays === "string" && hintDays.trim()) {
-      const v = hintDays.toString();
-      return Array.from({ length: daysLen }, () => v);
-    }
-
-    // Fallback: boolean flags -> default text like Stundenplan24
-    const missingDays = meta?.vplan_missing_days ?? null;
-    if (Array.isArray(missingDays) && missingDays.length) {
-      return Array.from({ length: daysLen }, (_, i) => missingDays[i] ? "(noch keine Vp-Daten vorhanden)" : "");
-    }
-
-    return null;
-  }
-
-
 getRowsResolved(t) {
     const e = t.source_type ?? "manual";
     const effEntity = (
@@ -1442,19 +1333,16 @@ getRowsResolved(t) {
   // Parse to Fach (bold) + Raum + Lehrer + Info/Notes
   parseCellTriplet(t) {
     const e = (t ?? "").toString().replace(/\r/g, "").trim();
-    const RED_MARKER = "[[sp-red]]";
-    const stripMarker = (u) => (u ?? "").toString().replaceAll(RED_MARKER, "").trim();
-    const hasMarker = (u) => (u ?? "").toString().includes(RED_MARKER);
     if (!e) return null;
     const s = e.split(`
 `).map((u) => u.trim()).filter((u) => u.length > 0);
     if (!s.length) return null;
-    const i = s.map((u) => stripMarker(u)).join(" ").trim();
+    const i = s.join(" ").trim();
     if (/^(—|\-|–|---|\s)+$/.test(i)) return null;
-    const n = stripMarker(s[0]);
+    const n = s[0];
     if (/^(—|\-|–|---)$/.test(n)) return null;
     const o = (u) => {
-      const x = stripMarker(u);
+      const x = (u ?? "").toString().trim();
       return /^[🟠🔴🟡🟢⚪️🟣🟤]/.test(x)
         || /\bfällt\s+aus\b/i.test(x)
         || /\bverlegt\b/i.test(x)
@@ -1465,7 +1353,7 @@ getRowsResolved(t) {
         || /\bAufgaben\b/i.test(x)
         || /^für\b/i.test(x);
     }, l = (u) => {
-      const x = stripMarker(u);
+      const x = (u ?? "").toString().trim();
       // Räume: reine Nummern (222), alphanumerisch kurz (SH2-B, SH2-A), oder "044 Aula"
       return /^\d{1,4}$/.test(x)
         || /^[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}$/i.test(x)
@@ -1485,54 +1373,21 @@ getRowsResolved(t) {
         }
     }
     if (c < 0) return null;
-    const _ = stripMarker(a[c]);
-    const roomChanged = hasMarker(a[c]);
+    const _ = a[c];
     let h;
-    let teacherChanged = false;
-    let teacherIdx = -1;
     for (let u = c + 1; u < a.length; u++) {
       const g = a[u];
       if (!o(g) && !l(g)) {
-        h = stripMarker(g);
-        teacherChanged = hasMarker(g);
-        teacherIdx = u;
+        h = g;
         break;
       }
     }
     if (!h) {
       const u = a.filter((g) => !o(g) && !l(g));
-      h = u.length ? stripMarker(u[u.length - 1]) : void 0;
-      if (h) teacherChanged = hasMarker(u[u.length - 1]);
-      if (h) teacherIdx = a.lastIndexOf(u[u.length - 1]);
+      h = u.length ? u[u.length - 1] : void 0;
     }
-    const p = a.filter((u, idx) => idx !== c && idx !== teacherIdx && (o(u) || !l(u)));
-    // Duplikate in Notizen entfernen (z.B. "Frau Johne" vs "JOH" bei gleicher Aussage)
-    const normNote = (u: string) => stripMarker((u ?? "")
-      .toString()
-      .replace(/^[🟠🔴🟡🟢⚪️🟣🟤]\s*/u, "")
-      .replace(/\b(Frau|Herr)\s+[\p{L}\-]+\b/giu, "")
-      .replace(/\b[A-ZÄÖÜ]{2,4}\b/g, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .toLowerCase());
-    const deduped: string[] = [];
-    const seen = new Set<string>();
-    for (const line of p) {
-      const k = normNote(line);
-      if (!k) continue;
-      if (seen.has(k)) continue;
-      seen.add(k);
-      deduped.push(stripMarker(line));
-    }
-    return {
-      fach: n,
-      fachChanged: hasMarker(s[0]),
-      raum: _,
-      roomChanged,
-      lehrer: h,
-      teacherChanged,
-      notes: deduped.length ? deduped : void 0
-    };
+    const p = s.slice(1).filter((u) => o(u));
+    return { fach: n, raum: _, lehrer: h, notes: p.length ? p : void 0 };
   }
   renderCell(t, e) {
     const raw = (t ?? "").toString();
@@ -1577,7 +1432,6 @@ getRowsResolved(t) {
 
     // Helfer: Note-Klasse bestimmen (Emoji oder Keywords)
     const noteClass = (line) => {
-      if (/^\s*---\s*$/.test(line)) return "note noteRed noteDash";
       if (line.startsWith("🔴")) return "note noteRed";
       if (line.startsWith("🟠")) return "note noteOrange";
       if (line.startsWith("🟡")) return "note noteYellow";
@@ -1585,74 +1439,24 @@ getRowsResolved(t) {
       if (/\bfällt\s+aus\b/i.test(x) || /\bverlegt\b/i.test(x) || /\bstatt\b/i.test(x) || /\bgehalten\b/i.test(x) || /\bentfällt\b/i.test(x)) {
         return "note noteRed";
       }
-      return "note noteNeutral";
+      return "note";
     };
 
     const noteText = (line) =>
       (line ?? "")
         .toString()
-        .replaceAll("[[sp-red]]", "")
         // führende Emojis/Icons entfernen (verhindert "�" / Fragezeichen-Raute)
         .replace(/^\p{Extended_Pictographic}+\s*/u, "")
         // manchmal bleibt ein Replacement-Char übrig
         .replace(/^[�]+\s*/, "")
         .trim();
 
-    const rawLines = filtered0
-      .replace(/\r/g, "")
-      .split(`\n`)
-      .map((line) => (line ?? "").toString().trim());
-    const placeholderIndexes = rawLines
-      .map((line, idx) => (/^(?:\[\[sp-red\]\])?\s*(?:---|—|–)\s*$/.test(line) ? idx : -1))
-      .filter((idx) => idx >= 0);
-    if (placeholderIndexes.length) {
-      const cutAt = placeholderIndexes[placeholderIndexes.length - 1] + 1;
-      const overlayLines = rawLines
-        .slice(cutAt)
-        .map((line) => noteText(line))
-        .filter(Boolean);
-      const overlayParsed = this.parseCellTriplet(overlayLines.join("\n"));
-      if (overlayParsed?.fach && overlayParsed?.raum && overlayParsed?.lehrer) {
-        return d`
-          <div class="cellWrap">
-            <div class=${`fach${overlayParsed.fachChanged ? " changedText" : ""}`}>${overlayParsed.fach}</div>
-            <div class=${`lehrer${overlayParsed.teacherChanged ? " changedText" : ""}`}>${overlayParsed.lehrer}</div>
-            <div class=${`raum${overlayParsed.roomChanged ? " changedText" : ""}`}>${overlayParsed.raum}</div>
-
-            ${overlayParsed.notes?.length
-              ? d`
-                  <div class="notes">
-                    ${overlayParsed.notes.map((line) => {
-                      const cls = noteClass(line);
-                      const txt = noteText(line) || line;
-                      return d`<div class=${cls}><span class="txt">${txt}</span></div>`;
-                    })}
-                  </div>
-                `
-              : d``}
-          </div>
-        `;
-      }
-      const overlayOnly = ["---", ...overlayLines];
-      if (!overlayOnly.length) return d``;
-      return d`
-        <div class="cellWrap">
-          <div class="notes">
-            ${overlayOnly.map((line) => {
-              const cls = noteClass(line);
-              return d`<div class=${cls}><span class="txt">${line}</span></div>`;
-            })}
-          </div>
-        </div>
-      `;
-    }
-
     if (partsByBlank.length === 1 && parsed?.fach && parsed?.raum && parsed?.lehrer) {
       return d`
         <div class="cellWrap">
-          <div class=${`fach${parsed.fachChanged ? " changedText" : ""}`}>${parsed.fach}</div>
-          <div class=${`lehrer${parsed.teacherChanged ? " changedText" : ""}`}>${parsed.lehrer}</div>
-          <div class=${`raum${parsed.roomChanged ? " changedText" : ""}`}>${parsed.raum}</div>
+          <div class="fach">${parsed.fach}</div>
+          <div class="lehrer">${parsed.lehrer}</div>
+          <div class="raum">${parsed.raum}</div>
 
           ${parsed.notes?.length
             ? d`
@@ -1680,9 +1484,9 @@ getRowsResolved(t) {
       if (p?.fach && p?.raum && p?.lehrer) {
         return d`
           <div class="cellWrap">
-            <div class=${`fach${p.fachChanged ? " changedText" : ""}`}>${p.fach}</div>
-            <div class=${`lehrer${p.teacherChanged ? " changedText" : ""}`}>${p.lehrer}</div>
-            <div class=${`raum${p.roomChanged ? " changedText" : ""}`}>${p.raum}</div>
+            <div class="fach">${p.fach}</div>
+            <div class="lehrer">${p.lehrer}</div>
+            <div class="raum">${p.raum}</div>
 
             ${p.notes?.length
               ? d`
@@ -1701,8 +1505,8 @@ getRowsResolved(t) {
 
       // Fallback: erste Zeile als Fach, Rest als Notes
       const lines = v.split(`\n`).map((c) => c.trim()).filter(Boolean);
-      const head = ((lines[0] ?? "").trim()).replaceAll("[[sp-red]]", "");
-      const rest = lines.slice(1).map((line) => line.replaceAll("[[sp-red]]", ""));
+      const head = (lines[0] ?? "").trim();
+      const rest = lines.slice(1);
 
       if (head && rest.length) {
         return d`
@@ -1719,7 +1523,7 @@ getRowsResolved(t) {
         `;
       }
 
-      return d`<span class="cellText">${v.replaceAll("[[sp-red]]", "")}</span>`;
+      return d`<span class="cellText">${v}</span>`;
     };
 
     if (partsByBlank.length > 1) {
@@ -1762,56 +1566,66 @@ getRowsResolved(t) {
     return renderOne(filtered);
   }
 
-  render() {
-    if (!this.config) return d``;
-    const t = this.config, e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), highlightDate = this.getEffectiveHighlightDate(t, e), anchorDate = this.getRollingAnchorDate(t, e), s = this.getTodayIndex(t.days ?? [], u, (t.view_mode ?? "week") === "rolling" ? anchorDate : highlightDate), dayEntries = this.getVisibleDayEntries(t, u), currentVisibleIndex = this.getCurrentVisibleIndex(dayEntries, highlightDate), daysVis = dayEntries.map((y) => y.label), i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, hRaw = this.getWeekOffsetValue(t), h = this._uiWeekOffset != null ? this._uiWeekOffset : hRaw, sourceType = (t.source_type ?? "manual").toString(), showHeaderDate = E(t.show_header_date, !0),
-        p = (t.week_offset_entity ?? "").trim().length > 0,
-        showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), g = u && u.length >= (t.days?.length ?? 0) ? u : null, upd = this.getHeaderUpdatedFromEntity(t), vp = this.getHeaderVplanMissingTextFromEntity(t), O = this.getBaseDate(t), B = this.mondayOfWeek(O), cardInlineStyle = this.getCardInlineStyle(t);
+  renderCardLayout(t, vmOverride = null, popup = !1) {
+    const e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], u), vm = ((vmOverride ?? this._uiViewMode ?? t.view_mode ?? "week") + "").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(),
+        p = !popup && (t.week_offset_entity ?? "").trim().length > 0,
+        showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), g = u && u.length >= (t.days?.length ?? 0) ? u : null, upd = this.getHeaderUpdatedFromEntity(t), O = this.getBaseDate(t), B = this.mondayOfWeek(O), tapAction = this.normalizeTapAction(t.tap_action), displayMode = popup ? "default" : (t.display_mode ?? "default"), cardClass = `${displayMode === "compact" ? "compact" : ""}${!popup && tapAction.action !== "none" ? " tappable" : ""}${popup ? " popupCard" : ""}`, showTitle = t.show_title !== !1 && ((t.title ?? "").toString().trim().length > 0), titleStyle = this.getTitleStyle(t), showHeaderRow = showTitle || c || showPager,
+        rollingActive = vm === "rolling" && (popup || !showPager || (h ?? 0) === 0),
+        rollingSlots = rollingActive ? this.getRollingVisibleSlots(t, daysAhead) : [],
+        idxs = rollingSlots.length ? rollingSlots.map((y) => y.orig) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m),
+        daysVis = idxs.map((y) => t.days[y]),
+        rollingDates = rollingSlots.length ? rollingSlots.map((y) => y.date) : null,
+        updMap = (() => {
+          const y = /* @__PURE__ */ new Map();
+          if (!g || !upd) return y;
+          g.forEach((m, W) => {
+            const b = upd[W];
+            if (m instanceof Date && b) y.set(this.fmtYMD(m), b);
+          });
+          return y;
+        })();
     return d`
-      <ha-card style=${cardInlineStyle}>
-        <div class="headerRow">
-          <div class="title">${t.title ?? ""}</div>
+      <ha-card class=${cardClass} @click=${popup ? (y) => this.closeWeekPopup(y) : (y) => this.handleCardAction(t, y)}>
+        ${showHeaderRow ? d`<div class="headerRow">
+          ${showTitle ? d`<div class="title" style=${titleStyle}>${t.title ?? ""}</div>` : d`<div class="titleSpacer"></div>`}
 
           <div class="headRight">
             ${c ? d`<div class="weekBadgeInline">Woche <b>${_}</b></div>` : d``}
 
             ${showPager ? d`
                   <div class="offsetInline">
-                    <button class="btnMini ${h === 0 ? "active" : ""}" ?disabled=${h == null} @click=${async (ev) => { ev?.preventDefault?.(); ev?.stopPropagation?.(); if (h != null) { try { this._uiWeekOffset = 0; this.requestUpdate(); await this.setWeekOffset(t, 0); this.requestUpdate(); } catch (err) { console.warn("[stundenplan-card] setWeekOffset(0) failed", err); } } }}>Aktuelle Woche</button>
-                    <button class="btnMini ${h === 1 ? "active" : ""}" ?disabled=${h == null} @click=${async (ev) => { ev?.preventDefault?.(); ev?.stopPropagation?.(); if (h != null) { try { this._uiWeekOffset = 1; this.requestUpdate(); await this.setWeekOffset(t, 1); this.requestUpdate(); } catch (err) { console.warn("[stundenplan-card] setWeekOffset(+1) failed", err); } } }}>Nächste Woche</button>
+                    <button class="btnMini" @click=${(y) => { y.stopPropagation(), h != null && this.setWeekOffset(t, h - 1); }}>&lt;</button>
+                    <div class="offsetVal">${h ?? "?"}</div>
+                    <button class="btnMini" @click=${(y) => { y.stopPropagation(), h != null && this.setWeekOffset(t, h + 1); }}>&gt;</button>
                   </div>
                 ` : d``}
           </div>
-        </div>
+        </div>` : d``}
 
         <div class="card">
           <table>
             <thead>
               <tr>
                 <th class="time">Stunde</th>
-                ${dayEntries.map((entry, m) => { const y = entry.label, orig = entry.dataIndex;
-      const W = t.highlight_today && ((entry?.headerDate && currentVisibleIndex === m) || (!entry?.headerDate && orig === s)) ? "today" : "";
-      const headerUpdated = this.getExactUpdatedForDate(t, entry) || (entry.exactMatch ? (upd?.[orig] ?? "") : "");
-      const headerVpHint = this.getVplanHintForDate(t, entry) || (entry.exactMatch ? (vp?.[orig] ?? "") : "");
+                ${daysVis.map((y, m) => { const orig = idxs[m];
+      const W = t.highlight_today && (rollingDates ? this.fmtYMD(rollingDates[m]) === this.fmtYMD(new Date()) : orig === s) ? "today" : "";
       let b = "";
-      if (showHeaderDate)
-        if (entry.headerDate)
-          b = this.fmtDDMMYYYY(entry.headerDate);
-        else if (g && g[orig])
-          b = this.fmtDDMMYYYY(g[orig]);
-        else {
-          const w = Oe(y);
-          if (w) {
-            const x = new Date(B);
-            x.setDate(B.getDate() + (w - 1)), b = this.fmtDDMMYYYY(x);
-          }
+      if (rollingDates?.[m] instanceof Date)
+        b = this.fmtDDMMYYYY(rollingDates[m]);
+      else if (g)
+        b = this.fmtDDMMYYYY(g[orig]);
+      else {
+        const w = Oe(y);
+        if (w) {
+          const x = new Date(B);
+          x.setDate(B.getDate() + (w - 1)), b = this.fmtDDMMYYYY(x);
         }
+      }
       return d`
                     <th class=${W} style=${`--sp-hl:${n};`}>
                       <div>${y}</div>
-                      ${b ? d`<div class="thDate">${b}</div>` : d``}
-                      ${headerUpdated ? d`<div class="thUpdated">(aktualisiert: ${headerUpdated})</div>` : d``}
-                      ${headerVpHint ? d`<div class="thVpHint">${headerVpHint}</div>` : d``}
+                      <div class="thDate">${b}</div>
+                      ${rollingDates?.[m] ? (updMap.get(this.fmtYMD(rollingDates[m])) ? d`<div class="thUpdated">(aktualisiert: ${updMap.get(this.fmtYMD(rollingDates[m]))})</div>` : d``) : (upd?.[orig] ? d`<div class="thUpdated">(aktualisiert: ${upd[orig]})</div>` : d``)}
                     </th>
                   `;
     })}
@@ -1830,7 +1644,7 @@ getRowsResolved(t) {
                     </tr>
                   `;
       }
-      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], w = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), currentEntry = currentVisibleIndex >= 0 ? dayEntries[currentVisibleIndex] : null, currentExactCell = currentEntry ? this.getExactCellForDate(t, currentEntry, m) : null, currentOrig = currentEntry?.dataIndex ?? -1, x = currentExactCell != null ? currentExactCell : currentOrig >= 0 ? W[currentOrig] ?? "" : "", te = currentVisibleIndex >= 0 ? this.filterCellText(x, t) : "", ee = currentVisibleIndex >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), __rng = mt(m.time),
+      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], w = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), x = s >= 0 ? W[s] ?? "" : "", te = s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), __rng = mt(m.time),
       __timeHasRange = !!(__rng.start && __rng.end),
       Et = (!__timeHasRange && m.start && m.end) ? `${m.start}–${m.end}` : "";
       let gt = `--sp-hl:${o};`;
@@ -1843,14 +1657,11 @@ getRowsResolved(t) {
                       </div>
                     </td>
 
-                    ${dayEntries.map((entry, P) => { const z = entry.label, orig = entry.dataIndex;
-        const canUseSourceCell = !(sourceType === "entity" && orig < 0);
-        const exactCell = this.getExactCellForDate(t, entry, m);
-        const rawCell = exactCell != null ? exactCell : canUseSourceCell ? W[orig] ?? "" : "";
-        const F = this.filterCellText(rawCell, t), I = exactCell != null ? null : canUseSourceCell ? (b[orig] ?? null) : null, G = t.highlight_today && ((entry?.headerDate && currentVisibleIndex === P) || (!entry?.headerDate && orig === s)) ? "today" : "";
+                    ${daysVis.map((z, P) => { const orig = idxs[P];
+        const F = this.filterCellText(W[orig] ?? "", t), I = b[orig] ?? null, G = t.highlight_today && orig === s ? "today" : "";
         let Ct = `--sp-hl:${n};` + Te(I, i);
         const se = !yt(F);
-        return pt && se && w && t.highlight_current_text && l && ((entry?.headerDate && currentVisibleIndex === P) || (!entry?.headerDate && s >= 0 && orig === s)) && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(F, t)}</td>`;
+        return pt && se && w && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(F, t)}</td>`;
       })}
                   </tr>
                 `;
@@ -1861,38 +1672,54 @@ getRowsResolved(t) {
       </ha-card>
     `;
   }
+  render() {
+    if (!this.config) return d``;
+    const t = this.config;
+    return d`
+      ${this.renderCardLayout(t)}
+      ${this._uiPopupOpen ? d`
+        <div class="popupBackdrop" @click=${(e) => this.closeWeekPopup(e)}>
+          <div class="popupShell">
+            ${this.renderCardLayout(t, "week", !0)}
+          </div>
+        </div>
+      ` : d``}
+    `;
+  }
 }, D.styles = It`
     :host {
       display: block;
       width: 100%;
       max-width: 100%;
-      font-family: var(--sp-font-family, inherit);
-      font-size: var(--sp-font-size, 14px);
     }
     ha-card {
       display: block;
       width: 100%;
       max-width: 100%;
       box-sizing: border-box;
-      font-family: inherit;
-      font-size: inherit;
     }
-    .card,
-    table,
-    th,
-    td,
-    .weekBadgeInline,
-    .offsetInline,
-    .btnMini,
-    .timeWrap,
-    .cellWrap,
-    .cellText,
-    .fach,
-    .raum,
-    .lehrer,
-    .notes,
-    .note {
-      font-family: var(--sp-font-family, inherit);
+    ha-card.tappable {
+      cursor: pointer;
+    }
+    .popupBackdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .popupShell {
+      width: min(1400px, calc(100vw - 40px));
+      max-height: calc(100vh - 40px);
+      overflow: auto;
+    }
+    ha-card.popupCard {
+      cursor: pointer;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
     }
 
     .headerRow {
@@ -1903,10 +1730,13 @@ getRowsResolved(t) {
       padding: 14px 14px 8px 14px;
     }
     .title {
-      font-family: var(--primary-font-family, inherit);
       font-size: 20px;
       font-weight: 700;
       line-height: 1.2;
+    }
+    .titleSpacer {
+      flex: 1 1 auto;
+      min-width: 0;
     }
     .headRight {
       display: flex;
@@ -1920,7 +1750,7 @@ getRowsResolved(t) {
       border: 1px solid var(--divider-color);
       border-radius: 12px;
       background: var(--secondary-background-color);
-      font-size: calc(13px * var(--sp-font-scale, 1));
+      font-size: 13px;
       opacity: 0.95;
       white-space: nowrap;
     }
@@ -1942,12 +1772,7 @@ getRowsResolved(t) {
       padding: 6px 10px;
       cursor: pointer;
     }
-        .btnMini.active {
-      background: var(--primary-color);
-      border-color: var(--primary-color);
-      color: var(--text-primary-color, #fff);
-    }
-.btnMini:hover {
+    .btnMini:hover {
       filter: brightness(1.06);
     }
     .offsetVal {
@@ -1968,7 +1793,6 @@ getRowsResolved(t) {
       width: max-content;
       min-width: 100%;
       border-collapse: collapse;
-      font-size: inherit;
     }
     th,
     td {
@@ -1985,29 +1809,18 @@ getRowsResolved(t) {
     }
 
     .thDate {
-      font-size: calc(11px * var(--sp-font-scale, 1));
+      font-size: 11px;
       opacity: 0.75;
       margin-top: 2px;
       font-weight: 600;
       white-space: nowrap;
     }
     .thUpdated {
-      font-size: calc(10px * var(--sp-font-scale, 1));
+      font-size: 10px;
       opacity: 0.7;
       margin-top: 1px;
       white-space: nowrap;
     }
-
-    .thVpHint {
-      font-size: calc(11px * var(--sp-font-scale, 1));
-      margin-top: 2px;
-      color: var(--error-color);
-      font-style: italic;
-      font-weight: 600;
-      white-space: nowrap;
-      text-align: center;
-    }
-
 
     .time {
       font-weight: 700;
@@ -2021,11 +1834,11 @@ getRowsResolved(t) {
       line-height: 1.1;
     }
     .timeSt {
-      font-size: calc(13px * var(--sp-font-scale, 1));
+      font-size: 13px;
       font-weight: 800;
     }
     .timeHm {
-      font-size: calc(11px * var(--sp-font-scale, 1));
+      font-size: 11px;
       font-weight: 650;
       opacity: 0.85;
     }
@@ -2062,23 +1875,15 @@ getRowsResolved(t) {
     }
     .fach {
       font-weight: 800;
-      font-size: calc(14px * var(--sp-font-scale, 1));
+      font-size: 14px;
       letter-spacing: 0.2px;
       white-space: nowrap;
     }
     .raum,
     .lehrer {
-      font-size: calc(12px * var(--sp-font-scale, 1));
+      font-size: 12px;
       opacity: 0.9;
       white-space: nowrap;
-    }
-    .changedText {
-      display: inline-block;
-      padding: 2px 5px;
-      border-radius: 8px;
-      background: rgba(244, 67, 54, 0.12);
-      color: #ff8d86;
-      opacity: 1;
     }
 
     .notes {
@@ -2092,26 +1897,15 @@ getRowsResolved(t) {
     .note {
       display: block;
       text-align: center;
-      font-size: calc(11px * var(--sp-font-scale, 1));
+      font-size: 11px;
       line-height: 1.25;
       opacity: 0.92;
       padding: 3px 4px;
       border-radius: 8px;
       background: rgba(0, 0, 0, 0.04);
     }
-    .noteNeutral {
-      background: rgba(166, 123, 53, 0.22);
-    }
     .noteRed {
       background: rgba(244, 67, 54, 0.12);
-    }
-    .noteDash {
-      background: transparent;
-      color: #ff8d86;
-      padding: 0;
-      border-radius: 0;
-      line-height: 1;
-      font-weight: 700;
     }
     .noteOrange {
       background: rgba(255, 152, 0, 0.12);
@@ -2120,7 +1914,7 @@ getRowsResolved(t) {
       background: rgba(255, 235, 59, 0.14);
     }
     .dot {
-      font-size: calc(12px * var(--sp-font-scale, 1));
+      font-size: 12px;
       line-height: 1;
       margin-top: 1px;
       opacity: 0.95;
@@ -2133,9 +1927,6 @@ getRowsResolved(t) {
     .cellText {
       white-space: pre-line;
       display: inline-block;
-      font-size: calc(14px * var(--sp-font-scale, 1));
-      font-weight: 700;
-      line-height: 1.2;
     }
   
 
@@ -2149,6 +1940,73 @@ getRowsResolved(t) {
       opacity: 0.85;
       font-style: italic;
       white-space: normal;
+    }
+    ha-card.compact .headerRow {
+      padding: 10px 10px 4px 10px;
+      gap: 8px;
+    }
+    ha-card.compact .title {
+      font-size: 16px !important;
+      line-height: 1.1;
+    }
+    ha-card.compact .headRight {
+      gap: 6px;
+    }
+    ha-card.compact .weekBadgeInline,
+    ha-card.compact .offsetInline {
+      padding: 4px 6px;
+      border-radius: 10px;
+      font-size: 11px;
+    }
+    ha-card.compact .btnMini {
+      padding: 4px 8px;
+    }
+    ha-card.compact .card {
+      padding: 8px 8px 10px 8px;
+    }
+    ha-card.compact th,
+    ha-card.compact td {
+      padding: 4px;
+    }
+    ha-card.compact .time {
+      width: 102px;
+    }
+    ha-card.compact .thDate {
+      font-size: 10px;
+      margin-top: 1px;
+    }
+    ha-card.compact .thUpdated {
+      font-size: 9px;
+      margin-top: 0;
+    }
+    ha-card.compact .timeSt {
+      font-size: 12px;
+    }
+    ha-card.compact .timeHm {
+      font-size: 10px;
+    }
+    ha-card.compact .cellWrap {
+      gap: 1px;
+      line-height: 1.08;
+    }
+    ha-card.compact .fach {
+      font-size: 12px;
+    }
+    ha-card.compact .raum,
+    ha-card.compact .lehrer {
+      font-size: 11px;
+    }
+    ha-card.compact .notes {
+      margin-top: 2px;
+      gap: 2px;
+    }
+    ha-card.compact .note {
+      font-size: 10px;
+      padding: 2px 4px;
+      border-radius: 7px;
+    }
+    ha-card.compact .dot {
+      font-size: 11px;
     }
 `, D);
 X = /* @__PURE__ */ new WeakMap();
@@ -2379,15 +2237,6 @@ const ut = class ut extends U {
       </div>
     `;
   }
-  renderSubsection(title, hint, content) {
-    return d`
-      <div class="subSection">
-        <div class="subSectionTitle">${title}</div>
-        ${hint ? d`<div class="subSectionHint">${hint}</div>` : d``}
-        <div class="subSectionBody">${content}</div>
-      </div>
-    `;
-  }
   onToggle(t, e) {
     const s = !!t?.target?.checked;
     this.setValue(e, s);
@@ -2482,84 +2331,6 @@ const ut = class ut extends U {
     i[t] = { ...o, cell_styles: l };
     this.emit({ ...this._config, rows: i });
   }
-  focusManualCell(rowIndex, colIndex) {
-    try {
-      this._rowOpen = { ...(this._rowOpen ?? {}), [rowIndex]: !0 };
-      this.requestUpdate();
-      window.setTimeout(() => {
-        try {
-          const root = this.renderRoot ?? this.shadowRoot;
-          const sel = `textarea[data-row="${rowIndex}"][data-col="${colIndex}"]`;
-          const el = root?.querySelector?.(sel);
-          if (el) {
-            el.focus();
-            const len = (el.value ?? "").length;
-            el.setSelectionRange?.(len, len);
-            el.scrollIntoView?.({ block: "center", behavior: "smooth" });
-          }
-        } catch {}
-      }, 50);
-    } catch {}
-  }
-  renderManualPreview(days, rows) {
-    const lessonRows = rows.filter((r) => !ct(r));
-    if (!lessonRows.length) return d``;
-    return d`
-      <div class="manualPreviewWrap">
-        <div class="manualPreviewTitle">Vorschau</div>
-        <div class="manualPreviewHint">Klicke auf eine Zelle, um direkt das passende Eingabefeld zu öffnen.</div>
-        <div class="manualPreviewTableWrap">
-          <table class="manualPreviewTable">
-            <thead>
-              <tr>
-                <th class="time">Stunde</th>
-                ${days.map((day) => d`<th>${day}</th>`)}
-              </tr>
-            </thead>
-            <tbody>
-              ${rows.map((row, rowIndex) => {
-        if (ct(row)) {
-          return d`
-                    <tr class="manualPreviewBreak">
-                      <td class="time">${(row.time ?? "").toString()}</td>
-                      <td colspan=${days.length}>${(row.label ?? "Pause").toString()}</td>
-                    </tr>
-                  `;
-        }
-        const cells = Array.isArray(row.cells) ? row.cells : [];
-        return d`
-                  <tr>
-                    <td class="time">${(row.time ?? "").toString()}</td>
-                    ${days.map((day, colIndex) => {
-          const value = (cells[colIndex] ?? "").toString().trim();
-          const preview = value ? value.split(/\r?\n/).slice(0, 3) : [];
-          return d`
-                        <td>
-                          <button
-                            type="button"
-                            class="manualPreviewCellBtn"
-                            @click=${() => this.focusManualCell(rowIndex, colIndex)}
-                          >
-                            ${preview.length
-              ? d`
-                                  <span class="manualPreviewLines">
-                                    ${preview.map((line, lineIndex) => d`<span class=${lineIndex === 0 ? "manualPreviewMain" : "manualPreviewSub"}>${line}</span>`)}
-                                  </span>
-                                `
-              : d`<span class="manualPreviewEmpty">Leer</span>`}
-                          </button>
-                        </td>
-                      `;
-        })}
-                  </tr>
-                `;
-      })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  }
   
   renderManualRows() {
     if (!this._config) return d``;
@@ -2569,28 +2340,26 @@ const ut = class ut extends U {
     return d`
       <div class="rowsTop">
         <div class="rowsTitle">Stundenplan (Zeilen)</div>
+
+        <div class="btnBar">
+          <div class="toggleInline">
+            <div class="toggleText">Cell-Styles</div>
+            <ha-switch
+              .checked=${!!this._showCellStyles}
+              @change=${(e) => {
+                this._showCellStyles = !!e?.target?.checked;
+                this.requestUpdate();
+              }}
+            ></ha-switch>
+          </div>
+
+          <mwc-button outlined @click=${this.addLessonRow}>+ Stunde</mwc-button>
+          <mwc-button outlined @click=${this.addBreakRow}>+ Pause</mwc-button>
+        </div>
       </div>
 
       <div class="sub" style="margin-bottom:10px;">
         Pro Zeile: Zeit + optional Start/Ende. Per Klick in der Vorschau springst du zur passenden Zelle.
-      </div>
-
-      ${this.renderManualPreview(days, rows)}
-
-      <div class="btnBar btnBarManual">
-        <div class="toggleInline">
-          <div class="toggleText">Cell-Styles</div>
-          <ha-switch
-            .checked=${!!this._showCellStyles}
-            @change=${(e) => {
-              this._showCellStyles = !!e?.target?.checked;
-              this.requestUpdate();
-            }}
-          ></ha-switch>
-        </div>
-
-        <button type="button" class="spBtn spBtnPrimary" @click=${this.addLessonRow}>+ Stunde</button>
-        <button type="button" class="spBtn" @click=${this.addBreakRow}>+ Pause</button>
       </div>
 
       ${rows.map((r, idx) => {
@@ -2674,8 +2443,6 @@ const ut = class ut extends U {
 
                             <textarea
                               class="lessonArea" rows="2"
-                              data-row=${String(idx)}
-                              data-col=${String(i)}
                               .value=${val}
                               @input=${(e) => this.updateManualCell(idx, i, e?.target?.value ?? "")}
                               placeholder="Fach&#10;Raum&#10;Lehrer + Info-Zeilen"
@@ -2737,7 +2504,11 @@ const ut = class ut extends U {
       "Allgemein",
       "general",
       d`
-            <div class="hintBox">Lege hier zuerst Titel, Schultage und den gewünschten Ansichtsmodus fest. Diese Einstellungen bestimmen, wie die Karte später aufgebaut wird.</div>
+            <div class="infoBox">
+              Lege hier zuerst Titel, Schultage und den gewünschten Ansichtsmodus fest.
+              Diese Einstellungen bestimmen, wie die Karte später aufgebaut wird.
+            </div>
+
             <div class="grid2">
               <ha-textfield label="Titel der Karte" .value=${t.title ?? ""} @input=${(e) => this.onText(e, "title")}></ha-textfield>
 
@@ -2746,6 +2517,28 @@ const ut = class ut extends U {
                 .value=${Ne(t.days ?? [])}
                 @input=${(e) => this.setValue("days", Pe(e.target.value))}
                 helper="Beispiel: Mo, Di, Mi, Do, Fr"
+              ></ha-textfield>
+            </div>
+
+            <div class="grid3">
+              <ha-switch .checked=${E(t.show_title, !0)} @change=${(e) => this.onToggle(e, "show_title")}></ha-switch>
+              <div class="switchLabel">Titelzeile anzeigen</div>
+              <div></div>
+
+              <div></div>
+              <ha-textfield
+                label="Titelgröße (px)"
+                type="number"
+                .value=${String(t.title_font_size ?? 20)}
+                @input=${(e) => {
+                  const n = Number(e.target.value);
+                  this.setValue("title_font_size", Number.isFinite(n) ? Math.max(10, Math.min(40, Math.floor(n))) : 20);
+                }}
+              ></ha-textfield>
+              <ha-textfield
+                label="Titel-Schriftfamilie (optional)"
+                .value=${t.title_font_family ?? ""}
+                @input=${(e) => this.onText(e, "title_font_family")}
               ></ha-textfield>
             </div>
 
@@ -2778,26 +2571,54 @@ const ut = class ut extends U {
                 }}
               ></ha-form>
 
+              <ha-form
+                .hass=${this.hass}
+                .data=${{ display_mode: (t.display_mode ?? "default") }}
+                .schema=${[
+                  {
+                    name: "display_mode",
+                    selector: {
+                      select: {
+                        options: [
+                          { value: "default", label: "Normal" },
+                          { value: "compact", label: "Kompakt" }
+                        ]
+                      }
+                    }
+                  }
+                ]}
+                .computeLabel=${(e) => e?.name === "display_mode" ? "Ansichtsdichte" : e?.name}
+                @value-changed=${(e) => {
+                  try {
+                    e?.stopPropagation?.();
+                    const v = (e?.detail?.value ?? {}).display_mode ?? "default";
+                    this.setValue("display_mode", v);
+                  } catch (s) {
+                    console.error("stundenplan-card editor: display_mode change failed", s);
+                  }
+                }}
+              ></ha-form>
+
               ${(t.view_mode ?? "week") === "rolling" ? d`
                 <ha-textfield
                   label="Zusätzliche Tage im Voraus"
                   type="number"
                   .value=${String(t.days_ahead ?? 0)}
-                  helper="0 = nur Starttag, 1 = Starttag + nächster Schultag"
                   @input=${(e) => {
                     const n = Number(e.target.value);
                     this.setValue("days_ahead", Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0);
                   }}
+                  helper="0 = nur Starttag, 1 = Starttag + nächster Schultag"
                 ></ha-textfield>
+
                 <ha-form
                   .hass=${this.hass}
-                  .data=${{ next_day_jump_mode: (t.next_day_jump_mode ?? "midnight") }}
+                  .data=${{ rolling_switch_mode: (t.rolling_switch_mode ?? "midnight") }}
                   .schema=${[
                     {
-                      name: "next_day_jump_mode",
+                      name: "rolling_switch_mode",
                       selector: {
                         select: {
-                          mode: "dropdown",
                           options: [
                             { value: "midnight", label: "Ab 00:00 Uhr" },
                             { value: "after_last_lesson", label: "Nach der letzten Stunde" },
@@ -2807,141 +2628,117 @@ const ut = class ut extends U {
                       }
                     }
                   ]}
-                  .computeLabel=${(e) => e?.name === "next_day_jump_mode" ? "Auf nächsten Tag springen" : e?.name}
+                  .computeLabel=${(e) => e?.name === "rolling_switch_mode" ? "Auf nächsten Tag springen" : e?.name}
                   @value-changed=${(e) => {
                     try {
                       e?.stopPropagation?.();
-                      const v = (e?.detail?.value ?? {}).next_day_jump_mode ?? "midnight";
-                      this.setValue("next_day_jump_mode", v);
+                      const v = (e?.detail?.value ?? {}).rolling_switch_mode ?? "midnight";
+                      this.setValue("rolling_switch_mode", v);
                     } catch (s) {
-                      console.error("stundenplan-card editor: next_day_jump_mode change failed", s);
+                      console.error("stundenplan-card editor: rolling_switch_mode change failed", s);
                     }
                   }}
                 ></ha-form>
-                ${(t.next_day_jump_mode ?? "midnight") === "fixed_time" ? d`
+
+                ${(t.rolling_switch_mode ?? "midnight") === "fixed_time" ? d`
                   <ha-textfield
-                    label="Umschaltzeit"
-                    .value=${(t.rolling_cutoff_time ?? "").toString()}
-                    placeholder="z. B. 15:00"
-                    helper="Ab dieser Uhrzeit springt Rolling auf den nächsten Schultag."
-                    @input=${(e) => this.setValue("rolling_cutoff_time", e?.target?.value ?? "")}
+                    label="Umschaltzeit (HH:MM)"
+                    .value=${t.rolling_switch_time ?? ""}
+                    @input=${(e) => this.onText(e, "rolling_switch_time")}
+                    helper="Beispiel: 15:00"
                   ></ha-textfield>
-                ` : d`<div class="hintBox">${(t.next_day_jump_mode ?? "midnight") === "after_last_lesson" ? "Der Sprung erfolgt automatisch nach der letzten Endzeit aus deinem Stundenplan." : "Der Sprung auf den nächsten Schultag erfolgt direkt ab Mitternacht."}</div>`}
+                ` : d`<div class="infoBox slim">${(t.rolling_switch_mode ?? "midnight") === "after_last_lesson"
+                  ? "Der Sprung auf den nächsten Schultag folgt nach der letzten Endzeit aus deinem Plan."
+                  : "Der Sprung auf den nächsten Schultag folgt direkt ab Mitternacht."}</div>`}
               ` : d``}
             </div>
 
             <div class="hint">„Ab heute (rolling)“ zeigt ab dem Starttag die nächsten passenden Schultage. Beim Blättern in andere Wochen beginnt die Ansicht automatisch am Montag.</div>
-          `
-    )}
 
-        ${this.renderSection(
-      "Highlights & Anzeige",
-      "highlights",
-      d`
-            ${this.renderSubsection(
-              "Hintergrund & Markierungen",
-              "Diese Optionen steuern, welche Bereiche farbig hinterlegt werden. Die passende Hintergrundfarbe kannst du jeweils direkt daneben festlegen.",
-              d`
-                <div class="grid3">
-                  <ha-switch .checked=${E(t.highlight_today, !0)} @change=${(e) => this.onToggle(e, "highlight_today")}></ha-switch>
-                  <div class="switchLabel">Aktuellen Tag im Hintergrund markieren</div>
-                  <ha-textfield label="Tagesfarbe" helper="z. B. rgba(...) oder #RRGGBB" .value=${t.highlight_today_color ?? ""} @input=${(e) => this.onText(e, "highlight_today_color")}></ha-textfield>
-
-                  <ha-switch .checked=${E(t.highlight_current, !0)} @change=${(e) => this.onToggle(e, "highlight_current")}></ha-switch>
-                  <div class="switchLabel">Laufende Stunde im Hintergrund hervorheben</div>
-                  <ha-textfield label="Stundenfarbe" helper="z. B. rgba(...) oder #RRGGBB" .value=${t.highlight_current_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_color")}></ha-textfield>
-
-                  <ha-switch .checked=${E(t.highlight_breaks, !1)} @change=${(e) => this.onToggle(e, "highlight_breaks")}></ha-switch>
-                  <div class="switchLabel">Pausenzeilen ebenfalls hinterlegen</div>
-                  <div class="switchMeta">Sinnvoll, wenn du Pausen als eigene Zeilen eingetragen hast.</div>
-
-                  <ha-switch
-                    .checked=${E(t.free_only_column_highlight, !0)}
-                    @change=${(e) => this.onToggle(e, "free_only_column_highlight")}
-                  ></ha-switch>
-                  <div class="switchLabel">Nur markieren, wenn die Spalte nicht komplett frei ist</div>
-                  <div class="switchMeta">Verhindert eine farbige Leerspalte.</div>
-                </div>
-              `
-            )}
-
-            ${this.renderSubsection(
-              "Text & Zusatzinfos",
-              "Diese Optionen betreffen nur Textdarstellung und Kopfzeile, nicht die Hintergrundfarben.",
-              d`
-                <div class="grid3">
-                  <ha-switch .checked=${E(t.show_header_date, !0)} @change=${(e) => this.onToggle(e, "show_header_date")}></ha-switch>
-                  <div class="switchLabel">Datum unter dem Wochentag anzeigen</div>
-                  <div class="switchMeta">Hilfreich bei Rolling und beim Wochenwechsel.</div>
-
-                  <ha-switch .checked=${E(t.highlight_current_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_text")}></ha-switch>
-                  <div class="switchLabel">Text in der aktuellen Stunde einfärben</div>
-                  <ha-textfield label="Textfarbe" helper="#RRGGBB oder CSS-Farbe" .value=${t.highlight_current_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_text_color")}></ha-textfield>
-
-                  <ha-switch .checked=${E(t.highlight_current_time_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_time_text")}></ha-switch>
-                  <div class="switchLabel">Zeitspalte der aktuellen Stunde einfärben</div>
-                  <ha-textfield label="Zeitfarbe" helper="#RRGGBB oder CSS-Farbe" .value=${t.highlight_current_time_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_time_text_color")}></ha-textfield>
-                </div>
-              `
-            )}
-          `
-    )}
-
-        ${this.renderSection(
-      "Typografie",
-      "type",
-      d`
-            <div class="hintBox">Diese Einstellungen gelten für Tabellenkopf, Zeitspalte und Zellen. Der Kartentitel bleibt bewusst unverändert, damit er immer stabil lesbar bleibt.</div>
             <div class="grid2">
               <ha-form
                 .hass=${this.hass}
-                .data=${{ font_family: (t.font_family ?? "").toString() }}
+                .data=${{ tap_action_action: ((t.tap_action?.action ?? "none") + "").toString() }}
                 .schema=${[
                   {
-                    name: "font_family",
+                    name: "tap_action_action",
                     selector: {
                       select: {
-                        mode: "dropdown",
                         options: [
-                          { value: "system", label: "Home Assistant Standard" },
-                          { value: "segoe", label: "Segoe UI" },
-                          { value: "arial", label: "Arial" },
-                          { value: "verdana", label: "Verdana" },
-                          { value: "trebuchet", label: "Trebuchet MS" },
-                          { value: "gillsans", label: "Gill Sans" },
-                          { value: "georgia", label: "Georgia" },
-                          { value: "palatino", label: "Palatino" },
-                          { value: "courier", label: "Courier New" }
+                          { value: "none", label: "Keine Aktion" },
+                          { value: "toggle_view", label: "Ansicht umschalten" },
+                          { value: "popup_week", label: "Wochen-Popup" }
                         ]
                       }
                     }
                   }
                 ]}
-                .computeLabel=${(e) => e?.name === "font_family" ? "Schriftart" : e?.name}
+                .computeLabel=${(e) => e?.name === "tap_action_action" ? "Tap-Aktion" : e?.name}
                 @value-changed=${(e) => {
                   try {
                     e?.stopPropagation?.();
-                    const v = (e?.detail?.value ?? {}).font_family ?? "";
-                    this.setValue("font_family", v);
+                    const v = (e?.detail?.value ?? {}).tap_action_action ?? "none";
+                    this.setValue("tap_action", { ...(t.tap_action ?? {}), action: v });
                   } catch (s) {
-                    console.error("stundenplan-card editor: font_family change failed", s);
+                    console.error("stundenplan-card editor: tap_action change failed", s);
                   }
                 }}
               ></ha-form>
-              <ha-textfield
-                label="Schriftgröße (px)"
-                type="number"
-                .value=${String(t.font_size ?? 14)}
-                helper="Erlaubter Bereich: 10 bis 28 px"
-                @input=${(e) => {
-                  const n = Number(e?.target?.value);
-                  this.setValue("font_size", Number.isFinite(n) ? Math.max(10, Math.min(28, Math.floor(n))) : 14);
-                }}
-              ></ha-textfield>
+
+              ${((t.tap_action?.action ?? "none") + "").toString() === "toggle_view" ? d`
+                <div class="hint">Ein Tipp auf die Karte wechselt zwischen „Ganze Woche“ und „Ab heute (rolling)“.</div>
+              ` : ((t.tap_action?.action ?? "none") + "").toString() === "popup_week" ? d`
+                <div class="hint">Ein Tipp auf die Karte öffnet ein Popup mit der aktuellen ganzen Woche. Ein weiterer Tipp auf das Popup schließt es wieder.</div>
+              ` : d`<div class="hint">Für Wallpanels sind meist „Ansicht umschalten“ oder „Wochen-Popup“ die sinnvollsten Varianten.</div>`}
             </div>
           `
     )}
 
+        ${this.renderSection(
+      "Highlights",
+      "highlights",
+      d`
+            <div class="grid3">
+              <ha-switch .checked=${E(t.highlight_today, !0)} @change=${(e) => this.onToggle(e, "highlight_today")}></ha-switch>
+              <div class="switchLabel">Heute-Spalte hervorheben</div>
+              <div></div>
+
+              <ha-switch .checked=${E(t.highlight_current, !0)} @change=${(e) => this.onToggle(e, "highlight_current")}></ha-switch>
+              <div class="switchLabel">Aktuelle Stunde hervorheben</div>
+              <div></div>
+
+              <ha-switch .checked=${E(t.highlight_breaks, !1)} @change=${(e) => this.onToggle(e, "highlight_breaks")}></ha-switch>
+              <div class="switchLabel">Pause hervorheben</div>
+              <div></div>
+
+              <ha-switch
+                .checked=${E(t.free_only_column_highlight, !0)}
+                @change=${(e) => this.onToggle(e, "free_only_column_highlight")}
+              ></ha-switch>
+              <div class="switchLabel">Nur wenn heute-Spalte nicht frei</div>
+              <div></div>
+
+              <ha-switch .checked=${E(t.highlight_current_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_text")}></ha-switch>
+              <div class="switchLabel">Textfarbe in aktueller Stunde</div>
+              <ha-textfield label="Textfarbe" .value=${t.highlight_current_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_text_color")}></ha-textfield>
+
+              <ha-switch .checked=${E(t.highlight_current_time_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_time_text")}></ha-switch>
+              <div class="switchLabel">Zeitspalte Textfarbe (aktuell)</div>
+              <ha-textfield label="Zeitfarbe" .value=${t.highlight_current_time_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_time_text_color")}></ha-textfield>
+            </div>
+          `
+    )}
+
+        ${this.renderSection(
+      "Farben",
+      "colors",
+      d`
+            <div class="grid2">
+              <ha-textfield label="Heute Overlay" .value=${t.highlight_today_color ?? ""} @input=${(e) => this.onText(e, "highlight_today_color")}></ha-textfield>
+              <ha-textfield label="Aktuell Overlay" .value=${t.highlight_current_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_color")}></ha-textfield>
+            </div>
+          `
+    )}
         ${this.renderSection(
       "Datenquellen",
       "sources",
@@ -3165,27 +2962,6 @@ ut.properties = {
       display: grid;
       gap: 12px;
     }
-    .subSection {
-      display: grid;
-      gap: 8px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.06);
-      background: rgba(255,255,255,0.02);
-    }
-    .subSectionTitle {
-      font-weight: 700;
-      line-height: 1.2;
-    }
-    .subSectionHint {
-      font-size: 12px;
-      line-height: 1.45;
-      opacity: 0.82;
-    }
-    .subSectionBody {
-      display: grid;
-      gap: 10px;
-    }
     .grid2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -3199,27 +2975,26 @@ ut.properties = {
       align-items: start;
     }
     .switchLabel {
-      opacity: 0.95;
-      line-height: 1.35;
-    }
-    .switchMeta {
-      font-size: 12px;
-      opacity: 0.72;
-      line-height: 1.35;
+      opacity: 0.9;
     }
     .hint {
       font-size: 12px;
       opacity: 0.85;
       line-height: 1.4;
     }
-    .hintBox {
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(0, 163, 255, 0.16);
-      background: rgba(0, 163, 255, 0.07);
-      font-size: 12px;
+    .infoBox {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(3, 169, 244, 0.10);
+      border: 1px solid rgba(3, 169, 244, 0.35);
       line-height: 1.45;
-      color: var(--primary-text-color);
+      margin-bottom: 12px;
+    }
+    .infoBox.slim {
+      margin-bottom: 0;
+      display: flex;
+      align-items: center;
+      min-height: 56px;
     }
     code {
       font-family: var(--code-font-family, monospace);
@@ -3276,112 +3051,6 @@ ut.properties = {
       font-size: 12px;
     }
 
-    .manualPreviewWrap {
-      display: grid;
-      gap: 10px;
-      margin-bottom: 16px;
-      padding: 14px;
-      border: 1px solid var(--divider-color);
-      border-radius: 16px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
-    }
-    .manualPreviewTitle {
-      font-weight: 700;
-      font-size: 14px;
-    }
-    .manualPreviewHint {
-      font-size: 12px;
-      opacity: 0.8;
-    }
-    .manualPreviewTableWrap {
-      overflow-x: auto;
-      border-radius: 14px;
-      border: 1px solid rgba(255,255,255,0.06);
-      background: rgba(0,0,0,0.14);
-    }
-    .manualPreviewTable {
-      width: max-content;
-      min-width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-    }
-    .manualPreviewTable th,
-    .manualPreviewTable td {
-      border: 1px solid rgba(255,255,255,0.06);
-      padding: 0;
-      vertical-align: stretch;
-      text-align: center;
-    }
-    .manualPreviewTable th {
-      background: rgba(255,255,255,0.05);
-      font-weight: 700;
-      padding: 10px 8px;
-    }
-    .manualPreviewTable .time {
-      width: 96px;
-      min-width: 96px;
-      white-space: nowrap;
-      background: rgba(255,255,255,0.03);
-      font-weight: 700;
-      font-size: 12px;
-      padding: 10px 8px;
-    }
-    .manualPreviewCellBtn {
-      width: 100%;
-      min-height: 92px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      border-radius: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.03));
-      color: var(--primary-text-color);
-      padding: 10px 8px;
-      cursor: pointer;
-      text-align: center;
-      transition: background 120ms ease, box-shadow 120ms ease;
-    }
-    .manualPreviewCellBtn:hover {
-      background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.08));
-      box-shadow: inset 0 0 0 9999px rgba(255,255,255,0.02);
-    }
-    .manualPreviewCellBtn:focus-visible {
-      outline: 2px solid rgba(33,150,243,0.6);
-      outline-offset: 2px;
-    }
-    .manualPreviewLines {
-      display: grid;
-      gap: 4px;
-      font-size: 12px;
-      line-height: 1.2;
-      justify-items: center;
-      width: 100%;
-    }
-    .manualPreviewMain {
-      font-weight: 700;
-      font-size: 13px;
-      letter-spacing: 0.2px;
-    }
-    .manualPreviewSub {
-      opacity: 0.9;
-      font-size: 11px;
-    }
-    .manualPreviewEmpty {
-      display: block;
-      text-align: center;
-      opacity: 0.55;
-      font-style: italic;
-      font-size: 12px;
-      line-height: 1.25;
-    }
-    .manualPreviewBreak td {
-      opacity: 0.75;
-      font-style: italic;
-      padding: 10px 8px;
-      background: rgba(255,255,255,0.03);
-    }
-
     .lessonArea {
       width: 100%;
       min-height: 44px;
@@ -3422,10 +3091,6 @@ ut.properties = {
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
-    }
-    .btnBarManual {
-      margin: 0 0 14px;
-      justify-content: flex-start;
     }
     .toggleInline {
       display: flex;
@@ -3620,10 +3285,11 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v2026-02-24.2 (marker: STUNDENPLAN_CARD_v2026-02-24.2)",
+  description: "Stundenplan Card v2026-02-16.2 (marker: STUNDENPLAN_CARD_v2026-02-16.2)",
   preview: !0
 });
 export {
   Xt as StundenplanCard,
   ht as StundenplanCardEditor
 };
+
