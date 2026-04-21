@@ -1,4 +1,4 @@
-const bt = globalThis, Ht = bt.ShadowRoot && (bt.ShadyCSS === void 0 || bt.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, Lt = /* @__PURE__ */ Symbol(), qt = /* @__PURE__ */ new WeakMap();
+const bt = globalThis, Bt = bt.ShadowRoot && (bt.ShadyCSS === void 0 || bt.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, Lt = /* @__PURE__ */ Symbol(), qt = /* @__PURE__ */ new WeakMap();
 let de = class {
   constructor(e, t, i) {
     if (this._$cssResult$ = !0, i !== Lt) throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");
@@ -7,7 +7,7 @@ let de = class {
   get styleSheet() {
     let e = this.o;
     const t = this.t;
-    if (Ht && e === void 0) {
+    if (Bt && e === void 0) {
       const i = t !== void 0 && t.length === 1;
       i && (e = qt.get(t)), e === void 0 && ((this.o = e = new CSSStyleSheet()).replaceSync(this.cssText), i && qt.set(t, e));
     }
@@ -25,12 +25,12 @@ const Ee = (e) => new de(typeof e == "string" ? e : e + "", void 0, Lt), ue = (e
   })(n) + e[r + 1], e[0]);
   return new de(i, e, Lt);
 }, Me = (e, t) => {
-  if (Ht) e.adoptedStyleSheets = t.map((i) => i instanceof CSSStyleSheet ? i : i.styleSheet);
+  if (Bt) e.adoptedStyleSheets = t.map((i) => i instanceof CSSStyleSheet ? i : i.styleSheet);
   else for (const i of t) {
     const s = document.createElement("style"), n = bt.litNonce;
     n !== void 0 && s.setAttribute("nonce", n), s.textContent = i.cssText, e.appendChild(s);
   }
-}, Gt = Ht ? (e) => e : (e) => e instanceof CSSStyleSheet ? ((t) => {
+}, Gt = Bt ? (e) => e : (e) => e instanceof CSSStyleSheet ? ((t) => {
   let i = "";
   for (const s of t.cssRules) i += s.cssText;
   return Ee(i);
@@ -253,7 +253,7 @@ function fe(e, t) {
   if (!It(e) || !e.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return ee !== void 0 ? ee.createHTML(t) : t;
 }
-const Be = (e, t) => {
+const He = (e, t) => {
   const i = e.length - 1, s = [];
   let n, r = t === 2 ? "<svg>" : t === 3 ? "<math>" : "", o = st;
   for (let a = 0; a < i; a++) {
@@ -270,7 +270,7 @@ class ht {
     let n;
     this.parts = [];
     let r = 0, o = 0;
-    const a = t.length - 1, l = this.parts, [d, _] = Be(t, i);
+    const a = t.length - 1, l = this.parts, [d, _] = He(t, i);
     if (this.el = ht.createElement(d, s), V.currentNode = this.el.content, i === 2 || i === 3) {
       const u = this.el.content.firstChild;
       u.replaceWith(...u.childNodes);
@@ -308,7 +308,7 @@ function X(e, t, i = e, s) {
   const r = ct(t) ? void 0 : t._$litDirective$;
   return n?.constructor !== r && (n?._$AO?.(!1), r === void 0 ? n = void 0 : (n = new r(e), n._$AT(e, i, s)), s !== void 0 ? (i._$Co ?? (i._$Co = []))[s] = n : i._$Cl = n), n !== void 0 && (t = X(e, n._$AS(e, t.values), n, s)), t;
 }
-class He {
+class Be {
   constructor(t, i) {
     this._$AV = [], this._$AN = void 0, this._$AD = t, this._$AM = i;
   }
@@ -370,7 +370,7 @@ class dt {
     const { values: i, _$litType$: s } = t, n = typeof s == "number" ? this._$AC(t) : (s.el === void 0 && (s.el = ht.createElement(fe(s.h, s.h[0]), this.options)), s);
     if (this._$AH?._$AD === n) this._$AH.p(i);
     else {
-      const r = new He(n, this), o = r.u(this.options);
+      const r = new Be(n, this), o = r.u(this.options);
       r.p(i), this.T(o), this._$AH = r;
     }
   }
@@ -791,6 +791,7 @@ const D = (nt = class extends q {
       show_title: !0,
       title_font_size: 20,
       title_font_family: "",
+      show_header_date: !0,
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       view_mode: "week",
       display_mode: "default",
@@ -861,7 +862,7 @@ const D = (nt = class extends q {
     const t = nt.getStubConfig(), i = Array.isArray(e.days) && e.days.length ? e.days.map((y) => (y ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], s = (Array.isArray(e.rows) ? e.rows : []).map((y) => {
       if (G(y))
         return { break: !0, time: (y.time ?? "").toString(), label: (y.label ?? "Pause").toString() };
-      const A = Array.isArray(y?.cells) ? y.cells : [], T = Array.from({ length: i.length }, (N, H) => (A[H] ?? "").toString()), B = Array.isArray(y?.cell_styles) ? y.cell_styles : [], tt = Array.from({ length: i.length }, (N, H) => Xe(B[H])), ut = (y?.time ?? "").toString(), et = yt(ut), Nt = (y?.start ?? "").toString().trim(), jt = (y?.end ?? "").toString().trim(), gt = {
+      const A = Array.isArray(y?.cells) ? y.cells : [], T = Array.from({ length: i.length }, (N, B) => (A[B] ?? "").toString()), H = Array.isArray(y?.cell_styles) ? y.cell_styles : [], tt = Array.from({ length: i.length }, (N, B) => Xe(H[B])), ut = (y?.time ?? "").toString(), et = yt(ut), Nt = (y?.start ?? "").toString().trim(), jt = (y?.end ?? "").toString().trim(), gt = {
         time: ut,
         start: Nt || et.start || void 0,
         end: jt || et.end || void 0,
@@ -873,8 +874,8 @@ const D = (nt = class extends q {
       if (y === "manual" || y === "entity" || y === "json" || y === "sensor") return y;
       const A = ((e.source_entity ?? t.source_entity) + "").toString().trim();
       if (A) {
-        const T = ((e.source_attribute ?? "") + "").toString().trim(), B = ((e.source_time_key ?? "") + "").toString().trim();
-        return !(/_woche$/i.test(A) && (T === "" || T === "rows_table") && (B === "" || B === "time")) && (T || B) ? "legacy" : "entity";
+        const T = ((e.source_attribute ?? "") + "").toString().trim(), H = ((e.source_time_key ?? "") + "").toString().trim();
+        return !(/_woche$/i.test(A) && (T === "" || T === "rows_table") && (H === "" || H === "time")) && (T || H) ? "legacy" : "entity";
       }
       return "manual";
     })(), m = (e.source_entity ?? t.source_entity).toString().trim(), x = (e.source_entity_integration ?? "").toString().trim(), S = (e.source_entity_legacy ?? "").toString().trim(), k = p === "sensor" ? S || m : p === "entity" && x || m, v = (e.week_offset_entity ?? "").toString().trim() || si(k);
@@ -884,6 +885,7 @@ const D = (nt = class extends q {
       show_title: e.show_title ?? t.show_title,
       title_font_size: Number.isFinite(Number(e.title_font_size)) ? Math.max(0, Math.min(40, Number(e.title_font_size))) : t.title_font_size,
       title_font_family: (e.title_font_family ?? t.title_font_family ?? "").toString(),
+      show_header_date: e.show_header_date ?? t.show_header_date,
       days: i,
       view_mode: r,
       display_mode: a,
@@ -1367,10 +1369,10 @@ const D = (nt = class extends q {
     return d(n);
   }
   renderCardLayout(e, t = null, i = !1) {
-    const s = this._rowsCache, n = this.getHeaderDaysFromEntity(e), r = this.getTodayIndex(e.days ?? [], n), o = ((t ?? this._uiViewMode ?? e.view_mode ?? "week") + "").toString(), a = Number(e.days_ahead), l = Number.isFinite(a) ? Math.max(0, Math.min(6, Math.floor(a))) : 0, d = "1px solid var(--divider-color)", _ = ae(e.highlight_today_color ?? "", 0.12), u = ae(e.highlight_current_color ?? "", 0.18), h = (e.highlight_current_text_color ?? "").toString().trim(), g = (e.highlight_current_time_text_color ?? "").toString().trim(), f = e.week_mode !== "off", p = f ? this.getActiveWeek(e) : null, m = this.getWeekOffsetValue(e), x = (e.source_type ?? "manual").toString(), S = !i && (e.week_offset_entity ?? "").trim().length > 0, k = S && (x === "entity" || x === "sensor" && (e.week_mode ?? "off") !== "off"), v = n && n.length >= (e.days?.length ?? 0) ? n : null, y = this.getHeaderUpdatedFromEntity(e), A = this.getBaseDate(e), T = this.mondayOfWeek(A), B = this.normalizeTapAction(e.tap_action), tt = i ? "default" : e.display_mode ?? "default", ut = `${tt === "compact" ? "compact" : ""}${!i && B.action !== "none" ? " tappable" : ""}${i ? " popupCard" : ""}`, et = e.show_title !== !1 && (e.title ?? "").toString().trim().length > 0, Nt = this.getTitleStyle(e), jt = et || f || k, gt = o === "rolling" && (i || !k || (m ?? 0) === 0), N = gt ? this.getRollingVisibleSlots(e, l) : [], H = N.length ? N.map((w) => w.orig) : Array.from({ length: e.days?.length ?? 0 }, (w, b) => b), pt = H.map((w) => e.days[w]), L = N.length ? N.map((w) => w.date) : null, Yt = (() => {
+    const s = this._rowsCache, n = this.getHeaderDaysFromEntity(e), r = this.getTodayIndex(e.days ?? [], n), o = ((t ?? this._uiViewMode ?? e.view_mode ?? "week") + "").toString(), a = Number(e.days_ahead), l = Number.isFinite(a) ? Math.max(0, Math.min(6, Math.floor(a))) : 0, d = "1px solid var(--divider-color)", _ = ae(e.highlight_today_color ?? "", 0.12), u = ae(e.highlight_current_color ?? "", 0.18), h = (e.highlight_current_text_color ?? "").toString().trim(), g = (e.highlight_current_time_text_color ?? "").toString().trim(), f = e.week_mode !== "off", p = f ? this.getActiveWeek(e) : null, m = this.getWeekOffsetValue(e), x = (e.source_type ?? "manual").toString(), S = !i && (e.week_offset_entity ?? "").trim().length > 0, k = S && (x === "entity" || x === "sensor" && (e.week_mode ?? "off") !== "off"), v = n && n.length >= (e.days?.length ?? 0) ? n : null, y = this.getHeaderUpdatedFromEntity(e), A = this.getBaseDate(e), T = this.mondayOfWeek(A), H = this.normalizeTapAction(e.tap_action), tt = i ? "default" : e.display_mode ?? "default", ut = `${tt === "compact" ? "compact" : ""}${!i && H.action !== "none" ? " tappable" : ""}${i ? " popupCard" : ""}`, et = e.show_title !== !1 && (e.title ?? "").toString().trim().length > 0, Nt = this.getTitleStyle(e), jt = et || f || k, gt = o === "rolling" && (i || !k || (m ?? 0) === 0), N = gt ? this.getRollingVisibleSlots(e, l) : [], B = N.length ? N.map((w) => w.orig) : Array.from({ length: e.days?.length ?? 0 }, (w, b) => b), pt = B.map((w) => e.days[w]), L = N.length ? N.map((w) => w.date) : null, Yt = (() => {
       const w = /* @__PURE__ */ new Map();
-      return !v || !y || v.forEach((b, E) => {
-        const J = y[E];
+      return !v || !y || v.forEach((b, M) => {
+        const J = y[M];
         b instanceof Date && J && w.set(this.fmtYMD(b), J);
       }), w;
     })();
@@ -1402,12 +1404,12 @@ const D = (nt = class extends q {
               <tr>
                 <th class="time">Stunde</th>
                 ${pt.map((w, b) => {
-      const E = H[b], J = e.highlight_today && (L ? this.fmtYMD(L[b]) === this.fmtYMD(/* @__PURE__ */ new Date()) : E === r) ? "today" : "";
+      const M = B[b], J = e.highlight_today && (L ? this.fmtYMD(L[b]) === this.fmtYMD(/* @__PURE__ */ new Date()) : M === r) ? "today" : "";
       let j = "";
       if (L?.[b] instanceof Date)
         j = this.fmtDDMMYYYY(L[b]);
       else if (v)
-        j = this.fmtDDMMYYYY(v[E]);
+        j = this.fmtDDMMYYYY(v[M]);
       else {
         const _t = he(w);
         if (_t) {
@@ -1418,8 +1420,8 @@ const D = (nt = class extends q {
       return c`
                     <th class=${J} style=${`--sp-hl:${_};`}>
                       <div>${w}</div>
-                      <div class="thDate">${j}</div>
-                      ${L?.[b] ? Yt.get(this.fmtYMD(L[b])) ? c`<div class="thUpdated">(aktualisiert: ${Yt.get(this.fmtYMD(L[b]))})</div>` : c`` : y?.[E] ? c`<div class="thUpdated">(aktualisiert: ${y[E]})</div>` : c``}
+                      ${e.show_header_date !== !1 ? c`<div class="thDate">${j}</div>` : c``}
+                      ${L?.[b] ? Yt.get(this.fmtYMD(L[b])) ? c`<div class="thUpdated">(aktualisiert: ${Yt.get(this.fmtYMD(L[b]))})</div>` : c`` : y?.[M] ? c`<div class="thUpdated">(aktualisiert: ${y[M]})</div>` : c``}
                     </th>
                   `;
     })}
@@ -1438,7 +1440,7 @@ const D = (nt = class extends q {
                     </tr>
                   `;
       }
-      const b = w, E = b.cells ?? [], J = b.cell_styles ?? [], j = !!b.start && !!b.end && this.isNowBetween(b.start, b.end), _t = r >= 0 ? E[r] ?? "" : "", ft = r >= 0 ? this.filterCellText(_t, e) : "", xe = r >= 0 ? wt(ft) : !1, Pt = !(e.free_only_column_highlight && xe), Jt = yt(b.time), Se = !!(Jt.start && Jt.end), Kt = !Se && b.start && b.end ? `${b.start}–${b.end}` : "";
+      const b = w, M = b.cells ?? [], J = b.cell_styles ?? [], j = !!b.start && !!b.end && this.isNowBetween(b.start, b.end), _t = r >= 0 ? M[r] ?? "" : "", ft = r >= 0 ? this.filterCellText(_t, e) : "", xe = r >= 0 ? wt(ft) : !1, Pt = !(e.free_only_column_highlight && xe), Jt = yt(b.time), Se = !!(Jt.start && Jt.end), Kt = !Se && b.start && b.end ? `${b.start}–${b.end}` : "";
       let Rt = `--sp-hl:${u};`;
       return Pt && e.highlight_current && j && (Rt += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), Pt && j && e.highlight_current_time_text && g && (Rt += `color:${g};`), c`
                   <tr>
@@ -1450,7 +1452,7 @@ const D = (nt = class extends q {
                     </td>
 
                     ${pt.map((it, zt) => {
-        const F = H[zt], K = this.filterCellText(E[F] ?? "", e), mt = J[F] ?? null, ke = e.highlight_today && F === r ? "today" : "";
+        const F = B[zt], K = this.filterCellText(M[F] ?? "", e), mt = J[F] ?? null, ke = e.highlight_today && F === r ? "today" : "";
         let Zt = `--sp-hl:${_};` + ei(mt, d);
         const Ae = !wt(K);
         return Pt && Ae && j && e.highlight_current_text && h && r >= 0 && F === r && (Zt += `color:${h};`), c`<td class=${ke} style=${Zt}>${this.renderCell(K, e)}</td>`;
@@ -1843,7 +1845,7 @@ function Ut(e, t, i) {
     })
   );
 }
-function M(e, t = !1) {
+function E(e, t = !1) {
   if (typeof e == "boolean") return e;
   if (e == null) return t;
   const i = String(e).trim().toLowerCase();
@@ -1855,7 +1857,7 @@ function ni(e) {
 function ri(e) {
   return (e ?? []).map((t) => (t ?? "").toString().trim()).filter(Boolean).join(", ");
 }
-const Bt = class extends q {
+const Ht = class extends q {
   constructor() {
     super(...arguments), this._unsubEntities = null, this._didSubEntities = !1, this._open = {
       general: !1,
@@ -2217,11 +2219,7 @@ const Bt = class extends q {
       "Allgemein",
       "general",
       c`
-            <div class="infoBox">
-              Lege hier zuerst Titel, Schultage und den gewünschten Ansichtsmodus fest.
-              Diese Einstellungen bestimmen, wie die Karte später aufgebaut wird.
-            </div>
-
+<div class="generalDivider first">Grunddaten</div>
             <div class="grid2">
               <ha-textfield label="Titel der Karte" .value=${t.title ?? ""} @input=${(i) => this.onText(i, "title")}></ha-textfield>
 
@@ -2233,9 +2231,14 @@ const Bt = class extends q {
               ></ha-textfield>
             </div>
 
+            <div class="generalDivider">Titel & Kopfzeile</div>
             <div class="grid3">
-              <ha-switch .checked=${M(t.show_title, !0)} @change=${(i) => this.onToggle(i, "show_title")}></ha-switch>
+              <ha-switch .checked=${E(t.show_title, !0)} @change=${(i) => this.onToggle(i, "show_title")}></ha-switch>
               <div class="switchLabel">Titelzeile anzeigen</div>
+              <div></div>
+
+              <ha-switch .checked=${E(t.show_header_date, !0)} @change=${(i) => this.onToggle(i, "show_header_date")}></ha-switch>
+              <div class="switchLabel">Datum anzeigen</div>
               <div></div>
 
               <div></div>
@@ -2255,6 +2258,7 @@ const Bt = class extends q {
               ></ha-textfield>
             </div>
 
+            <div class="generalDivider">Ansicht</div>
             <div class="grid2">
               <ha-form
                 .hass=${this.hass}
@@ -2313,6 +2317,7 @@ const Bt = class extends q {
               ></ha-form>
 
               ${(t.view_mode ?? "week") === "rolling" ? c`
+                <div class="generalDivider gridFull">Rolling</div>
                 <ha-textfield
                   label="Zusätzliche Tage im Voraus"
                   type="number"
@@ -2360,12 +2365,13 @@ const Bt = class extends q {
                     @input=${(i) => this.onText(i, "rolling_switch_time")}
                     helper="Beispiel: 15:00"
                   ></ha-textfield>
-                ` : c`<div class="infoBox slim">${(t.rolling_switch_mode ?? "midnight") === "after_last_lesson" ? "Der Sprung auf den nächsten Schultag folgt nach der letzten Endzeit aus deinem Plan." : "Der Sprung auf den nächsten Schultag folgt direkt ab Mitternacht."}</div>`}
+                ` : c`<div class="infoBox slim gridFull">${(t.rolling_switch_mode ?? "midnight") === "after_last_lesson" ? "Der Sprung auf den nächsten Schultag folgt nach der letzten Endzeit aus deinem Plan." : "Der Sprung auf den nächsten Schultag folgt direkt ab Mitternacht."}</div>`}
               ` : c``}
             </div>
 
             <div class="hint">„Ab heute (rolling)“ zeigt ab dem Starttag die nächsten passenden Schultage. Beim Blättern in andere Wochen beginnt die Ansicht automatisch am Montag.</div>
 
+            <div class="generalDivider">Tap-Aktion</div>
             <div class="grid2">
               <ha-form
                 .hass=${this.hass}
@@ -2410,30 +2416,30 @@ const Bt = class extends q {
       "highlights",
       c`
             <div class="grid3">
-              <ha-switch .checked=${M(t.highlight_today, !0)} @change=${(i) => this.onToggle(i, "highlight_today")}></ha-switch>
+              <ha-switch .checked=${E(t.highlight_today, !0)} @change=${(i) => this.onToggle(i, "highlight_today")}></ha-switch>
               <div class="switchLabel">Heute-Spalte hervorheben</div>
               <div></div>
 
-              <ha-switch .checked=${M(t.highlight_current, !0)} @change=${(i) => this.onToggle(i, "highlight_current")}></ha-switch>
+              <ha-switch .checked=${E(t.highlight_current, !0)} @change=${(i) => this.onToggle(i, "highlight_current")}></ha-switch>
               <div class="switchLabel">Aktuelle Stunde hervorheben</div>
               <div></div>
 
-              <ha-switch .checked=${M(t.highlight_breaks, !1)} @change=${(i) => this.onToggle(i, "highlight_breaks")}></ha-switch>
+              <ha-switch .checked=${E(t.highlight_breaks, !1)} @change=${(i) => this.onToggle(i, "highlight_breaks")}></ha-switch>
               <div class="switchLabel">Pause hervorheben</div>
               <div></div>
 
               <ha-switch
-                .checked=${M(t.free_only_column_highlight, !0)}
+                .checked=${E(t.free_only_column_highlight, !0)}
                 @change=${(i) => this.onToggle(i, "free_only_column_highlight")}
               ></ha-switch>
               <div class="switchLabel">Nur wenn heute-Spalte nicht frei</div>
               <div></div>
 
-              <ha-switch .checked=${M(t.highlight_current_text, !1)} @change=${(i) => this.onToggle(i, "highlight_current_text")}></ha-switch>
+              <ha-switch .checked=${E(t.highlight_current_text, !1)} @change=${(i) => this.onToggle(i, "highlight_current_text")}></ha-switch>
               <div class="switchLabel">Textfarbe in aktueller Stunde</div>
               <ha-textfield label="Textfarbe" .value=${t.highlight_current_text_color ?? ""} @input=${(i) => this.onText(i, "highlight_current_text_color")}></ha-textfield>
 
-              <ha-switch .checked=${M(t.highlight_current_time_text, !1)} @change=${(i) => this.onToggle(i, "highlight_current_time_text")}></ha-switch>
+              <ha-switch .checked=${E(t.highlight_current_time_text, !1)} @change=${(i) => this.onToggle(i, "highlight_current_time_text")}></ha-switch>
               <div class="switchLabel">Zeitspalte Textfarbe (aktuell)</div>
               <ha-textfield label="Zeitfarbe" .value=${t.highlight_current_time_text_color ?? ""} @input=${(i) => this.onText(i, "highlight_current_time_text_color")}></ha-textfield>
             </div>
@@ -2571,7 +2577,7 @@ placeholder="sensor.stundenplan"
                       .hass=${this.hass}
                       .data=${{
         week_mode: t.week_mode ?? "off",
-        week_a_is_even_kw: M(t.week_a_is_even_kw, !0)
+        week_a_is_even_kw: E(t.week_a_is_even_kw, !0)
       }}
                       .schema=${[
         {
@@ -2606,7 +2612,7 @@ placeholder="sensor.stundenplan"
           const s = i?.detail?.value ?? {}, n = s.week_mode ?? t.week_mode ?? "off";
           n !== (t.week_mode ?? "off") && this.setValue("week_mode", n);
           const r = s.week_a_is_even_kw;
-          typeof r == "boolean" && r !== M(t.week_a_is_even_kw, !0) && this.setValue("week_a_is_even_kw", r);
+          typeof r == "boolean" && r !== E(t.week_a_is_even_kw, !0) && this.setValue("week_a_is_even_kw", r);
         } catch (s) {
           console.error("stundenplan-card editor: week settings change failed", s);
         }
@@ -2623,10 +2629,10 @@ placeholder="sensor.stundenplan"
     `;
   }
 };
-Bt.properties = {
+Ht.properties = {
   hass: {},
   _config: { state: !0 }
-}, Bt.styles = ue`
+}, Ht.styles = ue`
     .wrap {
       padding: 12px;
       display: grid;
@@ -2691,6 +2697,34 @@ Bt.properties = {
       display: flex;
       align-items: center;
       min-height: 56px;
+    }
+    .generalDivider {
+      margin: 18px 0 8px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: var(--primary-text-color);
+    }
+    .generalDivider.first {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
+    }
+    .generalDivider.gridFull {
+      grid-column: 1 / -1;
+      margin-top: 6px;
+    }
+    .gridFull {
+      grid-column: 1 / -1;
+    }
+    .generalHint {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
     }
     code {
       font-family: var(--code-font-family, monospace);
@@ -2968,7 +3002,7 @@ Bt.properties = {
       background: rgba(219,68,55,0.18);
     }
   `;
-let $e = Bt;
+let $e = Ht;
 C([
   U()
 ], $e.prototype, "_open", 2);

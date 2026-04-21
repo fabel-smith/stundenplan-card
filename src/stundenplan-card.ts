@@ -814,6 +814,7 @@ const v = (D = class extends U {
       show_title: !0,
       title_font_size: 20,
       title_font_family: "",
+      show_header_date: !0,
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       view_mode: "week",
       display_mode: "default",
@@ -917,6 +918,7 @@ const v = (D = class extends U {
       show_title: t.show_title ?? e.show_title,
       title_font_size: Number.isFinite(Number(t.title_font_size)) ? Math.max(0, Math.min(40, Number(t.title_font_size))) : e.title_font_size,
       title_font_family: (t.title_font_family ?? e.title_font_family ?? "").toString(),
+      show_header_date: t.show_header_date ?? e.show_header_date,
       days: s,
       view_mode: vm,
       display_mode: displayMode,
@@ -1624,7 +1626,7 @@ getRowsResolved(t) {
       return d`
                     <th class=${W} style=${`--sp-hl:${n};`}>
                       <div>${y}</div>
-                      <div class="thDate">${b}</div>
+                      ${t.show_header_date !== !1 ? d`<div class="thDate">${b}</div>` : d``}
                       ${rollingDates?.[m] ? (updMap.get(this.fmtYMD(rollingDates[m])) ? d`<div class="thUpdated">(aktualisiert: ${updMap.get(this.fmtYMD(rollingDates[m]))})</div>` : d``) : (upd?.[orig] ? d`<div class="thUpdated">(aktualisiert: ${upd[orig]})</div>` : d``)}
                     </th>
                   `;
@@ -2504,11 +2506,7 @@ const ut = class ut extends U {
       "Allgemein",
       "general",
       d`
-            <div class="infoBox">
-              Lege hier zuerst Titel, Schultage und den gewünschten Ansichtsmodus fest.
-              Diese Einstellungen bestimmen, wie die Karte später aufgebaut wird.
-            </div>
-
+<div class="generalDivider first">Grunddaten</div>
             <div class="grid2">
               <ha-textfield label="Titel der Karte" .value=${t.title ?? ""} @input=${(e) => this.onText(e, "title")}></ha-textfield>
 
@@ -2520,9 +2518,14 @@ const ut = class ut extends U {
               ></ha-textfield>
             </div>
 
+            <div class="generalDivider">Titel & Kopfzeile</div>
             <div class="grid3">
               <ha-switch .checked=${E(t.show_title, !0)} @change=${(e) => this.onToggle(e, "show_title")}></ha-switch>
               <div class="switchLabel">Titelzeile anzeigen</div>
+              <div></div>
+
+              <ha-switch .checked=${E(t.show_header_date, !0)} @change=${(e) => this.onToggle(e, "show_header_date")}></ha-switch>
+              <div class="switchLabel">Datum anzeigen</div>
               <div></div>
 
               <div></div>
@@ -2542,6 +2545,7 @@ const ut = class ut extends U {
               ></ha-textfield>
             </div>
 
+            <div class="generalDivider">Ansicht</div>
             <div class="grid2">
               <ha-form
                 .hass=${this.hass}
@@ -2600,6 +2604,7 @@ const ut = class ut extends U {
               ></ha-form>
 
               ${(t.view_mode ?? "week") === "rolling" ? d`
+                <div class="generalDivider gridFull">Rolling</div>
                 <ha-textfield
                   label="Zusätzliche Tage im Voraus"
                   type="number"
@@ -2647,7 +2652,7 @@ const ut = class ut extends U {
                     @input=${(e) => this.onText(e, "rolling_switch_time")}
                     helper="Beispiel: 15:00"
                   ></ha-textfield>
-                ` : d`<div class="infoBox slim">${(t.rolling_switch_mode ?? "midnight") === "after_last_lesson"
+                ` : d`<div class="infoBox slim gridFull">${(t.rolling_switch_mode ?? "midnight") === "after_last_lesson"
                   ? "Der Sprung auf den nächsten Schultag folgt nach der letzten Endzeit aus deinem Plan."
                   : "Der Sprung auf den nächsten Schultag folgt direkt ab Mitternacht."}</div>`}
               ` : d``}
@@ -2655,6 +2660,7 @@ const ut = class ut extends U {
 
             <div class="hint">„Ab heute (rolling)“ zeigt ab dem Starttag die nächsten passenden Schultage. Beim Blättern in andere Wochen beginnt die Ansicht automatisch am Montag.</div>
 
+            <div class="generalDivider">Tap-Aktion</div>
             <div class="grid2">
               <ha-form
                 .hass=${this.hass}
@@ -2996,6 +3002,34 @@ ut.properties = {
       align-items: center;
       min-height: 56px;
     }
+    .generalDivider {
+      margin: 18px 0 8px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: var(--primary-text-color);
+    }
+    .generalDivider.first {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
+    }
+    .generalDivider.gridFull {
+      grid-column: 1 / -1;
+      margin-top: 6px;
+    }
+    .gridFull {
+      grid-column: 1 / -1;
+    }
+    .generalHint {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
     code {
       font-family: var(--code-font-family, monospace);
       font-size: 12px;
@@ -3292,4 +3326,5 @@ export {
   Xt as StundenplanCard,
   ht as StundenplanCardEditor
 };
+
 
