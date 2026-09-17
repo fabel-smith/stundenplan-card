@@ -2199,7 +2199,7 @@ const ut = class ut extends U {
       let derivedOffset = "";
       if (sid) {
         // sensor.07d_woche -> number.07d_woche_offset
-        derivedOffset = sid.replace(/^sensor\./, "number.") + "_offset";
+        derivedOffset = this.hass?.states?.[sid]?.attributes?.week_offset_entity || je(sid);
       }
 
       this.emit({
@@ -2762,7 +2762,7 @@ const ut = class ut extends U {
             select: {
               options: [
                 { value: "manual", label: "Manuell (rows)" },
-                { value: "entity", label: "Stundenplan24 (Integration)" },
+                { value: "entity", label: "Stundenplan Suite (Integration)" },
                 ...(((t.source_type ?? "manual") === "json")
                   ? [{ value: "json", label: "JSON-Datei (deprecated)" }]
                   : []),
@@ -2786,12 +2786,12 @@ const ut = class ut extends U {
             </div>
 
             ${(t.source_type ?? "manual") === "entity" ? d`
-                  <div class="hint">Stundenplan24: bitte einen <code>sensor.*_woche</code> auswählen.</div>
+                  <div class="hint">Stundenplan Suite: Wochensensor für Stundenplan24 oder Schulmanager auswählen.</div>
 
                   ${this.isHaEntityPickerAvailable() ? d`
                     ${(() => {
                       const all = Object.keys(this.hass?.states ?? {});
-                      const matches = all.filter((id) => /^sensor\./.test(id) && /_woche$/i.test(id));
+                      const matches = all.filter((id) => /^sensor\./.test(id) && (/_woche$/i.test(id) || this.hass?.states?.[id]?.attributes?.rows_table != null));
                       // Better loading hint: show only if we have very few states OR none of the *_woche sensors exist yet
                       return (all.length < 5 || matches.length === 0)
                         ? d`<div class="hint">Keine <code>*_woche</code>-Sensoren gefunden – Integration noch nicht geladen?</div>`
@@ -2807,9 +2807,9 @@ const ut = class ut extends U {
                           ? entityId
                           : (entityId && typeof entityId === "object" && "entity_id" in entityId ? entityId.entity_id : "");
                         const sid = (id ?? "").toString();
-                        return !sid || /_woche$/i.test(sid);
+                        return !sid || /_woche$/i.test(sid) || this.hass?.states?.[sid]?.attributes?.rows_table != null;
                       }}
-                      .label=${"Stundenplan24 Sensor"}
+                      .label=${"Stundenplan Suite Sensor"}
                       @value-changed=${(e) => {
                         try {
                           const v = e.detail?.value ?? e.target?.value;
