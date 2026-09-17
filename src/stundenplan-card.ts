@@ -2361,7 +2361,7 @@ const ut = class ut extends U {
       </div>
 
       <div class="sub" style="margin-bottom:10px;">
-        Pro Zeile: Zeit + optional Start/Ende. Per Klick in der Vorschau springst du zur passenden Zelle.
+        Pro Zeile: Zeit sowie optional Start und Ende. Ein Klick in der Vorschau öffnet direkt die passende Zelle.
       </div>
 
       ${rows.map((r, idx) => {
