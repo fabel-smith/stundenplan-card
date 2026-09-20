@@ -815,6 +815,7 @@ const v = (D = class extends U {
       title_font_size: 20,
       title_font_family: "",
       show_header_date: !0,
+      show_time: !0,
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       view_mode: "week",
       display_mode: "default",
@@ -919,6 +920,7 @@ const v = (D = class extends U {
       title_font_size: Number.isFinite(Number(t.title_font_size)) ? Math.max(0, Math.min(40, Number(t.title_font_size))) : e.title_font_size,
       title_font_family: (t.title_font_family ?? e.title_font_family ?? "").toString(),
       show_header_date: t.show_header_date ?? e.show_header_date,
+      show_time: E(t.show_time ?? t.show_period ?? t.show_stunde, e.show_time),
       days: s,
       view_mode: vm,
       display_mode: displayMode,
@@ -1572,6 +1574,7 @@ getRowsResolved(t) {
     const e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], u), vm = ((vmOverride ?? this._uiViewMode ?? t.view_mode ?? "week") + "").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(),
         p = !popup && (t.week_offset_entity ?? "").trim().length > 0,
         showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), g = u && u.length >= (t.days?.length ?? 0) ? u : null, upd = this.getHeaderUpdatedFromEntity(t), O = this.getBaseDate(t), B = this.mondayOfWeek(O), tapAction = this.normalizeTapAction(t.tap_action), displayMode = popup ? "default" : (t.display_mode ?? "default"), cardClass = `${displayMode === "compact" ? "compact" : ""}${!popup && tapAction.action !== "none" ? " tappable" : ""}${popup ? " popupCard" : ""}`, showTitle = t.show_title !== !1 && ((t.title ?? "").toString().trim().length > 0), titleStyle = this.getTitleStyle(t), showHeaderRow = showTitle || c || showPager,
+        showTime = t.show_time !== !1,
         rollingActive = vm === "rolling" && (popup || !showPager || (h ?? 0) === 0),
         rollingSlots = rollingActive ? this.getRollingVisibleSlots(t, daysAhead) : [],
         idxs = rollingSlots.length ? rollingSlots.map((y) => y.orig) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m),
@@ -1608,7 +1611,7 @@ getRowsResolved(t) {
           <table>
             <thead>
               <tr>
-                <th class="time">Stunde</th>
+                ${showTime ? d`<th class="time">Stunde</th>` : d``}
                 ${daysVis.map((y, m) => { const orig = idxs[m];
       const W = t.highlight_today && (rollingDates ? this.fmtYMD(rollingDates[m]) === this.fmtYMD(new Date()) : orig === s) ? "today" : "";
       let b = "";
@@ -1635,13 +1638,13 @@ getRowsResolved(t) {
             </thead>
 
             <tbody>
-              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${(daysVis.length) + 1}>${this._noDataMsg}</td></tr>` : e.map((y) => {
+              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${(daysVis.length) + (showTime ? 1 : 0)}>${this._noDataMsg}</td></tr>` : e.map((y) => {
       if (ct(y)) {
         const z = mt(y.time), P = !!z.start && !!z.end && this.isNowBetween(z.start, z.end), F = !!t.highlight_breaks && P;
         let I = `--sp-hl:${o};`, G = "";
         return F && (I += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", G += `--sp-hl:${o}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), F && t.highlight_current_time_text && a && (I += `color:${a};`), d`
                     <tr class="break">
-                      <td class="time" style=${I}>${y.time}</td>
+                      ${showTime ? d`<td class="time" style=${I}>${y.time}</td>` : d``}
                       <td colspan=${daysVis.length} style=${G}>${y.label ?? ""}</td>
                     </tr>
                   `;
@@ -1652,12 +1655,14 @@ getRowsResolved(t) {
       let gt = `--sp-hl:${o};`;
       return pt && t.highlight_current && w && (gt += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), pt && w && t.highlight_current_time_text && a && (gt += `color:${a};`), d`
                   <tr>
+                    ${showTime ? d`
                     <td class="time" style=${gt}>
                       <div class="timeWrap">
                         <div class="timeSt">${m.time}</div>
                         ${Et ? d`<div class="timeHm">${Et}</div>` : d``}
                       </div>
                     </td>
+                    ` : d``}
 
                     ${daysVis.map((z, P) => { const orig = idxs[P];
         const F = this.filterCellText(W[orig] ?? "", t), I = b[orig] ?? null, G = t.highlight_today && orig === s ? "today" : "";
@@ -2526,6 +2531,10 @@ const ut = class ut extends U {
 
               <ha-switch .checked=${E(t.show_header_date, !0)} @change=${(e) => this.onToggle(e, "show_header_date")}></ha-switch>
               <div class="switchLabel">Datum anzeigen</div>
+              <div></div>
+
+              <ha-switch .checked=${E(t.show_time ?? t.show_period ?? t.show_stunde, !0)} @change=${(e) => this.onToggle(e, "show_time")}></ha-switch>
+              <div class="switchLabel">Stunden-Spalte anzeigen</div>
               <div></div>
 
               <div></div>

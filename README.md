@@ -26,6 +26,7 @@ Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle
 ## ✨ Features
 
 -   Tabellenansicht (Tage × Stunden)
+-   **Erste Spalte (Stunde / Zeit) ein-/ausblendbar** (`show_time: false`)
 -   **Kompletter visueller Editor (kein YAML notwendig)**
 -   Manueller Stundenplan direkt im Dialog bearbeitbar
 -   Aufklappbare Stunden (Accordion-Editor)
@@ -58,6 +59,7 @@ erstellt werden ---\
 kein YAML und keine JSON-Dateien notwendig.
 
 -   Stunde anklicken → Details bearbeiten
+-   Erste Spalte („Stunde“) ein- oder ausblenden
 -   Fach pro Wochentag eintragen
 -   Lehrer und Raum optional ergänzen
 -   Farben individuell setzen
@@ -90,6 +92,18 @@ Typ:
 > **Hinweis (Browser-Cache):**\
 > Nach einem Update der Card kann es notwendig sein den Browser-Cache zu
 > leeren (`STRG + F5`), da Home Assistant Custom Cards aggressiv cached.
+
+------------------------------------------------------------------------
+
+## ⚙️ Wichtige Optionen (YAML & visueller Editor)
+
+| Option | Typ | Standard | Beschreibung |
+|---|---|---|---|
+| `show_time` | boolean | `true` | Blendet die erste Spalte (Stunde bzw. Uhrzeit) ein (`true`) oder aus (`false`). Unterstützt auch `show_period` und `show_stunde` als Alias. Im visuellen Editor unter **Allgemein → Stunden-Spalte anzeigen**. |
+| `show_title` | boolean | `true` | Titelzeile der Karte anzeigen oder verbergen. |
+| `show_header_date` | boolean | `true` | Datum in den Spaltenköpfen der Tage anzeigen oder verbergen. |
+| `highlight_today` | boolean | `true` | Heutigen Wochentag hervorheben. |
+| `highlight_current` | boolean | `true` | Aktuelles Fach zur aktuellen Zeit hervorheben. |
 
 ------------------------------------------------------------------------
 
