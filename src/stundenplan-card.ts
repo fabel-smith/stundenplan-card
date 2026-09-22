@@ -1577,10 +1577,18 @@ const v = (D = class extends U {
         || /^für\b/i.test(x);
     }, l = (u) => {
       const x = (u ?? "").toString().trim();
-      // Räume: reine Nummern (222), alphanumerisch kurz (SH2-B, SH2-A), oder "044 Aula"
+
+      // Räume:
+      // 134, 131       -> reine Nummer
+      // U04, E18, SH2  -> Buchstaben direkt gefolgt von Zahlen
+      // IT 4, Ph 1     -> Buchstaben, Leerzeichen, Zahlen
+      // KuWe 25        -> längeres Fachraum-Kürzel mit Leerzeichen
+      // SH2-A, SH2/B   -> zusammengesetzte Raumbezeichnungen
+      // 044 Aula       -> Nummer plus Bezeichnung
       return /^\d{1,4}$/.test(x)
+        || /^[A-Za-zÄÖÜäöüß]{1,8}\s*\d{1,4}$/i.test(x)
         || /^[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}$/i.test(x)
-        || /^\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12}$/.test(x);
+        || /^\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12}$/i.test(x);
     }, a = s.slice(1);
     let c = -1;
     for (let u = 0; u < a.length; u++)
@@ -1755,8 +1763,8 @@ const v = (D = class extends U {
 
     // Heuristik: 6/9/12… Zeilen ohne Notes => als 2+ Spalten rendern (typisch: Fach/Raum/Lehrer je Block)
     const flatLines = (filtered ?? "").split(`\n`).map((c) => c.trim()).filter(Boolean);
-    const roomRe = /^\d{1,4}$/;
-    const teacherRe = /^[A-ZÄÖÜ]{2,6}$/;
+    const roomRe = /^(?:\d{1,4}|[A-Za-zÄÖÜäöüß]{1,8}\s*\d{1,4}|[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}|\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12})$/i;
+    const teacherRe = /^[A-Za-zÄÖÜäöüß]{2,12}$/i;
     const looksLikeSubject = (s: string) => {
       const x = (s ?? "").trim();
       if (!x) return false;
