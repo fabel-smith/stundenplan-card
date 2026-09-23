@@ -654,6 +654,23 @@ function trimTrailingEmptyRows(r, t, e = (s, i, n) => s?.cells?.[n] ?? "") {
   });
   return lastUsed >= 0 ? rows.slice(0, lastUsed + 1) : [];
 }
+function mergedCellInfo(r, t, e) {
+  const rows = Array.isArray(r) ? r : [];
+  if (t < 0 || t >= rows.length || ct(rows[t])) return { covered: !1, span: 1 };
+  const signature = (index) => {
+    if (index < 0 || index >= rows.length || ct(rows[index])) return null;
+    const info = e(rows[index], index) ?? {};
+    const text = (info.text ?? "").toString();
+    if (yt(text)) return null;
+    return JSON.stringify([text, De(info.style)]);
+  };
+  const current = signature(t);
+  if (!current) return { covered: !1, span: 1 };
+  if (signature(t - 1) === current) return { covered: !0, span: 0 };
+  let span = 1;
+  while (signature(t + span) === current) span += 1;
+  return { covered: !1, span };
+}
 function je(r) {
   const t = (r ?? "").toString().trim();
   if (!t.startsWith("sensor.")) return "";
@@ -850,6 +867,7 @@ const v = (D = class extends U {
       show_header_date: !0,
       show_time_column: !0,
       trim_empty_rows: !1,
+      merge_double_lessons: !1,
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       view_mode: "week",
       display_mode: "default",
@@ -947,6 +965,7 @@ const v = (D = class extends U {
       show_header_date: t.show_header_date ?? e.show_header_date,
       show_time_column: t.show_time_column ?? e.show_time_column,
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
+      merge_double_lessons: t.merge_double_lessons ?? e.merge_double_lessons,
       days: s,
       view_mode: vm,
       display_mode: displayMode,
@@ -1709,10 +1728,20 @@ const v = (D = class extends U {
                     </td>` : d``}
 
                     ${daysVis.map((z, P) => { const orig = idxs[P], rowForDay = this.getManualRowForDate(t, m, rowIndex, rollingDates?.[P]), rowCells = rowForDay?.cells ?? W, rowStyles = rowForDay?.cell_styles ?? b;
-        const F = this.filterCellText(rowCells[orig] ?? "", t), I = rowStyles[orig] ?? null, G = t.highlight_today && orig === s ? "today" : "";
+        const F = this.filterCellText(rowCells[orig] ?? "", t), I = rowStyles[orig] ?? null, G = t.highlight_today && orig === s ? "today" : "", merge = t.merge_double_lessons ? mergedCellInfo(visibleRows, rowIndex, (candidate, candidateIndex) => {
+          const resolved = this.getManualRowForDate(t, candidate, candidateIndex, rollingDates?.[P]);
+          return { text: this.filterCellText((resolved?.cells ?? candidate?.cells ?? [])[orig] ?? "", t), style: (resolved?.cell_styles ?? candidate?.cell_styles ?? [])[orig] ?? null };
+        }) : { covered: !1, span: 1 };
+        if (merge.covered) return f;
         let Ct = `--sp-hl:${n};` + Te(I, i);
-        const se = !yt(F);
-        return pt && se && w && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(F, t)}</td>`;
+        const se = !yt(F), mergedCurrent = (() => {
+          if (!focusIsToday || orig !== focusDayIndex || merge.span <= 1) return !1;
+          const firstTime = (rowForDay?.cell_times ?? m.cell_times)?.[orig] ?? null;
+          const lastIndex = rowIndex + merge.span - 1, lastBase = visibleRows[lastIndex], lastRow = this.getManualRowForDate(t, lastBase, lastIndex, rollingDates?.[P]), lastTime = (lastRow?.cell_times ?? lastBase?.cell_times)?.[orig] ?? null;
+          const start = firstTime?.start || rowForDay?.start || m.start, end = lastTime?.end || lastRow?.end || lastBase?.end;
+          return !!start && !!end && this.isNowBetween(start, end);
+        })(), cellCurrent = w || mergedCurrent;
+        return pt && se && cellCurrent && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct} rowspan=${merge.span}>${this.renderCell(F, t)}</td>`;
       })}
                   </tr>
                 `;
@@ -2735,6 +2764,14 @@ const ut = class ut extends U {
                   <div class="sub">Kürzt die Tabelle nach der letzten belegten Stunde der sichtbaren Tage.</div>
                 </div>
                 <ha-switch .checked=${E(t.trim_empty_rows, !1)} @change=${(e) => this.onToggle(e, "trim_empty_rows")}></ha-switch>
+              </div>
+
+              <div class="optRow gridFull">
+                <div>
+                  <div class="optTitle">Gleiche Folgestunden verbinden</div>
+                  <div class="sub">Fasst direkt aufeinanderfolgende gleiche Fächer ohne Pause als Doppelstunde zusammen.</div>
+                </div>
+                <ha-switch .checked=${E(t.merge_double_lessons, !1)} @change=${(e) => this.onToggle(e, "merge_double_lessons")}></ha-switch>
               </div>
 
               ${(t.view_mode ?? "week") === "rolling" ? d`

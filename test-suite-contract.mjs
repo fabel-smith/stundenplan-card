@@ -48,6 +48,15 @@ const longRows = [{cells:['D','']},{break:true},{cells:['','M']},{cells:['','']}
 assert.deepEqual(trimRows(longRows,[0]),[longRows[0]]);
 assert.deepEqual(trimRows(longRows,[0,1]),longRows.slice(0,3));
 assert.deepEqual(trimRows([{cells:['D']},{cells:['---']}],[0]),[{cells:['D']},{cells:['---']}]);
+const normalizeStyle = value => value && typeof value === 'object' ? value : null;
+const mergeInfo = standalone('mergedCellInfo', 'je', {ct:isBreak,yt:isEmpty,De:normalizeStyle});
+const merged = [{cells:['D'],cell_styles:[null]},{cells:['D'],cell_styles:[null]},{break:true},{cells:['D']}];
+const info = (row) => ({text:row.cells?.[0] ?? '',style:row.cell_styles?.[0] ?? null});
+assert.deepEqual(mergeInfo(merged,0,info),{covered:false,span:2});
+assert.deepEqual(mergeInfo(merged,1,info),{covered:true,span:0});
+assert.deepEqual(mergeInfo(merged,3,info),{covered:false,span:1});
+assert.deepEqual(mergeInfo([{cells:['D']},{cells:['']}],0,info),{covered:false,span:1});
+assert.deepEqual(mergeInfo([{cells:['D'],cell_styles:[{color:'red'}]},{cells:['D'],cell_styles:[null]}],0,info),{covered:false,span:1});
 assert(code.includes('Stundenplan Suite (Integration)'));
 assert(code.includes('attributes?.week_offset_entity || je(sid)'));
-console.log('Card contract: 11 assertions passed (actual source methods).');
+console.log('Card contract: 16 assertions passed (actual source methods).');

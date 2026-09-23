@@ -175,6 +175,21 @@ und Freistunden zwischen belegten Stunden bleiben erhalten. In der
 rollierenden Ansicht werden ausschließlich die gerade sichtbaren Tage
 berücksichtigt.
 
+### Doppelstunden verbinden
+
+Unter **Allgemein → Ansicht** können direkt aufeinanderfolgende identische
+Fächer automatisch zu einer gemeinsamen Zelle verbunden werden. In YAML:
+
+```yaml
+merge_double_lessons: true
+```
+
+Die Karte verbindet nur nicht-leere Zellen mit demselben Text und demselben
+Zellstil. Pausenzeilen unterbrechen die Verbindung. Dadurch bleiben echte
+Freistunden erhalten, und Ausfälle oder Änderungen werden nicht versehentlich
+mit regulären Stunden zusammengefasst. Die Markierung der aktuellen Stunde gilt
+für den gesamten verbundenen Zeitraum.
+
 Mehrere Fächer innerhalb einer Stunde sind möglich (z. B.
 Gruppenunterricht / AG / Teilung).\
 Durch eine Leerzeile kann eine Stunde mehrfach unterteilt werden.
