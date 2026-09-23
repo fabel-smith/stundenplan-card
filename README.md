@@ -6,7 +6,7 @@ Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 ![Maintenance](https://img.shields.io/maintenance/yes/2026)
 ![License](https://img.shields.io/github/license/fabel-smith/stundenplan-card)
 
-> **TL;DR** - **Automatischer Stundenplan aus stundenplan24.de?** →
+> **TL;DR** - **Automatischer Stundenplan aus Stundenplan24 oder Schulmanager Online?** →
 > installiere die **stundenplan-suite** - **Stundenplan manuell
 > anzeigen?** → nutze die **stundenplan-card**
 
@@ -16,8 +16,9 @@ Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle
 
 > **Hinweis:**\
 > Diese Card ist das **Frontend**.\
-> Wenn du deinen Stundenplan automatisch aus *stundenplan24.de*
-> importieren möchtest (Sensoren, A/B-Wochen, Auto-Update), nutze die
+> Wenn du deinen Stundenplan automatisch aus *stundenplan24.de* oder aus
+> der Home-Assistant-Integration *Schulmanager Online* übernehmen möchtest,
+> nutze die
 > **stundenplan-suite**:\
 > https://github.com/fabel-smith/stundenplan-suite
 
@@ -175,12 +176,26 @@ Die Card dient sowohl als Anzeige für automatisch importierte Daten
 (*stundenplan-suite*) als auch als vollständig eigenständig gepflegter
 Stundenplan.
 
+Die Suite unterstützt zwei Datenquellen:
+
+- **Stundenplan24** wird direkt von der Suite abgerufen.
+- **Schulmanager Online** wird über die bereits installierte
+  [Schulmanager-Integration](https://github.com/rwunsch/schulmanager-online-hass)
+  angebunden. Die Suite liest deren Kalender- und Stundenplan-Entitäten und
+  erzeugt daraus den einheitlichen Wochensensor für die Karte.
+
+In der Kartenkonfiguration unter **Datenquellen → Stundenplan Suite
+(Integration)** einfach den passenden `*_woche`-Sensor auswählen. Die Karte
+benötigt keine Schulmanager-Zugangsdaten. Weitere Informationen zur Einrichtung
+stehen im Repository der
+[Stundenplan Suite](https://github.com/fabel-smith/stundenplan-suite).
+
 ------------------------------------------------------------------------
 
-## ⚠️ Wichtiger Hinweis zur Nutzung mit stundenplan24
+## ⚠️ Wichtiger Hinweis zu automatischen Datenquellen
 
 Die Nutzung der *stundenplan-suite* bzw. der automatischen
-Datenübernahme aus **stundenplan24.de** erfolgt **auf eigene
+Datenübernahme aus **stundenplan24.de** oder **Schulmanager Online** erfolgt **auf eigene
 Verantwortung**.
 
 Diese Anzeige ist kein offizielles System der Schule.\
