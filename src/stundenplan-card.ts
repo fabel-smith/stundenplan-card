@@ -554,6 +554,19 @@ function De(r) {
   const t = {};
   return typeof r.bg == "string" && r.bg.trim() && (t.bg = r.bg.trim()), typeof r.color == "string" && r.color.trim() && (t.color = r.color.trim()), typeof r.border == "string" && r.border.trim() && (t.border = r.border.trim()), typeof r.bg_alpha == "number" && !Number.isNaN(r.bg_alpha) && (t.bg_alpha = At(r.bg_alpha)), Object.keys(t).length ? t : null;
 }
+function normalizeRowsForDays(r, t) {
+  return (Array.isArray(r) ? r : []).map((e) => {
+    if (ct(e))
+      return { break: !0, time: (e.time ?? "").toString(), label: (e.label ?? "Pause").toString() };
+    const s = Array.isArray(e?.cells) ? e.cells : [], i = Array.from({ length: t.length }, (a, c) => (s[c] ?? "").toString()), n = Array.isArray(e?.cell_styles) ? e.cell_styles : [], o = Array.from({ length: t.length }, (a, c) => De(n[c])), l = (e?.time ?? "").toString(), h = mt(l), f = (e?.start ?? "").toString().trim(), p = (e?.end ?? "").toString().trim(), u = {
+      time: l,
+      start: f || h.start || void 0,
+      end: p || h.end || void 0,
+      cells: i
+    };
+    return o.some((a) => !!a) && (u.cell_styles = o), u;
+  });
+}
 function Me(r) {
   if (!r?.bg) return null;
   const t = r.bg.trim();
@@ -815,6 +828,7 @@ const v = (D = class extends U {
       title_font_size: 20,
       title_font_family: "",
       show_header_date: !0,
+      show_time_column: !0,
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       view_mode: "week",
       display_mode: "default",
@@ -853,7 +867,8 @@ const v = (D = class extends U {
       filter_main_only: !0,
       filter_allow_prefixes: [],
       filter_exclude: [],
-      rows: []
+      rows: [],
+      rows_b: []
     };
   }
   static getConfigElement() {
@@ -884,17 +899,7 @@ const v = (D = class extends U {
     };
   }
   normalizeConfig(t) {
-    const e = D.getStubConfig(), s = Array.isArray(t.days) && t.days.length ? t.days.map((h) => (h ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], n = (Array.isArray(t.rows) ? t.rows : []).map((h) => {
-      if (ct(h))
-        return { break: !0, time: (h.time ?? "").toString(), label: (h.label ?? "Pause").toString() };
-      const p = Array.isArray(h?.cells) ? h.cells : [], u = Array.from({ length: s.length }, (w, x) => (p[x] ?? "").toString()), g = Array.isArray(h?.cell_styles) ? h.cell_styles : [], O = Array.from({ length: s.length }, (w, x) => De(g[x])), B = (h?.time ?? "").toString(), y = mt(B), m = (h?.start ?? "").toString().trim(), W = (h?.end ?? "").toString().trim(), b = {
-        time: B,
-        start: m || y.start || void 0,
-        end: W || y.end || void 0,
-        cells: u
-      };
-      return O.some((w) => !!w) && (b.cell_styles = O), b;
-    }), vmRaw = ((t.view_mode ?? "week") + "").toString().trim(), vm = vmRaw === "rolling" ? "rolling" : "week", displayModeRaw = ((t.display_mode ?? "default") + "").toString().trim(), displayMode = displayModeRaw === "compact" ? "compact" : "default", da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, rollingSwitchRaw = ((t.rolling_switch_mode ?? e.rolling_switch_mode ?? "midnight") + "").toString().trim(), rollingSwitchMode = rollingSwitchRaw === "after_last_lesson" || rollingSwitchRaw === "fixed_time" ? rollingSwitchRaw : "midnight", rollingSwitchTime = ((t.rolling_switch_time ?? e.rolling_switch_time ?? "") + "").toString().trim(), o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", f = (() => {
+    const e = D.getStubConfig(), s = Array.isArray(t.days) && t.days.length ? t.days.map((h) => (h ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], n = normalizeRowsForDays(t.rows, s), nB = normalizeRowsForDays(t.rows_b, s), vmRaw = ((t.view_mode ?? "week") + "").toString().trim(), vm = vmRaw === "rolling" ? "rolling" : "week", displayModeRaw = ((t.display_mode ?? "default") + "").toString().trim(), displayMode = displayModeRaw === "compact" ? "compact" : "default", da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, rollingSwitchRaw = ((t.rolling_switch_mode ?? e.rolling_switch_mode ?? "midnight") + "").toString().trim(), rollingSwitchMode = rollingSwitchRaw === "after_last_lesson" || rollingSwitchRaw === "fixed_time" ? rollingSwitchRaw : "midnight", rollingSwitchTime = ((t.rolling_switch_time ?? e.rolling_switch_time ?? "") + "").toString().trim(), o = ((t.week_mode ?? e.week_mode) + "").toString().trim(), l = o === "kw_parity" || o === "week_map" || o === "off" ? o : "off", f = (() => {
       const raw = ((t.source_type ?? "") + "").toString().trim();
       if (raw === "manual" || raw === "entity" || raw === "json" || raw === "sensor") return raw;
       const a_guess = ((t.source_entity ?? e.source_entity) + "").toString().trim();
@@ -919,6 +924,7 @@ const v = (D = class extends U {
       title_font_size: Number.isFinite(Number(t.title_font_size)) ? Math.max(0, Math.min(40, Number(t.title_font_size))) : e.title_font_size,
       title_font_family: (t.title_font_family ?? e.title_font_family ?? "").toString(),
       show_header_date: t.show_header_date ?? e.show_header_date,
+      show_time_column: t.show_time_column ?? e.show_time_column,
       days: s,
       view_mode: vm,
       display_mode: displayMode,
@@ -960,7 +966,8 @@ const v = (D = class extends U {
       filter_main_only: t.filter_main_only ?? !0,
       filter_allow_prefixes: Array.isArray(t.filter_allow_prefixes) ? t.filter_allow_prefixes.map(String) : [],
       filter_exclude: Array.isArray(t.filter_exclude) ? t.filter_exclude.map(String) : [],
-      rows: n
+      rows: n,
+      rows_b: nB
     };
   }
   getTodayIndex(t, metaDays) {
@@ -1085,8 +1092,11 @@ const v = (D = class extends U {
     e === this._jsonUrlLast && this._jsonStatus !== "error" || (e !== this._jsonUrlLast && (this._jsonUrlLast = e, this._jsonRows = null, this._jsonStatus = "idle", this._jsonError = ""), this._jsonStatus === "idle" && e && this.loadJsonRows(t, e));
   }
   weekFromParity(t) {
-    const { isoWeek: e } = Bt(/* @__PURE__ */ new Date()), s = e % 2 === 0, i = !!t.week_a_is_even_kw;
-    return s === i ? "A" : "B";
+    return this.weekFromParityAtDate(t, /* @__PURE__ */ new Date());
+  }
+  weekFromParityAtDate(t, e) {
+    const { isoWeek: s } = Bt(e), i = s % 2 === 0, n = !!t.week_a_is_even_kw;
+    return i === n ? "A" : "B";
   }
   weekFromMap(t) {
     const e = (t.week_map_entity ?? "").toString().trim();
@@ -1293,7 +1303,7 @@ const v = (D = class extends U {
 
     return null;
   }
-getRowsResolved(t) {
+  getRowsResolved(t) {
     const e = t.source_type ?? "manual";
     const effEntity = (
       e === "entity"
@@ -1303,8 +1313,11 @@ getRowsResolved(t) {
           : (t.source_entity ?? "")
     ).toString().trim();
 
-    if (e === "manual")
+    if (e === "manual") {
+      if (t.week_mode === "kw_parity" && this.getActiveWeek(t) === "B")
+        return Array.isArray(t.rows_b) && t.rows_b.length ? t.rows_b : t.rows ?? [];
       return t.rows ?? [];
+    }
     if (e === "json")
       return this.ensureJsonLoaded(t), this._jsonRows ?? [];
     if (t.week_mode !== "off") {
@@ -1318,6 +1331,12 @@ getRowsResolved(t) {
     }
     const s = effEntity;
     return s ? this.getRowsFromEntity(t, s, ((t.source_attribute ?? "") + "").toString().trim() || "plan") ?? [] : [];
+  }
+  getManualRowForDate(t, e, s, i) {
+    if ((t.source_type ?? "manual") !== "manual" || t.week_mode !== "kw_parity" || !(i instanceof Date)) return e;
+    const n = this.weekFromParityAtDate(t, i), o = n === "B" && Array.isArray(t.rows_b) && t.rows_b.length ? t.rows_b : t.rows ?? [];
+    const l = (e?.time ?? "").toString(), a = o.find((c) => ct(c) === ct(e) && (c?.time ?? "").toString() === l);
+    return a ?? o[s] ?? e;
   }
   recomputeRows() {
     if (!this.config) {
@@ -1569,7 +1588,7 @@ getRowsResolved(t) {
   }
 
   renderCardLayout(t, vmOverride = null, popup = !1) {
-    const e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], u), vm = ((vmOverride ?? this._uiViewMode ?? t.view_mode ?? "week") + "").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(),
+    const e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], u), vm = ((vmOverride ?? this._uiViewMode ?? t.view_mode ?? "week") + "").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(), showTimeColumn = t.show_time_column !== !1,
         p = !popup && (t.week_offset_entity ?? "").trim().length > 0,
         showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), g = u && u.length >= (t.days?.length ?? 0) ? u : null, upd = this.getHeaderUpdatedFromEntity(t), O = this.getBaseDate(t), B = this.mondayOfWeek(O), tapAction = this.normalizeTapAction(t.tap_action), displayMode = popup ? "default" : (t.display_mode ?? "default"), cardClass = `${displayMode === "compact" ? "compact" : ""}${!popup && tapAction.action !== "none" ? " tappable" : ""}${popup ? " popupCard" : ""}`, showTitle = t.show_title !== !1 && ((t.title ?? "").toString().trim().length > 0), titleStyle = this.getTitleStyle(t), showHeaderRow = showTitle || c || showPager,
         rollingActive = vm === "rolling" && (popup || !showPager || (h ?? 0) === 0),
@@ -1608,7 +1627,7 @@ getRowsResolved(t) {
           <table>
             <thead>
               <tr>
-                <th class="time">Stunde</th>
+                ${showTimeColumn ? d`<th class="time">Stunde</th>` : d``}
                 ${daysVis.map((y, m) => { const orig = idxs[m];
       const W = t.highlight_today && (rollingDates ? this.fmtYMD(rollingDates[m]) === this.fmtYMD(new Date()) : orig === s) ? "today" : "";
       let b = "";
@@ -1635,13 +1654,13 @@ getRowsResolved(t) {
             </thead>
 
             <tbody>
-              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${(daysVis.length) + 1}>${this._noDataMsg}</td></tr>` : e.map((y) => {
+              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${daysVis.length + (showTimeColumn ? 1 : 0)}>${this._noDataMsg}</td></tr>` : e.map((y, rowIndex) => {
       if (ct(y)) {
         const z = mt(y.time), P = !!z.start && !!z.end && this.isNowBetween(z.start, z.end), F = !!t.highlight_breaks && P;
         let I = `--sp-hl:${o};`, G = "";
         return F && (I += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", G += `--sp-hl:${o}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), F && t.highlight_current_time_text && a && (I += `color:${a};`), d`
                     <tr class="break">
-                      <td class="time" style=${I}>${y.time}</td>
+                      ${showTimeColumn ? d`<td class="time" style=${I}>${y.time}</td>` : d``}
                       <td colspan=${daysVis.length} style=${G}>${y.label ?? ""}</td>
                     </tr>
                   `;
@@ -1652,15 +1671,15 @@ getRowsResolved(t) {
       let gt = `--sp-hl:${o};`;
       return pt && t.highlight_current && w && (gt += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), pt && w && t.highlight_current_time_text && a && (gt += `color:${a};`), d`
                   <tr>
-                    <td class="time" style=${gt}>
+                    ${showTimeColumn ? d`<td class="time" style=${gt}>
                       <div class="timeWrap">
                         <div class="timeSt">${m.time}</div>
                         ${Et ? d`<div class="timeHm">${Et}</div>` : d``}
                       </div>
-                    </td>
+                    </td>` : d``}
 
-                    ${daysVis.map((z, P) => { const orig = idxs[P];
-        const F = this.filterCellText(W[orig] ?? "", t), I = b[orig] ?? null, G = t.highlight_today && orig === s ? "today" : "";
+                    ${daysVis.map((z, P) => { const orig = idxs[P], rowForDay = this.getManualRowForDate(t, m, rowIndex, rollingDates?.[P]), rowCells = rowForDay?.cells ?? W, rowStyles = rowForDay?.cell_styles ?? b;
+        const F = this.filterCellText(rowCells[orig] ?? "", t), I = rowStyles[orig] ?? null, G = t.highlight_today && orig === s ? "today" : "";
         let Ct = `--sp-hl:${n};` + Te(I, i);
         const se = !yt(F);
         return pt && se && w && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct}>${this.renderCell(F, t)}</td>`;
@@ -2084,6 +2103,7 @@ const ut = class ut extends U {
     };
     this._rowOpen = {};
     this._showCellStyles = !1;
+    this._manualWeek = "A";
   }
   connectedCallback() {
     super.connectedCallback();
@@ -2258,42 +2278,54 @@ const ut = class ut extends U {
     [key]: value
   });
 }
+  getManualRowsKey() {
+    return this._config?.week_mode === "kw_parity" && this._manualWeek === "B" ? "rows_b" : "rows";
+  }
+  getManualRows() {
+    const key = this.getManualRowsKey();
+    return Array.isArray(this._config?.[key]) ? this.clone(this._config[key]) : [];
+  }
+  emitManualRows(rows) {
+    if (!this._config) return;
+    const key = this.getManualRowsKey();
+    this.emit({ ...this._config, [key]: rows });
+  }
   addManualRow() {
     if (!this._config) return;
-    const t = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"], e = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [], s = { time: `${e.length + 1}.`, cells: Array.from({ length: t.length }, () => "") };
-    e.push(s), this.emit({ ...this._config, rows: e });
+    const t = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"], e = this.getManualRows(), s = { time: `${e.length + 1}.`, cells: Array.from({ length: t.length }, () => "") };
+    e.push(s), this.emitManualRows(e);
   }
   insertManualRowBelow(t) {
     if (!this._config) return;
     const days = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"];
-    const rows = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
+    const rows = this.getManualRows();
     const newRow = { time: `${t + 2}.`, start: "", end: "", cells: Array.from({ length: days.length }, () => "") };
     rows.splice(t + 1, 0, newRow);
-    this.emit({ ...this._config, rows });
+    this.emitManualRows(rows);
   }
   insertManualBreakBelow(t) {
     if (!this._config) return;
-    const rows = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
+    const rows = this.getManualRows();
     rows.splice(t + 1, 0, { break: !0, time: "", label: "Pause" });
-    this.emit({ ...this._config, rows });
+    this.emitManualRows(rows);
   }
 
   removeManualRow(t) {
     if (!this._config) return;
-    const e = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
-    e.splice(t, 1), this.emit({ ...this._config, rows: e });
+    const e = this.getManualRows();
+    e.splice(t, 1), this.emitManualRows(e);
   }
   updateManualRow(t, e) {
     if (!this._config) return;
-    const s = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [], i = s[t];
-    s[t] = { ...i, ...e }, this.emit({ ...this._config, rows: s });
+    const s = this.getManualRows(), i = s[t];
+    s[t] = { ...i, ...e }, this.emitManualRows(s);
   }
   updateManualCell(t, e, s) {
     if (!this._config) return;
-    const i = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [], n = i[t];
+    const i = this.getManualRows(), n = i[t];
     if (!n || ct(n)) return;
     const o = n, l = Array.isArray(o.cells) ? o.cells.slice() : [];
-    l[e] = s, i[t] = { ...o, cells: l }, this.emit({ ...this._config, rows: i });
+    l[e] = s, i[t] = { ...o, cells: l }, this.emitManualRows(i);
   }
 
   addLessonRow() {
@@ -2301,14 +2333,14 @@ const ut = class ut extends U {
   }
   addBreakRow() {
     if (!this._config) return;
-    const e = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
+    const e = this.getManualRows();
     e.push({ break: !0, time: "", label: "Pause" });
-    this.emit({ ...this._config, rows: e });
+    this.emitManualRows(e);
   }
   toggleManualBreak(t, e) {
     if (!this._config) return;
     const s = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"];
-    const i = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
+    const i = this.getManualRows();
     const n = i[t];
     if (!n) return;
     if (e) {
@@ -2319,11 +2351,11 @@ const ut = class ut extends U {
       const time = (n.time ?? "").toString();
       i[t] = { time, start: "", end: "", cells: Array.from({ length: s.length }, () => "") };
     }
-    this.emit({ ...this._config, rows: i });
+    this.emitManualRows(i);
   }
   updateManualCellStyle(t, e, s) {
     if (!this._config) return;
-    const i = Array.isArray(this._config.rows) ? this.clone(this._config.rows) : [];
+    const i = this.getManualRows();
     const n = i[t];
     if (!n || ct(n)) return;
     const o = n;
@@ -2331,17 +2363,77 @@ const ut = class ut extends U {
     const a = l[e] ?? {};
     l[e] = { ...a, ...s };
     i[t] = { ...o, cell_styles: l };
-    this.emit({ ...this._config, rows: i });
+    this.emitManualRows(i);
   }
   
   renderManualRows() {
     if (!this._config) return d``;
     const c = this._config;
     const days = c.days ?? ["Mo", "Di", "Mi", "Do", "Fr"];
-    const rows = Array.isArray(c.rows) ? c.rows : [];
+    const alternating = c.week_mode === "kw_parity";
+    const activeWeek = alternating && this._manualWeek === "B" ? "B" : "A";
+    const rows = activeWeek === "B" && Array.isArray(c.rows_b) ? c.rows_b : Array.isArray(c.rows) ? c.rows : [];
     return d`
+      <div class="manualWeekBox">
+        <div class="optRow">
+          <div>
+            <div class="optTitle">Wechselwochen A/B</div>
+            <div class="sub">Zwei manuelle Pläne automatisch nach Kalenderwoche wechseln.</div>
+          </div>
+          <ha-switch
+            .checked=${alternating}
+            @change=${(e) => {
+              const enabled = !!e?.target?.checked;
+              const rowsB = Array.isArray(c.rows_b) && c.rows_b.length ? c.rows_b : this.clone(c.rows ?? []);
+              this._manualWeek = "A";
+              this._rowOpen = {};
+              this.emit({ ...c, week_mode: enabled ? "kw_parity" : "off", rows_b: rowsB });
+            }}
+          ></ha-switch>
+        </div>
+
+        ${alternating ? d`
+          <ha-form
+            .hass=${this.hass}
+            .data=${{ week_a_is_even_kw: E(c.week_a_is_even_kw, !0) }}
+            .schema=${[{
+              name: "week_a_is_even_kw",
+              selector: {
+                select: {
+                  mode: "dropdown",
+                  options: [
+                    { value: !0, label: "Woche A = gerade Kalenderwoche" },
+                    { value: !1, label: "Woche A = ungerade Kalenderwoche" }
+                  ]
+                }
+              }
+            }]}
+            .computeLabel=${() => "Zuordnung der Woche A"}
+            @value-changed=${(e) => {
+              const value = e?.detail?.value?.week_a_is_even_kw;
+              if (typeof value === "boolean") this.setValue("week_a_is_even_kw", value);
+            }}
+          ></ha-form>
+
+          <div class="manualWeekTabs">
+            ${["A", "B"].map((week) => d`
+              <button
+                type="button"
+                class=${`spBtn ${activeWeek === week ? "spBtnActive" : ""}`}
+                @click=${() => {
+                  this._manualWeek = week;
+                  this._rowOpen = {};
+                  this.requestUpdate();
+                }}
+              >Woche ${week} bearbeiten</button>
+            `)}
+          </div>
+          <div class="hint">Aktuell bearbeitest du Woche ${activeWeek}. Die Karte zeigt automatisch den zur Kalenderwoche passenden Plan.</div>
+        ` : d``}
+      </div>
+
       <div class="rowsTop">
-        <div class="rowsTitle">Stundenplan (Zeilen)</div>
+        <div class="rowsTitle">Stundenplan${alternating ? ` · Woche ${activeWeek}` : ""}</div>
 
         <div class="btnBar">
           <div class="toggleInline">
@@ -2526,6 +2618,10 @@ const ut = class ut extends U {
 
               <ha-switch .checked=${E(t.show_header_date, !0)} @change=${(e) => this.onToggle(e, "show_header_date")}></ha-switch>
               <div class="switchLabel">Datum anzeigen</div>
+              <div></div>
+
+              <ha-switch .checked=${E(t.show_time_column, !0)} @change=${(e) => this.onToggle(e, "show_time_column")}></ha-switch>
+              <div class="switchLabel">Spalte „Stunde“ anzeigen</div>
               <div></div>
 
               <div></div>
@@ -3109,6 +3205,24 @@ ut.properties = {
     }
 
     /* ---- Manual Rows Editor (classic accordion UI) ---- */
+    .manualWeekBox {
+      display: grid;
+      gap: 10px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid var(--divider-color);
+      border-radius: 14px;
+      background: rgba(255,255,255,0.02);
+    }
+    .manualWeekTabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .spBtnActive {
+      border-color: var(--primary-color);
+      background: color-mix(in srgb, var(--primary-color) 18%, transparent);
+    }
     .rowsTop {
       display: flex;
       justify-content: space-between;

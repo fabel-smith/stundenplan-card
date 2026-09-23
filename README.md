@@ -129,6 +129,37 @@ Vorgehen:
 Mit **„+ Stunde darunter"** oder **„+ Pause darunter"** kannst du den
 Plan sehr schnell aufbauen.
 
+### Manuelle Wechselwochen
+
+Im Abschnitt **„Manuell (rows)"** kannst du **Wechselwochen A/B**
+aktivieren. Anschließend lassen sich Woche A und Woche B getrennt im
+visuellen Editor pflegen. Die Karte wechselt automatisch anhand der
+Kalenderwoche. Dabei kannst du festlegen, ob Woche A auf eine gerade oder
+ungerade Kalenderwoche fällt.
+
+Im YAML entsprechen dem die Einstellungen:
+
+```yaml
+source_type: manual
+week_mode: kw_parity
+week_a_is_even_kw: true
+rows:       # Woche A
+  - time: 1.
+    cells: [Mathe, Deutsch, Englisch, Sport, Biologie]
+rows_b:     # Woche B
+  - time: 1.
+    cells: [Deutsch, Mathe, Kunst, Englisch, Sport]
+```
+
+### Zeitspalte ausblenden
+
+Für Essenspläne und andere Wochenübersichten kann die Spalte
+**„Stunde"** im Bereich **„Allgemein"** deaktiviert werden. Im YAML:
+
+```yaml
+show_time_column: false
+```
+
 Mehrere Fächer innerhalb einer Stunde sind möglich (z. B.
 Gruppenunterricht / AG / Teilung).\
 Durch eine Leerzeile kann eine Stunde mehrfach unterteilt werden.
