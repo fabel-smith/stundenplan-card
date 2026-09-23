@@ -642,7 +642,17 @@ function zt(r) {
 function yt(r) {
   const t = (r ?? "").toString().trim();
   // Treat single dash variants as empty, but keep "---" (used by Indiware as a visible placeholder).
-  return !!(!t || t === "-" || t === "–" || t === "—" || /^(—|\-|–|\s)+$/.test(t));
+  return !t || t === "-" || t === "–" || t === "—";
+}
+function trimTrailingEmptyRows(r, t, e = (s, i, n) => s?.cells?.[n] ?? "") {
+  const rows = Array.isArray(r) ? r : [], days = Array.isArray(t) ? t : [];
+  let lastUsed = -1;
+  rows.forEach((row, rowIndex) => {
+    if (ct(row)) return;
+    if (days.some((dayIndex, visibleIndex) => !yt(e(row, rowIndex, dayIndex, visibleIndex))))
+      lastUsed = rowIndex;
+  });
+  return lastUsed >= 0 ? rows.slice(0, lastUsed + 1) : [];
 }
 function je(r) {
   const t = (r ?? "").toString().trim();
@@ -839,6 +849,7 @@ const v = (D = class extends U {
       title_font_family: "",
       show_header_date: !0,
       show_time_column: !0,
+      trim_empty_rows: !1,
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       view_mode: "week",
       display_mode: "default",
@@ -935,6 +946,7 @@ const v = (D = class extends U {
       title_font_family: (t.title_font_family ?? e.title_font_family ?? "").toString(),
       show_header_date: t.show_header_date ?? e.show_header_date,
       show_time_column: t.show_time_column ?? e.show_time_column,
+      trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
       days: s,
       view_mode: vm,
       display_mode: displayMode,
@@ -1610,6 +1622,10 @@ const v = (D = class extends U {
         focusDayIndex = idxs[focusVisibleIndex] ?? 0,
         focusDate = rollingDates?.[focusVisibleIndex] ?? null,
         focusIsToday = focusDate instanceof Date ? this.fmtYMD(focusDate) === this.fmtYMD(new Date()) : focusDayIndex === s,
+        visibleRows = t.trim_empty_rows ? trimTrailingEmptyRows(e, idxs, (row, rowIndex, dayIndex, visibleIndex) => {
+          const resolved = this.getManualRowForDate(t, row, rowIndex, rollingDates?.[visibleIndex]);
+          return this.filterCellText((resolved?.cells ?? row?.cells ?? [])[dayIndex] ?? "", t);
+        }) : e,
         updMap = (() => {
           const y = /* @__PURE__ */ new Map();
           if (!g || !upd) return y;
@@ -1668,7 +1684,7 @@ const v = (D = class extends U {
             </thead>
 
             <tbody>
-              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${daysVis.length + (showTimeColumn ? 1 : 0)}>${this._noDataMsg}</td></tr>` : e.map((y, rowIndex) => {
+              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${daysVis.length + (showTimeColumn ? 1 : 0)}>${this._noDataMsg}</td></tr>` : visibleRows.map((y, rowIndex) => {
       if (ct(y)) {
         const z = mt(y.time), P = !!z.start && !!z.end && this.isNowBetween(z.start, z.end), F = !!t.highlight_breaks && P;
         let I = `--sp-hl:${o};`, G = "";
@@ -2712,6 +2728,14 @@ const ut = class ut extends U {
                   }
                 }}
               ></ha-form>
+
+              <div class="optRow gridFull">
+                <div>
+                  <div class="optTitle">Leere Endstunden ausblenden</div>
+                  <div class="sub">Kürzt die Tabelle nach der letzten belegten Stunde der sichtbaren Tage.</div>
+                </div>
+                <ha-switch .checked=${E(t.trim_empty_rows, !1)} @change=${(e) => this.onToggle(e, "trim_empty_rows")}></ha-switch>
+              </div>
 
               ${(t.view_mode ?? "week") === "rolling" ? d`
                 <div class="generalDivider gridFull">Rolling</div>

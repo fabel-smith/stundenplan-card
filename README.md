@@ -161,6 +161,20 @@ Für Essenspläne und andere Wochenübersichten kann die Spalte
 show_time_column: false
 ```
 
+### Leere Endstunden ausblenden
+
+Unter **Allgemein → Ansicht** kann die Karte automatisch nach der letzten
+belegten Stunde der aktuell sichtbaren Tage gekürzt werden. In YAML:
+
+```yaml
+trim_empty_rows: true
+```
+
+Die Einstellung entfernt nur vollständig leere Zeilen am Tabellenende. Pausen
+und Freistunden zwischen belegten Stunden bleiben erhalten. In der
+rollierenden Ansicht werden ausschließlich die gerade sichtbaren Tage
+berücksichtigt.
+
 Mehrere Fächer innerhalb einer Stunde sind möglich (z. B.
 Gruppenunterricht / AG / Teilung).\
 Durch eine Leerzeile kann eine Stunde mehrfach unterteilt werden.
