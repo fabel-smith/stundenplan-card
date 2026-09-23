@@ -165,6 +165,27 @@ Mehrere Fächer innerhalb einer Stunde sind möglich (z. B.
 Gruppenunterricht / AG / Teilung).\
 Durch eine Leerzeile kann eine Stunde mehrfach unterteilt werden.
 
+### Unterschiedliche Unterrichtszeiten je Tag
+
+JSON- und Sensorquellen können optional für jede Tageszelle eine eigene Zeit
+über `cell_times` bereitstellen. Das ist beispielsweise für verkürzte
+Unterrichtstage geeignet. Jeder Eintrag darf ein Zeitbereich als Text oder ein
+Objekt mit `time`, `start` und `end` sein:
+
+```yaml
+time: 08:00-08:45
+cells: [Mathe, Englisch]
+cell_times:
+  - start: "08:00"
+    end: "08:45"
+  - "08:00-08:30"
+```
+
+In der Wochenansicht verwendet die gemeinsame Stunden-Spalte heute als
+Fokustag, andernfalls den ersten sichtbaren Tag. In der rollierenden Ansicht
+gilt der erste sichtbare Tag. Die Hervorhebung der aktuellen Stunde
+berücksichtigt dabei ebenfalls die jeweilige Zellzeit.
+
 Diese Methode benötigt: - keine REST-Sensoren - keine JSON-Dateien -
 keine externe Integration
 

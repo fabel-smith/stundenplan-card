@@ -558,13 +558,13 @@ function normalizeRowsForDays(r, t) {
   return (Array.isArray(r) ? r : []).map((e) => {
     if (ct(e))
       return { break: !0, time: (e.time ?? "").toString(), label: (e.label ?? "Pause").toString() };
-    const s = Array.isArray(e?.cells) ? e.cells : [], i = Array.from({ length: t.length }, (a, c) => (s[c] ?? "").toString()), n = Array.isArray(e?.cell_styles) ? e.cell_styles : [], o = Array.from({ length: t.length }, (a, c) => De(n[c])), l = (e?.time ?? "").toString(), h = mt(l), f = (e?.start ?? "").toString().trim(), p = (e?.end ?? "").toString().trim(), u = {
+    const s = Array.isArray(e?.cells) ? e.cells : [], i = Array.from({ length: t.length }, (a, c) => (s[c] ?? "").toString()), n = Array.isArray(e?.cell_styles) ? e.cell_styles : [], o = Array.from({ length: t.length }, (a, c) => De(n[c])), a = Array.isArray(e?.cell_times) ? Array.from({ length: t.length }, (c, l) => normalizeCellTime(e.cell_times[l])) : [], l = (e?.time ?? "").toString(), h = mt(l), f = (e?.start ?? "").toString().trim(), p = (e?.end ?? "").toString().trim(), u = {
       time: l,
       start: f || h.start || void 0,
       end: p || h.end || void 0,
       cells: i
     };
-    return o.some((a) => !!a) && (u.cell_styles = o), u;
+    return o.some((c) => !!c) && (u.cell_styles = o), a.some((c) => !!c) && (u.cell_times = a), u;
   });
 }
 function Me(r) {
@@ -593,6 +593,16 @@ function Lt(r, t) {
 function mt(r) {
   const e = (r ?? "").toString().match(/(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})/);
   return e ? { start: e[1], end: e[2] } : {};
+}
+function normalizeCellTime(r) {
+  if (r == null) return null;
+  if (typeof r == "string") {
+    const t = r.trim(), e = mt(t);
+    return t ? { time: t, start: e.start, end: e.end } : null;
+  }
+  if (typeof r != "object") return null;
+  const t = (r.time ?? "").toString().trim(), e = mt(t), s = (r.start ?? "").toString().trim() || e.start, i = (r.end ?? "").toString().trim() || e.end;
+  return t || s || i ? { time: t || (s && i ? `${s}-${i}` : ""), start: s || void 0, end: i || void 0 } : null;
 }
 function wt(r) {
   return (r ?? "").toString().trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, "");
@@ -1043,8 +1053,8 @@ const v = (D = class extends U {
       const l = (o?.time ?? o?.[tkCfg] ?? o?.[tkAlt1] ?? o?.[tkAlt2] ?? "").toString(), a = mt(l), c = Array.isArray(o?.cells) ? Array.from({ length: s.length }, (u, g) => (o?.cells?.[g] ?? "").toString()) : Array.from({ length: s.length }, (u, g) => {
         const O = (s[g] ?? "").toString();
         return (o?.[O] ?? "").toString();
-      }), _ = Array.isArray(o?.cell_styles) ? Array.from({ length: s.length }, (u, g) => De(o?.cell_styles?.[g])) : [], h = (o?.start ?? "").toString().trim() || a.start, f = (o?.end ?? "").toString().trim() || a.end, p = { time: l, start: h || void 0, end: f || void 0, cells: c };
-      return _.some((u) => !!u) && (p.cell_styles = _), p;
+      }), _ = Array.isArray(o?.cell_styles) ? Array.from({ length: s.length }, (u, g) => De(o?.cell_styles?.[g])) : [], h = Array.isArray(o?.cell_times) ? Array.from({ length: s.length }, (u, g) => normalizeCellTime(o.cell_times[g])) : [], f = (o?.start ?? "").toString().trim() || a.start, p = (o?.end ?? "").toString().trim() || a.end, x = { time: l, start: f || void 0, end: p || void 0, cells: c };
+      return _.some((u) => !!u) && (x.cell_styles = _), h.some((u) => !!u) && (x.cell_times = h), x;
     });
     return n.length ? n : null;
   }
@@ -1596,6 +1606,10 @@ const v = (D = class extends U {
         idxs = rollingSlots.length ? rollingSlots.map((y) => y.orig) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m),
         daysVis = idxs.map((y) => t.days[y]),
         rollingDates = rollingSlots.length ? rollingSlots.map((y) => y.date) : null,
+        focusVisibleIndex = rollingSlots.length ? 0 : Math.max(0, idxs.indexOf(s)),
+        focusDayIndex = idxs[focusVisibleIndex] ?? 0,
+        focusDate = rollingDates?.[focusVisibleIndex] ?? null,
+        focusIsToday = focusDate instanceof Date ? this.fmtYMD(focusDate) === this.fmtYMD(new Date()) : focusDayIndex === s,
         updMap = (() => {
           const y = /* @__PURE__ */ new Map();
           if (!g || !upd) return y;
@@ -1665,15 +1679,15 @@ const v = (D = class extends U {
                     </tr>
                   `;
       }
-      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], w = !!m.start && !!m.end && this.isNowBetween(m.start, m.end), x = s >= 0 ? W[s] ?? "" : "", te = s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), __rng = mt(m.time),
+      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], focusedRow = this.getManualRowForDate(t, m, rowIndex, focusDate), cellTime = (focusedRow?.cell_times ?? m.cell_times)?.[focusDayIndex] ?? null, displayTime = cellTime?.time || focusedRow?.time || m.time, displayStart = cellTime?.start || focusedRow?.start || m.start, displayEnd = cellTime?.end || focusedRow?.end || m.end, w = focusIsToday && !!displayStart && !!displayEnd && this.isNowBetween(displayStart, displayEnd), x = s >= 0 ? W[s] ?? "" : "", te = s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), __rng = mt(displayTime),
       __timeHasRange = !!(__rng.start && __rng.end),
-      Et = (!__timeHasRange && m.start && m.end) ? `${m.start}–${m.end}` : "";
+      Et = (!__timeHasRange && displayStart && displayEnd) ? `${displayStart}–${displayEnd}` : "";
       let gt = `--sp-hl:${o};`;
       return pt && t.highlight_current && w && (gt += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), pt && w && t.highlight_current_time_text && a && (gt += `color:${a};`), d`
                   <tr>
                     ${showTimeColumn ? d`<td class="time" style=${gt}>
                       <div class="timeWrap">
-                        <div class="timeSt">${m.time}</div>
+                        <div class="timeSt">${displayTime}</div>
                         ${Et ? d`<div class="timeHm">${Et}</div>` : d``}
                       </div>
                     </td>` : d``}
