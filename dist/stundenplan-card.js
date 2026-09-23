@@ -3110,13 +3110,13 @@ D([
 ], xe.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", $e);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", xe);
-window.__STUNDENPLAN_CARD_VERSION = "v2026-02-16.2";
+window.__STUNDENPLAN_CARD_VERSION = "v3.2.6";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v2026-02-16.2 (marker: STUNDENPLAN_CARD_v2026-02-16.2)",
+  description: "Stundenplan Card v3.2.6 (marker: STUNDENPLAN_CARD_v3.2.6)",
   preview: !0
 });
 export {
