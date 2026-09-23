@@ -2497,12 +2497,12 @@ const ut = class ut extends U {
 
             <div class="rowBody">
               <div class="grid2">
-                <ha-textfield
+                <ha-input
                   label="Zeit / Stunde"
                   .value=${(r.time ?? "").toString()}
                   placeholder="z. B. 1. 08:00–08:45"
                   @input=${(e) => this.updateManualRow(idx, { time: e?.target?.value ?? "" })}
-                ></ha-textfield>
+                ></ha-input>
 
                 <div class="optRow">
                   <div>
@@ -2515,25 +2515,25 @@ const ut = class ut extends U {
 
               ${isBreak
                 ? d`
-                    <ha-textfield
+                    <ha-input
                       label="Pausentext"
                       .value=${label}
                       placeholder="z. B. Große Pause"
                       @input=${(e) => this.updateManualRow(idx, { label: e?.target?.value ?? "" })}
-                    ></ha-textfield>
+                    ></ha-input>
                   `
                 : d`
                     <div class="grid2" style="margin-top:10px;">
-                      <ha-textfield
+                      <ha-input
                         label="Start (HH:MM)"
                         .value=${start}
                         @input=${(e) => this.updateManualRow(idx, { start: e?.target?.value ?? "" })}
-                      ></ha-textfield>
-                      <ha-textfield
+                      ></ha-input>
+                      <ha-input
                         label="Ende (HH:MM)"
                         .value=${end}
                         @input=${(e) => this.updateManualRow(idx, { end: e?.target?.value ?? "" })}
-                      ></ha-textfield>
+                      ></ha-input>
                     </div>
 
                     <div class="cellsGrid" style=${`grid-template-columns: repeat(${days.length}, minmax(220px, 1fr));`}>
@@ -2614,14 +2614,14 @@ const ut = class ut extends U {
       d`
 <div class="generalDivider first">Grunddaten</div>
             <div class="grid2">
-              <ha-textfield label="Titel der Karte" .value=${t.title ?? ""} @input=${(e) => this.onText(e, "title")}></ha-textfield>
+              <ha-input label="Titel der Karte" .value=${t.title ?? ""} @input=${(e) => this.onText(e, "title")}></ha-input>
 
-              <ha-textfield
+              <ha-input
                 label="Schultage (CSV)"
                 .value=${Ne(t.days ?? [])}
                 @input=${(e) => this.setValue("days", Pe(e.target.value))}
-                helper="Beispiel: Mo, Di, Mi, Do, Fr"
-              ></ha-textfield>
+                hint="Beispiel: Mo, Di, Mi, Do, Fr"
+              ></ha-input>
             </div>
 
             <div class="generalDivider">Titel & Kopfzeile</div>
@@ -2639,7 +2639,7 @@ const ut = class ut extends U {
               <div></div>
 
               <div></div>
-              <ha-textfield
+              <ha-input
                 label="Titelgröße (px)"
                 type="number"
                 .value=${String(t.title_font_size ?? 20)}
@@ -2647,12 +2647,12 @@ const ut = class ut extends U {
                   const n = Number(e.target.value);
                   this.setValue("title_font_size", Number.isFinite(n) ? Math.max(10, Math.min(40, Math.floor(n))) : 20);
                 }}
-              ></ha-textfield>
-              <ha-textfield
+              ></ha-input>
+              <ha-input
                 label="Titel-Schriftfamilie (optional)"
                 .value=${t.title_font_family ?? ""}
                 @input=${(e) => this.onText(e, "title_font_family")}
-              ></ha-textfield>
+              ></ha-input>
             </div>
 
             <div class="generalDivider">Ansicht</div>
@@ -2715,7 +2715,7 @@ const ut = class ut extends U {
 
               ${(t.view_mode ?? "week") === "rolling" ? d`
                 <div class="generalDivider gridFull">Rolling</div>
-                <ha-textfield
+                <ha-input
                   label="Zusätzliche Tage im Voraus"
                   type="number"
                   .value=${String(t.days_ahead ?? 0)}
@@ -2723,8 +2723,8 @@ const ut = class ut extends U {
                     const n = Number(e.target.value);
                     this.setValue("days_ahead", Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0);
                   }}
-                  helper="0 = nur Starttag, 1 = Starttag + nächster Schultag"
-                ></ha-textfield>
+                  hint="0 = nur Starttag, 1 = Starttag + nächster Schultag"
+                ></ha-input>
 
                 <ha-form
                   .hass=${this.hass}
@@ -2756,12 +2756,12 @@ const ut = class ut extends U {
                 ></ha-form>
 
                 ${(t.rolling_switch_mode ?? "midnight") === "fixed_time" ? d`
-                  <ha-textfield
+                  <ha-input
                     label="Umschaltzeit (HH:MM)"
                     .value=${t.rolling_switch_time ?? ""}
                     @input=${(e) => this.onText(e, "rolling_switch_time")}
-                    helper="Beispiel: 15:00"
-                  ></ha-textfield>
+                    hint="Beispiel: 15:00"
+                  ></ha-input>
                 ` : d`<div class="infoBox slim gridFull">${(t.rolling_switch_mode ?? "midnight") === "after_last_lesson"
                   ? "Der Sprung auf den nächsten Schultag folgt nach der letzten Endzeit aus deinem Plan."
                   : "Der Sprung auf den nächsten Schultag folgt direkt ab Mitternacht."}</div>`}
@@ -2836,11 +2836,11 @@ const ut = class ut extends U {
 
               <ha-switch .checked=${E(t.highlight_current_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_text")}></ha-switch>
               <div class="switchLabel">Textfarbe in aktueller Stunde</div>
-              <ha-textfield label="Textfarbe" .value=${t.highlight_current_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_text_color")}></ha-textfield>
+              <ha-input label="Textfarbe" .value=${t.highlight_current_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_text_color")}></ha-input>
 
               <ha-switch .checked=${E(t.highlight_current_time_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_time_text")}></ha-switch>
               <div class="switchLabel">Zeitspalte Textfarbe (aktuell)</div>
-              <ha-textfield label="Zeitfarbe" .value=${t.highlight_current_time_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_time_text_color")}></ha-textfield>
+              <ha-input label="Zeitfarbe" .value=${t.highlight_current_time_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_time_text_color")}></ha-input>
             </div>
           `
     )}
@@ -2850,8 +2850,8 @@ const ut = class ut extends U {
       "colors",
       d`
             <div class="grid2">
-              <ha-textfield label="Heute Overlay" .value=${t.highlight_today_color ?? ""} @input=${(e) => this.onText(e, "highlight_today_color")}></ha-textfield>
-              <ha-textfield label="Aktuell Overlay" .value=${t.highlight_current_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_color")}></ha-textfield>
+              <ha-input label="Heute Overlay" .value=${t.highlight_today_color ?? ""} @input=${(e) => this.onText(e, "highlight_today_color")}></ha-input>
+              <ha-input label="Aktuell Overlay" .value=${t.highlight_current_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_color")}></ha-input>
             </div>
           `
     )}
@@ -2932,12 +2932,12 @@ const ut = class ut extends U {
                     ></ha-entity-picker>
                   ` : d``}
 
-                  <ha-textfield
+                  <ha-input
                     label="Stundenplan24 Entity-ID (manuell)"
                     .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
                     @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
 placeholder="sensor.05b_woche"
-                  ></ha-textfield>
+                  ></ha-input>
                 ` : d``}
 
             ${(t.source_type ?? "manual") === "sensor" ? d`
@@ -2969,16 +2969,16 @@ placeholder="sensor.05b_woche"
                     ></ha-entity-picker>
                   ` : d``}
 
-                  <ha-textfield
+                  <ha-input
                     label="Sensor Entity-ID (manuell)"
                     .value=${(t.source_entity ?? "")}
                     @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
 placeholder="sensor.stundenplan"
-                  ></ha-textfield>
+                  ></ha-input>
 
                   <div class="grid2">
-                    <ha-textfield label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} @change=${(e) => this.onText(e, "source_attribute")} @value-changed=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-textfield>
-                    <ha-textfield label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} @change=${(e) => this.onText(e, "source_time_key")} @value-changed=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-textfield>
+                    <ha-input label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} @change=${(e) => this.onText(e, "source_attribute")} @value-changed=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-input>
+                    <ha-input label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} @change=${(e) => this.onText(e, "source_time_key")} @value-changed=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-input>
                   </div>
                   <div class="hint">Sensor (JSON): REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
 
