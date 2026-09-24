@@ -654,15 +654,41 @@ function trimTrailingEmptyRows(r, t, e = (s, i, n) => s?.cells?.[n] ?? "") {
   });
   return lastUsed >= 0 ? rows.slice(0, lastUsed + 1) : [];
 }
+function mergedCellTextKey(r) {
+  const lines = (r ?? "").toString().replace(/\r/g, "").split("\n").map((line) => line.trim());
+  const normalized = [];
+  for (const line of lines) {
+    if (/^(—|–|-)$/.test(line)) continue;
+    if (!line) {
+      if (normalized.length && normalized[normalized.length - 1] !== "") normalized.push("");
+      continue;
+    }
+    normalized.push(line.replace(/\s+/g, " "));
+  }
+  while (normalized[normalized.length - 1] === "") normalized.pop();
+  return normalized.join("\n");
+}
+function mergedCellStyleKey(r) {
+  const style = De(r);
+  if (!style) return "";
+  const visible = {};
+  if (style.bg) {
+    visible.bg = style.bg;
+    visible.bg_alpha = typeof style.bg_alpha == "number" ? style.bg_alpha : 0.18;
+  }
+  if (style.color) visible.color = style.color;
+  if (style.border) visible.border = style.border;
+  return Object.keys(visible).length ? JSON.stringify(visible) : "";
+}
 function mergedCellInfo(r, t, e) {
   const rows = Array.isArray(r) ? r : [];
   if (t < 0 || t >= rows.length || ct(rows[t])) return { covered: !1, span: 1 };
   const signature = (index) => {
     if (index < 0 || index >= rows.length || ct(rows[index])) return null;
     const info = e(rows[index], index) ?? {};
-    const text = (info.text ?? "").toString();
+    const text = mergedCellTextKey(info.text);
     if (yt(text)) return null;
-    return JSON.stringify([text, De(info.style)]);
+    return JSON.stringify([text, mergedCellStyleKey(info.style)]);
   };
   const current = signature(t);
   if (!current) return { covered: !1, span: 1 };
@@ -1870,8 +1896,9 @@ const v = (D = class extends U {
     }
 
     table {
-      width: max-content;
-      min-width: 100%;
+      width: 100%;
+      min-width: 680px;
+      table-layout: fixed;
       border-collapse: collapse;
     }
     th,
@@ -1957,7 +1984,7 @@ const v = (D = class extends U {
       font-weight: 800;
       font-size: 14px;
       letter-spacing: 0.2px;
-      white-space: nowrap;
+      white-space: normal;
     }
     .raum,
     .lehrer {
