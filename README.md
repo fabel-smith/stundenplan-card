@@ -59,23 +59,21 @@ Stundenplan Suite an und kann den aktuellen Unterricht hervorheben.
 
 Aktuelle Beispiele aus Home Assistant mit Schulmanager-Daten über die Stundenplan Suite.
 
-| Wochenansicht | Ab heute (rolling) |
-| --- | --- |
-| [![Wochenansicht mit Pausen, verbundenen Folgestunden und aktuellem Unterricht](docs/screenshots/week.png)](docs/screenshots/week.png) | [![Kompakte Rolling-Ansicht mit Donnerstag und Freitag](docs/screenshots/rolling.png)](docs/screenshots/rolling.png) |
+### Wochenansicht
 
-Die Wochenansicht zeigt alle Schultage. Die Rolling-Ansicht zeigt die ausgewählten
-Tage ab dem aktuellen Starttag. Beide Beispiele nutzen verbundene Folgestunden;
-in der Rolling-Ansicht sind zusätzlich leere Endstunden ausgeblendet.
+[![Wochenansicht mit Pausen, verbundenen Folgestunden und aktuellem Unterricht](docs/screenshots/week.png)](docs/screenshots/week.png)
 
-<details>
-<summary>Editor und Farbeinstellungen</summary>
+Alle Schultage im Überblick, mit Pausen, verbundenen Folgestunden und
+Hervorhebung des aktuellen Unterrichts.
+
+### Ab heute (rolling) und Farbeinstellungen
 
 Highlights, Farbpalette und Transparenz lassen sich direkt im visuellen Editor
-einstellen. Unter Datenquellen ist hier der Wochensensor der Suite ausgewählt.
+einstellen. Die Vorschau zeigt Donnerstag und Freitag mit Raum- und
+Lehrerangaben, verbundenen Folgestunden und ausgeblendeten leeren Endstunden.
+Als Datenquelle ist die Stundenplan Suite ausgewählt.
 
-[![Visueller Editor mit Highlights, Farbpalette, Transparenz und Suite-Datenquelle](docs/screenshots/editor.png)](docs/screenshots/editor.png)
-
-</details>
+[![Visueller Editor mit Farbpalette und Rolling-Vorschau inklusive Raum- und Lehrerangaben](docs/screenshots/editor.png)](docs/screenshots/editor.png)
 
 ### Neuer visueller Editor (manueller Stundenplan)
 
