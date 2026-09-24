@@ -55,13 +55,27 @@ Stundenplan Suite an und kann den aktuellen Unterricht hervorheben.
 
 ------------------------------------------------------------------------
 
-## 📸 Screenshot
+## 📸 Screenshots
 
-![Screenshot](https://raw.githubusercontent.com/fabel-smith/stundenplan-card/main/screenshot.png)
+Aktuelle Beispiele aus Home Assistant mit Schulmanager-Daten über die Stundenplan Suite.
 
-*Beispiel aus einer älteren Version. Editor, Bezeichnungen und Anordnung der
-Bedienelemente wurden seitdem überarbeitet; das Bild zeigt nicht den aktuellen
-Editor von v3.4.0.*
+| Wochenansicht | Ab heute (rolling) |
+| --- | --- |
+| [![Wochenansicht mit Pausen, verbundenen Folgestunden und aktuellem Unterricht](docs/screenshots/week.png)](docs/screenshots/week.png) | [![Kompakte Rolling-Ansicht mit Donnerstag und Freitag](docs/screenshots/rolling.png)](docs/screenshots/rolling.png) |
+
+Die Wochenansicht zeigt alle Schultage. Die Rolling-Ansicht zeigt die ausgewählten
+Tage ab dem aktuellen Starttag. Beide Beispiele nutzen verbundene Folgestunden;
+in der Rolling-Ansicht sind zusätzlich leere Endstunden ausgeblendet.
+
+<details>
+<summary>Editor und Farbeinstellungen</summary>
+
+Highlights, Farbpalette und Transparenz lassen sich direkt im visuellen Editor
+einstellen. Unter Datenquellen ist hier der Wochensensor der Suite ausgewählt.
+
+[![Visueller Editor mit Highlights, Farbpalette, Transparenz und Suite-Datenquelle](docs/screenshots/editor.png)](docs/screenshots/editor.png)
+
+</details>
 
 ### Neuer visueller Editor (manueller Stundenplan)
 
