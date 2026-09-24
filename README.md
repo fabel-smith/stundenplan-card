@@ -193,7 +193,9 @@ für den gesamten verbundenen Zeitraum.
 Unterschiede, die bei der Darstellung keine Wirkung haben (beispielsweise eine
 Transparenzangabe ohne Hintergrundfarbe), verhindern die Verbindung nicht.
 Die Tages-Spalten werden gleichmäßig auf die verfügbare Tabellenbreite verteilt;
-lange Fachbezeichnungen umbrechen innerhalb ihrer Spalte.
+lange Fachbezeichnungen umbrechen innerhalb ihrer Spalte. Sowohl die ganze Woche
+als auch eine eintägige Rolling-Ansicht nutzen die vorhandene Kartenbreite ohne
+eine künstliche Mindestbreite.
 
 Mehrere Fächer innerhalb einer Stunde sind möglich (z. B.
 Gruppenunterricht / AG / Teilung).\

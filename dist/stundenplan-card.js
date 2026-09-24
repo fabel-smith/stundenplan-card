@@ -1667,7 +1667,6 @@ const j = (ct = class extends tt {
 
     table {
       width: 100%;
-      min-width: 680px;
       table-layout: fixed;
       border-collapse: collapse;
     }

@@ -1897,7 +1897,6 @@ const v = (D = class extends U {
 
     table {
       width: 100%;
-      min-width: 680px;
       table-layout: fixed;
       border-collapse: collapse;
     }

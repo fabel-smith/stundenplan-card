@@ -63,4 +63,5 @@ assert.deepEqual(mergeInfo([{cells:[' E\r\nR012 '],cell_styles:[{bg_alpha:0.18}]
 assert(code.includes('Stundenplan Suite (Integration)'));
 assert(code.includes('attributes?.week_offset_entity || je(sid)'));
 assert(code.includes('table-layout: fixed'));
-console.log('Card contract: 18 assertions passed (actual source methods).');
+assert(!code.includes('tableMinWidth'));
+console.log('Card contract: 19 assertions passed (actual source methods).');
