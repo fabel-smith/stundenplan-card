@@ -5,6 +5,7 @@ Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 ![Version](https://img.shields.io/github/v/release/fabel-smith/stundenplan-card)
 ![Maintenance](https://img.shields.io/maintenance/yes/2026)
 ![License](https://img.shields.io/github/license/fabel-smith/stundenplan-card)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_a_Coffee-Unterst%C3%BCtzen-FFDD00?logo=buymeacoffee&logoColor=000000)](https://www.buymeacoffee.com/fabelsmith)
 
 > **TL;DR** - **Automatischer Stundenplan aus Stundenplan24 oder Schulmanager Online?** →
 > installiere die **stundenplan-suite** - **Stundenplan manuell

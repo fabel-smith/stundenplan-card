@@ -18,3 +18,7 @@ Die Wochenbegrenzung ist standardmäßig aus. Gespeicherte Farben, Stunden und A
 Build und Syntaxprüfung erfolgreich. Verhaltenstests decken Wochen-/Jahresgrenzen und Farbumrechnung ab. Browserprüfungen kontrollieren den Editor bei 320/440 Pixeln, gespeicherte Farbänderungen und Quellenwechsel. Vier Ansichtsvarianten wurden mit v3.3.3 verglichen: Texte, Farben und Zellgrößen stimmen überein.
 
 Die Editor-Browsertests verwenden vereinfachte Home-Assistant-Bedienelemente; die Live-Prüfung in Home Assistant steht noch aus.
+
+## Unterstützung
+
+Du nutzt die Karte gerne? Über einen kleinen Kaffee als Unterstützung für die Weiterentwicklung freue ich mich: [Buy Me a Coffee](https://www.buymeacoffee.com/fabelsmith). Danke auch für eure Rückmeldungen und Verbesserungsvorschläge!
