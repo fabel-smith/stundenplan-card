@@ -1278,6 +1278,7 @@ const v = (D = class extends U {
   }
   async handleCardAction(t, e) {
     if (!e || e.defaultPrevented) return;
+    if (cardEditDialog(this)) return;
     const s = e.composedPath?.() ?? [];
     if (s.some((l) => l instanceof HTMLElement && (l.closest?.(".offsetInline") || l.closest?.(".btnMini")))) return;
     const i = this.normalizeTapAction(t.tap_action);
@@ -1316,6 +1317,26 @@ const v = (D = class extends U {
     e?.stopPropagation?.();
     this._uiPopupOpen = !1;
     this.requestUpdate();
+  }
+  handlePreviewCell(t, event, rowIndex, dayIndex, date, span = 1) {
+    if (!cardEditDialog(this)) return;
+    event.stopPropagation();
+    if (t.source_type !== "manual") return;
+    // A merged cell still represents multiple editable source rows.
+    let tr = event.currentTarget.parentElement;
+    for (let offset = 1; offset < span; offset++) {
+      tr = tr?.nextElementSibling;
+      if (tr && event.clientY >= tr.getBoundingClientRect().top) rowIndex++;
+      else break;
+    }
+    let week = t.week_mode === "kw_parity"
+      ? (date instanceof Date ? this.weekFromParityAtDate(t, date) : this.getActiveWeek(t)) : "A";
+    if (week === "B" && !t.rows_b?.length) week = "A";
+    const rows = week === "B" ? t.rows_b : t.rows;
+    const row = this.getManualRowForDate(t, this._rowsCache[rowIndex], rowIndex, date);
+    const sourceIndex = rows.indexOf(row);
+    if (sourceIndex < 0) return;
+    We(this, "stundenplan-edit-cell", { config: this.config, rowIndex: sourceIndex, dayIndex, week });
   }
   getBaseDate(t) {
     const e = this.getWeekOffsetValue(t) ?? 0, s = /* @__PURE__ */ new Date();
@@ -1758,7 +1779,7 @@ const v = (D = class extends U {
         return F && (I += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", G += `--sp-hl:${o}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), F && t.highlight_current_time_text && a && (I += `color:${a};`), d`
                     <tr class="break">
                       ${showTimeColumn ? d`<td class="time" style=${I}>${y.time}</td>` : d``}
-                      <td colspan=${daysVis.length} style=${G}>${y.label ?? ""}</td>
+                      <td colspan=${daysVis.length} style=${G} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, -1, focusDate)}>${y.label ?? ""}</td>
                     </tr>
                   `;
       }
@@ -1789,7 +1810,7 @@ const v = (D = class extends U {
           const start = firstTime?.start || rowForDay?.start || m.start, end = lastTime?.end || lastRow?.end || lastBase?.end;
           return !!start && !!end && this.isNowBetween(start, end);
         })(), cellCurrent = w || mergedCurrent;
-        return pt && se && cellCurrent && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct} rowspan=${merge.span}>${this.renderCell(F, t)}</td>`;
+        return pt && se && cellCurrent && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct} rowspan=${merge.span} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, orig, rollingDates?.[P], merge.span)}>${this.renderCell(F, t)}</td>`;
       })}
                   </tr>
                 `;
@@ -2177,6 +2198,13 @@ $([
   M()
 ], v.prototype, "_jsonError", 1);
 let Xt = v;
+function cardEditDialog(element) {
+  // Cross HA's shadow roots, but never bind unrelated dashboard cards globally.
+  for (let node = element; node; node = node.parentNode ?? node.host) {
+    if (node.localName === "hui-dialog-edit-card") return node;
+  }
+  return null;
+}
 function We(r, t, e) {
   r.dispatchEvent(
     new CustomEvent(t, {
@@ -2218,20 +2246,46 @@ const ut = class ut extends U {
     this._rowOpen = {};
     this._showCellStyles = !1;
     this._manualWeek = "A";
+    this._onPreviewCell = (event) => this.openPreviewCell(event);
   }
   connectedCallback() {
     super.connectedCallback();
+    this._previewDialog = cardEditDialog(this);
+    this._previewDialog?.addEventListener("stundenplan-edit-cell", this._onPreviewCell);
     this.ensureUiLoaded();
     this.ensureEntitySubscription();
   }
   disconnectedCallback() {
     super.disconnectedCallback();
+    this._previewDialog?.removeEventListener("stundenplan-edit-cell", this._onPreviewCell);
+    this._previewDialog = null;
     try {
       this._unsubEntities?.();
     } catch {
     }
     this._unsubEntities = null;
     this._didSubEntities = !1;
+  }
+  async openPreviewCell(event) {
+    const { config, rowIndex, dayIndex, week } = event.detail ?? {};
+    if (!this._config || this._config.source_type !== "manual" ||
+        JSON.stringify(config) !== JSON.stringify(this._config)) return;
+    const rows = week === "B" ? this._config.rows_b : this._config.rows;
+    const row = rows?.[rowIndex];
+    if (!row || !Number.isInteger(rowIndex) ||
+        (!ct(row) && (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex >= this._config.days.length))) return;
+    event.stopPropagation();
+    this._manualWeek = week === "B" ? "B" : "A";
+    this._open = { ...this._open, manual: !0 };
+    this._rowOpen = { [rowIndex]: !0 };
+    this.requestUpdate();
+    await this.updateComplete;
+    if (!this.isConnected) return;
+    const panel = this.shadowRoot.querySelectorAll(".rowPanel")[rowIndex];
+    const input = ct(row) ? panel?.querySelector('ha-input[label="Pausentext"]')
+      : panel?.querySelectorAll(".lessonArea")[dayIndex];
+    input?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    input?.focus({ preventScroll: !0 });
   }
   async ensureEntitySubscription() {
     if (this._didSubEntities) return;
@@ -3604,14 +3658,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.4.0";
+window.__STUNDENPLAN_CARD_VERSION = "v3.4.1";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.4.0 (marker: STUNDENPLAN_CARD_v3.4.0)",
+  description: "Stundenplan Card v3.4.1 (marker: STUNDENPLAN_CARD_v3.4.1)",
   preview: !0
 });
 export {

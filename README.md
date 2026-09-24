@@ -139,6 +139,12 @@ Vorgehen:
 5.  **+ Stunde** oder **+ Pause** hinzufügen
 6.  Stunde anklicken → Details bearbeiten
 
+Ein Klick auf eine Fachzelle in der Vorschau öffnet die passende Zeile und
+fokussiert das Fach im manuellen Editor. Bei verbundenen Folgestunden entscheidet
+die angeklickte Zeilenposition; bei Rolling über eine A/B-Wochengrenze wird der
+passende Wochenplan geöffnet. Die Tap-Aktion der Karte ist im Bearbeitungsdialog
+deaktiviert, auf dem Dashboard bleibt sie unverändert aktiv.
+
 Für diesen manuellen Modus brauchst du weder eine externe Integration noch
 JSON-Dateien oder REST-Sensoren. Auch manuelle A/B-Pläne sind ohne Suite möglich.
 
@@ -339,6 +345,10 @@ Raumänderungen oder Unterrichtsausfall.
 ------------------------------------------------------------------------
 
 ## Update-Hinweise
+
+**v3.4.1** korrigiert die Zellenauswahl per Klick in der manuellen Vorschau.
+Im Bearbeitungsdialog öffnet der Klick die passende Zelle statt die Tap-Aktion
+auszuführen. Auf dem Dashboard bleiben Ansichtswechsel und Wochen-Popup aktiv.
 
 **v3.4.0** ergänzt einen kompakteren, an die Editorbreite angepassten Dialog,
 Farbpalette und Transparenzregler sowie die optionale Rolling-Wochengrenze.

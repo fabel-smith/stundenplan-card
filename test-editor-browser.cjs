@@ -84,6 +84,7 @@ customElements.define('ha-input',Input);customElements.define('ha-form',Form);cu
   assert.deepEqual(errors,[]);
   const oldPage=await browser.newPage();
   const newPage=await browser.newPage();
+  newPage.on('pageerror',error=>errors.push(error.message));
   for(const testPage of [oldPage,newPage]) await testPage.addInitScript(()=>{
     const RealDate=Date; window.Date=class extends RealDate {
       constructor(...args){super(...(args.length?args:['2026-09-24T09:00:00']));}
@@ -110,6 +111,111 @@ customElements.define('ha-input',Input);customElements.define('ha-form',Form);cu
     const config={...base,view_mode,days_ahead:0,equal_column_widths};
     assert.deepEqual(await renderSnapshot(newPage,config),await renderSnapshot(oldPage,config),'Existing card changed: '+JSON.stringify({view_mode,equal_column_widths}));
   }
+  const setupPreview=async config=>newPage.evaluate(async config=>{
+    document.querySelector('#editor').replaceChildren();
+    document.querySelector('hui-dialog-edit-card')?.remove();
+    const dialog=document.createElement('hui-dialog-edit-card');
+    const root=dialog.attachShadow({mode:'open'});document.body.append(dialog);
+    const formHost=document.createElement('div');root.append(formHost);
+    const formRoot=formHost.attachShadow({mode:'open'});
+    const previewHost=document.createElement('div');root.append(previewHost);
+    const previewRoot=previewHost.attachShadow({mode:'open'});
+    const editor=document.createElement('stundenplan-card-editor');
+    editor.setConfig(config);formRoot.append(editor);
+    const card=document.createElement('stundenplan-card');
+    card.setConfig(config);previewRoot.append(card);
+    window.previewFixture={editor,card,dialog,changes:0};
+    editor.addEventListener('config-changed',()=>previewFixture.changes++);
+    await editor.updateComplete;await card.updateComplete;
+  },config);
+  const previewConfig={...base,trim_empty_rows:true,merge_double_lessons:true,
+    rows:[{time:'1.',cells:['D','E','M','Sp','D']},
+      {time:'2.',cells:['D','E','M','Sp','D']},
+      {break:true,time:'09:15-09:30',label:'Pause'},
+      {time:'3.',cells:['E','D','Sp','M','']},
+      {time:'4.',cells:['','','','','']}]};
+  for(const action of ['toggle_view','popup_week','none']) {
+    await setupPreview({...previewConfig,tap_action:{action}});
+    const preview=newPage.locator('hui-dialog-edit-card stundenplan-card');
+    // Click the lower half of a merged Thursday lesson: edit row 2, not row 1.
+    await preview.locator('tbody tr').nth(0).locator('td').nth(4).click({position:{x:10,y:40}});
+    assert.deepEqual(await newPage.evaluate(()=>({
+      open:previewFixture.editor._rowOpen,
+      value:previewFixture.editor.shadowRoot.activeElement?.value,
+      day:[...previewFixture.editor.shadowRoot.querySelectorAll('.rowPanel')[1].querySelectorAll('.lessonArea')]
+        .indexOf(previewFixture.editor.shadowRoot.activeElement),
+      mode:previewFixture.card._uiViewMode,popup:previewFixture.card._uiPopupOpen,
+      changes:previewFixture.changes
+    })),{open:{1:true},value:'Sp',day:3,mode:null,popup:false,changes:0});
+    // Also select an empty Friday cell after a pause with the time column hidden.
+    await setupPreview({...previewConfig,show_time_column:false,tap_action:{action}});
+    await preview.locator('tbody tr').nth(3).locator('td').nth(4).click();
+    assert.deepEqual(await newPage.evaluate(()=>({open:previewFixture.editor._rowOpen,
+      value:previewFixture.editor.shadowRoot.activeElement?.value,
+      mode:previewFixture.card._uiViewMode,popup:previewFixture.card._uiPopupOpen})),
+      {open:{3:true},value:'',mode:null,popup:false});
+    await preview.locator('tbody tr').nth(2).locator('td').click();
+    assert.equal(await newPage.evaluate(()=>previewFixture.editor._rowOpen[2]),true);
+  }
+  await setupPreview({...base,view_mode:'rolling',days_ahead:2,week_mode:'kw_parity',week_a_is_even_kw:true,
+    tap_action:{action:'toggle_view'},
+    rows:[{break:true,time:'07:00-07:05',label:'Nur A'},
+      {time:'1.',cells:['A-Mo','A-Di','A-Mi','A-Do','A-Fr']}],
+    rows_b:[{time:'1.',cells:['B-Mo','B-Di','B-Mi','B-Do','B-Fr']}]});
+  const rollingPreview=newPage.locator('hui-dialog-edit-card stundenplan-card');
+  await rollingPreview.locator('tbody tr').first().locator('td').nth(1).click();
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._manualWeek),'B');
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor.shadowRoot.activeElement?.value),'B-Do');
+  // Next Monday belongs to A, whose source index differs from the displayed row index.
+  await rollingPreview.locator('tbody tr').first().locator('td').nth(3).click();
+  assert.deepEqual(await newPage.evaluate(()=>({week:previewFixture.editor._manualWeek,
+    open:Object.keys(previewFixture.editor._rowOpen).filter(key=>previewFixture.editor._rowOpen[key]),
+    value:previewFixture.editor.shadowRoot.activeElement?.value})),
+    {week:'A',open:['1'],value:'A-Mo'});
+  await newPage.evaluate(()=>{
+    const input=previewFixture.editor.shadowRoot.activeElement;
+    input.value='Edited A-Mo';input.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  assert.deepEqual(await newPage.evaluate(()=>({a:previewFixture.editor._config.rows[1].cells[0],
+    b:previewFixture.editor._config.rows_b[0].cells[0]})),{a:'Edited A-Mo',b:'B-Mo'});
+  // A dashboard card must not control an open editor; its tap actions still work.
+  for(const action of ['toggle_view','popup_week']) {
+    await newPage.evaluate(async ({base,action})=>{
+      const card=document.createElement('stundenplan-card');
+      card.setConfig({...base,tap_action:{action}});
+      document.querySelector('#editor').replaceChildren(card);window.dashboardCard=card;
+      await card.updateComplete;
+    },{base,action});
+    await newPage.locator('#editor stundenplan-card tbody td').nth(1).click();
+    assert.equal(await newPage.evaluate(action=>action==='toggle_view'
+      ? dashboardCard._uiViewMode==='rolling' : dashboardCard._uiPopupOpen,action),true);
+    assert.equal(await newPage.evaluate(()=>previewFixture.editor._config.rows[1].cells[0]),'Edited A-Mo');
+  }
+  await newPage.locator('#editor stundenplan-card .popupCard tbody td').nth(1).click();
+  assert.equal(await newPage.evaluate(()=>dashboardCard._uiPopupOpen),false);
+  // Removing the editor must detach its dialog listener.
+  await newPage.evaluate(()=>previewFixture.editor.remove());
+  await rollingPreview.locator('tbody tr').first().locator('td').nth(1).click();
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._manualWeek),'A');
+  await setupPreview({...base,tap_action:{action:'popup_week'}});
+  // Ignore another config in the same dialog, rather than opening a wrong cell.
+  await newPage.evaluate(async()=>{
+    previewFixture.editor.setConfig({...previewFixture.editor._config,title:'Other card'});
+    await previewFixture.editor.updateComplete;
+  });
+  await rollingPreview.locator('tbody tr').first().locator('td').nth(1).click();
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._open.manual),false);
+  assert.equal(await newPage.evaluate(()=>previewFixture.card._uiPopupOpen),false);
+  await setupPreview({...base,source_type:'sensor',source_entity:'sensor.test',source_entity_legacy:'sensor.test',source_attribute:'plan',tap_action:{action:'toggle_view'}});
+  await newPage.evaluate(async()=>{
+    previewFixture.card.hass={states:{'sensor.test':{state:'ok',attributes:{plan:[{time:'1.',cells:['Sensor lesson']}]}}}};
+    await previewFixture.card.updateComplete;await previewFixture.card.updateComplete;
+  });
+  await rollingPreview.locator('tbody tr').first().locator('td').nth(1).click();
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._open.manual),false);
+  assert.equal(await newPage.evaluate(()=>previewFixture.card._uiViewMode),null);
+  assert.deepEqual(errors,[]);
+  console.log('Preview clicks passed: tap actions, merged rows, empty cells, pauses, A/B rolling, source edits and dashboard isolation.');
   console.log('Browser checks passed: color/opacity persistence, source switching, retained A/B data, editor widths 320/440px.');
   console.log('Existing card rendering matches v3.3.3 in four weekly/rolling/column-layout combinations.');
  } finally { if(browser)await browser.close();await new Promise(resolve=>server.close(resolve)); }
