@@ -1,5 +1,3 @@
-# v3.4.1 - Vorschau-Klick öffnet wieder die passende Zelle
-
 ## Behoben
 
 - Ein Klick auf eine Fachzelle in der Vorschau öffnet die passende Zeile im manuellen Editor und fokussiert das Fach.

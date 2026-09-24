@@ -1,5 +1,3 @@
-# v3.4.0 - Aufgeräumter Editor, Farbpalette und Rolling-Wochengrenze
-
 ## Neu
 
 - Optional **Auf Kalenderwoche begrenzen** unter Allgemein → Rolling: Ab Donnerstag werden bei Schultagen Mo–Fr nur Donnerstag und Freitag angezeigt. Am Wochenende startet die Ansicht beim nächsten Schultag. Die konfigurierte Umschaltzeit bleibt wirksam.
