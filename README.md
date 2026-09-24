@@ -7,13 +7,15 @@ Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
 ![License](https://img.shields.io/github/license/fabel-smith/stundenplan-card)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_a_Coffee-Unterst%C3%BCtzen-FFDD00?logo=buymeacoffee&logoColor=000000)](https://www.buymeacoffee.com/fabelsmith)
 
-> **TL;DR** - **Automatischer Stundenplan aus Stundenplan24 oder Schulmanager Online?** →
-> installiere die **stundenplan-suite** - **Stundenplan manuell
-> anzeigen?** → nutze die **stundenplan-card**
+> **Welche Komponenten brauchst du?**
+> - **Manueller Stundenplan oder vorhandener JSON-Sensor:** Die **stundenplan-card** genügt.
+> - **Stundenplan24:** **stundenplan-suite** für die Daten und **stundenplan-card** für die Anzeige.
+> - **Schulmanager Online:** Vorhandene **Schulmanager-Integration** mit der **stundenplan-suite** verbinden und in der **stundenplan-card** anzeigen.
 
-Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle
--- inklusive **visuellem Editor (GUI)**, **Heute-Highlight** und
-**Hervorhebung des aktuellen Fachs**.
+Eine flexible Stundenplan-Karte für Home Assistant mit **visuellem Editor**,
+**A/B-Wochen**, **Wochen- und Rolling-Ansicht** sowie individuellen Farben.
+Sie zeigt manuelle Pläne, Daten aus JSON-Sensoren oder Wochensensoren der
+Stundenplan Suite an und kann den aktuellen Unterricht hervorheben.
 
 > **Hinweis:**\
 > Diese Card ist das **Frontend**.\
@@ -28,6 +30,12 @@ Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle
 ## ✨ Features
 
 -   Tabellenansicht (Tage × Stunden)
+-   Ganze Woche oder **Ab heute (rolling)**, optional auf die Kalenderwoche begrenzt
+-   Normale und kompakte Darstellung
+-   Titelzeile, Datum und Zeitspalte optional ausblendbar
+-   Ansicht umschalten oder Wochen-Popup per Tipp auf die Karte
+-   Gleiche Folgestunden verbinden und leere Endstunden ausblenden (optional)
+-   Gleichmäßige Tages-Spalten für mehrere gleich breite Karten (optional)
 -   **Kompletter visueller Editor (kein YAML notwendig)**
 -   Manueller Stundenplan direkt im Dialog bearbeitbar
 -   Aufklappbare Stunden (Accordion-Editor)
@@ -36,10 +44,8 @@ Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle
 -   Mehrere Einträge pro Stunde möglich (Zellen teilbar / Leerzeile)
 -   Kompletter Stundenplan direkt im UI pflegbar
 -   Pausen-Zeilen (`break: true` + `label`)
--   **Cell-Styles (pro Fachzelle):**
-    -   Hintergrundfarbe
-    -   Transparenz
-    -   Textfarbe
+-   Farbpalette, freier Farbwähler und Transparenzregler für Highlights und manuelle Zellen
+-   Hintergrund- und Textfarben pro Fachzelle; JSON-/Sensorquellen unterstützen `cell_styles`
 -   Heute-Highlight (`highlight_today`)
 -   Aktuelles Fach hervorheben (`highlight_current`)
 -   Stunden untereinander einfügen / Pausen darunter einfügen
@@ -52,6 +58,10 @@ Eine Lovelace Custom Card zur Darstellung eines Stundenplans als Tabelle
 ## 📸 Screenshot
 
 ![Screenshot](https://raw.githubusercontent.com/fabel-smith/stundenplan-card/main/screenshot.png)
+
+*Beispiel aus einer älteren Version. Editor, Bezeichnungen und Anordnung der
+Bedienelemente wurden seitdem überarbeitet; das Bild zeigt nicht den aktuellen
+Editor von v3.4.0.*
 
 ### Neuer visueller Editor (manueller Stundenplan)
 
@@ -112,9 +122,13 @@ Vorgehen:
 
 1.  Card zum Dashboard hinzufügen
 2.  Bearbeiten öffnen
-3.  Abschnitt **„Manuell (rows)"** aufklappen
-4.  **+ Stunde** oder **+ Pause** hinzufügen
-5.  Stunde anklicken → Details bearbeiten
+3.  Unter **Datenquellen** die Quelle **Manuell (rows)** auswählen
+4.  Den nun sichtbaren Abschnitt **Manueller Stundenplan** aufklappen
+5.  **+ Stunde** oder **+ Pause** hinzufügen
+6.  Stunde anklicken → Details bearbeiten
+
+Für diesen manuellen Modus brauchst du weder eine externe Integration noch
+JSON-Dateien oder REST-Sensoren. Auch manuelle A/B-Pläne sind ohne Suite möglich.
 
 ### Einstellbar pro Stunde
 
@@ -133,7 +147,7 @@ Plan sehr schnell aufbauen.
 
 ### Manuelle Wechselwochen
 
-Im Abschnitt **„Manuell (rows)"** kannst du **Wechselwochen A/B**
+Im Abschnitt **Manueller Stundenplan** kannst du **Wechselwochen A/B**
 aktivieren. Anschließend lassen sich Woche A und Woche B getrennt im
 visuellen Editor pflegen. Die Karte wechselt automatisch anhand der
 Kalenderwoche. Dabei kannst du festlegen, ob Woche A auf eine gerade oder
@@ -152,6 +166,11 @@ rows_b:     # Woche B
   - time: 1.
     cells: [Deutsch, Mathe, Kunst, Englisch, Sport]
 ```
+
+## Anzeigeoptionen
+
+Diese Optionen gelten unabhängig davon, ob die Daten manuell, aus einem
+JSON-Sensor oder aus der Suite kommen.
 
 ### Zeitspalte ausblenden
 
@@ -197,7 +216,8 @@ Transparenzangabe ohne Hintergrundfarbe), verhindern die Verbindung nicht.
 ### Gleichmäßige Spaltenbreiten
 
 
-Für mehrere gleich breite Stundenplan-Karten untereinander kann unter
+Für mehrere gleich breite Stundenplan-Karten mit gleicher Anzahl sichtbarer
+Tage kann unter
 **Allgemein → Ansicht** die Option **Gleichmäßige Spaltenbreiten** aktiviert
 werden. In YAML:
 
@@ -265,9 +285,6 @@ Fokustag, andernfalls den ersten sichtbaren Tag. In der rollierenden Ansicht
 gilt der erste sichtbare Tag. Die Hervorhebung der aktuellen Stunde
 berücksichtigt dabei ebenfalls die jeweilige Zellzeit.
 
-Diese Methode benötigt: - keine REST-Sensoren - keine JSON-Dateien -
-keine externe Integration
-
 ------------------------------------------------------------------------
 
 ## 🔌 Nutzung mit der stundenplan-suite
@@ -309,14 +326,18 @@ Raumänderungen oder Unterrichtsausfall.
 
 ------------------------------------------------------------------------
 
-## 🔄 Update-Hinweise (v3.1.0)
+## Update-Hinweise
 
-Version **3.1.0** führt einen komplett überarbeiteten manuellen Editor
-ein.
+**v3.4.0** ergänzt einen kompakteren, an die Editorbreite angepassten Dialog,
+Farbpalette und Transparenzregler sowie die optionale Rolling-Wochengrenze.
+Der manuelle Editor erscheint nur bei manueller Datenquelle; gespeicherte
+A/B-Pläne bleiben beim Quellenwechsel erhalten.
 
-Bestehende Konfigurationen funktionieren weiterhin unverändert.\
-Du kannst jederzeit zusätzlich den manuellen Editor nutzen oder darauf
-umsteigen.
+Bestehende Einstellungen und Farbwerte bleiben erhalten. Die neue
+Wochenbegrenzung ist standardmäßig ausgeschaltet.
+
+Alle Änderungen und Hinweise stehen in den
+[GitHub-Releases](https://github.com/fabel-smith/stundenplan-card/releases).
 
 ------------------------------------------------------------------------
 
