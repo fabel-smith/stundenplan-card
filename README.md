@@ -192,10 +192,21 @@ für den gesamten verbundenen Zeitraum.
 
 Unterschiede, die bei der Darstellung keine Wirkung haben (beispielsweise eine
 Transparenzangabe ohne Hintergrundfarbe), verhindern die Verbindung nicht.
-Die Tages-Spalten werden gleichmäßig auf die verfügbare Tabellenbreite verteilt;
-lange Fachbezeichnungen umbrechen innerhalb ihrer Spalte. Sowohl die ganze Woche
-als auch eine eintägige Rolling-Ansicht nutzen die vorhandene Kartenbreite ohne
-eine künstliche Mindestbreite.
+
+### Gleichmäßige Spaltenbreiten
+
+Für mehrere gleich breite Stundenplan-Karten untereinander kann unter
+**Allgemein → Ansicht** die Option **Gleichmäßige Spaltenbreiten** aktiviert
+werden. In YAML:
+
+```yaml
+equal_column_widths: true
+```
+
+Dann werden die Tages-Spalten gleichmäßig auf die verfügbare Kartenbreite
+verteilt und lange Fachbezeichnungen innerhalb ihrer Spalte umgebrochen. Das
+funktioniert sowohl mit der ganzen Woche als auch mit einer eintägigen
+Rolling-Ansicht. Ohne diese Option bestimmt der Inhalt wie bisher die Breite.
 
 Mehrere Fächer innerhalb einer Stunde sind möglich (z. B.
 Gruppenunterricht / AG / Teilung).\

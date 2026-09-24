@@ -246,11 +246,11 @@ let Q = class extends HTMLElement {
   }
 };
 Q.elementStyles = [], Q.shadowRootOptions = { mode: "open" }, Q[ht("elementProperties")] = /* @__PURE__ */ new Map(), Q[ht("finalized")] = /* @__PURE__ */ new Map(), hi?.({ ReactiveElement: Q }), (F.reactiveElementVersions ?? (F.reactiveElementVersions = [])).push("2.1.2");
-const ut = globalThis, _e = (e) => e, jt = ut.trustedTypes, me = jt ? jt.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, De = "$lit$", U = `lit$${Math.random().toFixed(9).slice(2)}$`, Ce = "?" + U, ui = `<${Ce}>`, Y = document, pt = () => Y.createComment(""), gt = (e) => e === null || typeof e != "object" && typeof e != "function", Zt = Array.isArray, di = (e) => Zt(e) || typeof e?.[Symbol.iterator] == "function", Ht = `[ 	
+const ut = globalThis, _e = (e) => e, jt = ut.trustedTypes, me = jt ? jt.createPolicy("lit-html", { createHTML: (e) => e }) : void 0, De = "$lit$", U = `lit$${Math.random().toFixed(9).slice(2)}$`, Ce = "?" + U, ui = `<${Ce}>`, Y = document, pt = () => Y.createComment(""), gt = (e) => e === null || typeof e != "object" && typeof e != "function", qt = Array.isArray, di = (e) => qt(e) || typeof e?.[Symbol.iterator] == "function", Ht = `[ 	
 \f\r]`, lt = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, fe = /-->/g, ye = />/g, V = RegExp(`>|${Ht}(?:([^\\s"'>=/]+)(${Ht}*=${Ht}*(?:[^ 	
 \f\r"'\`<>=]|("|')|))|$)`, "g"), we = /'/g, be = /"/g, Te = /^(?:script|style|textarea|title)$/i, pi = (e) => (t, ...i) => ({ _$litType$: e, strings: t, values: i }), c = pi(1), it = /* @__PURE__ */ Symbol.for("lit-noChange"), S = /* @__PURE__ */ Symbol.for("lit-nothing"), ve = /* @__PURE__ */ new WeakMap(), I = Y.createTreeWalker(Y, 129);
 function Re(e, t) {
-  if (!Zt(e) || !e.hasOwnProperty("raw")) throw Error("invalid template strings array");
+  if (!qt(e) || !e.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return me !== void 0 ? me.createHTML(t) : t;
 }
 const gi = (e, t) => {
@@ -379,7 +379,7 @@ class mt {
     return i === void 0 && ve.set(t.strings, i = new _t(t)), i;
   }
   k(t) {
-    Zt(this._$AH) || (this._$AH = [], this._$AR());
+    qt(this._$AH) || (this._$AH = [], this._$AR());
     const i = this._$AH;
     let s, n = 0;
     for (const r of t) n === i.length ? i.push(s = new mt(this.O(pt()), this.O(pt()), this, this.options)) : s = i[n], s._$AI(r), n++;
@@ -538,7 +538,7 @@ var ki = Object.defineProperty, Ai = Object.getOwnPropertyDescriptor, je = (e) =
 function C(e) {
   return !!e && e.break === !0;
 }
-function qt(e) {
+function Zt(e) {
   return Math.min(1, Math.max(0, e));
 }
 function ze(e) {
@@ -551,7 +551,7 @@ function ze(e) {
 function Gt(e) {
   if (!e || typeof e != "object") return null;
   const t = {};
-  return typeof e.bg == "string" && e.bg.trim() && (t.bg = e.bg.trim()), typeof e.color == "string" && e.color.trim() && (t.color = e.color.trim()), typeof e.border == "string" && e.border.trim() && (t.border = e.border.trim()), typeof e.bg_alpha == "number" && !Number.isNaN(e.bg_alpha) && (t.bg_alpha = qt(e.bg_alpha)), Object.keys(t).length ? t : null;
+  return typeof e.bg == "string" && e.bg.trim() && (t.bg = e.bg.trim()), typeof e.color == "string" && e.color.trim() && (t.color = e.color.trim()), typeof e.border == "string" && e.border.trim() && (t.border = e.border.trim()), typeof e.bg_alpha == "number" && !Number.isNaN(e.bg_alpha) && (t.bg_alpha = Zt(e.bg_alpha)), Object.keys(t).length ? t : null;
 }
 function $e(e, t) {
   return (Array.isArray(e) ? e : []).map((i) => {
@@ -572,7 +572,7 @@ function Mi(e) {
   if (t.startsWith("rgba(") || t.startsWith("rgb(") || t.startsWith("var(")) return t;
   const i = ze(t);
   if (!i) return t;
-  const s = typeof e.bg_alpha == "number" ? qt(e.bg_alpha) : 0.18;
+  const s = typeof e.bg_alpha == "number" ? Zt(e.bg_alpha) : 0.18;
   return `rgba(${i.r}, ${i.g}, ${i.b}, ${s})`;
 }
 function Ei(e, t) {
@@ -585,7 +585,7 @@ function xe(e, t) {
   if (i.startsWith("rgba(") || i.startsWith("rgb(") || i.startsWith("var(")) return i;
   if (i.startsWith("#")) {
     const s = ze(i);
-    return s ? `rgba(${s.r}, ${s.g}, ${s.b}, ${qt(t)})` : i;
+    return s ? `rgba(${s.r}, ${s.g}, ${s.b}, ${Zt(t)})` : i;
   }
   return i;
 }
@@ -860,6 +860,7 @@ const j = (ct = class extends tt {
       show_time_column: !0,
       trim_empty_rows: !1,
       merge_double_lessons: !1,
+      equal_column_widths: !1,
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       view_mode: "week",
       display_mode: "default",
@@ -948,6 +949,7 @@ const j = (ct = class extends tt {
       show_time_column: e.show_time_column ?? t.show_time_column,
       trim_empty_rows: e.trim_empty_rows ?? t.trim_empty_rows,
       merge_double_lessons: e.merge_double_lessons ?? t.merge_double_lessons,
+      equal_column_widths: e.equal_column_widths ?? t.equal_column_widths,
       days: i,
       view_mode: a,
       display_mode: l,
@@ -1473,7 +1475,7 @@ const j = (ct = class extends tt {
         </div>` : c``}
 
         <div class="card">
-          <table>
+          <table class=${e.equal_column_widths ? "equalColumns" : ""}>
             <thead>
               <tr>
                 ${k ? c`<th class="time">Stunde</th>` : c``}
@@ -1487,8 +1489,8 @@ const j = (ct = class extends tt {
       else {
         const L = Ae(y);
         if (L) {
-          const Z = new Date(K);
-          Z.setDate(K.getDate() + (L - 1)), P = this.fmtDDMMYYYY(Z);
+          const q = new Date(K);
+          q.setDate(K.getDate() + (L - 1)), P = this.fmtDDMMYYYY(q);
         }
       }
       return c`
@@ -1505,7 +1507,7 @@ const j = (ct = class extends tt {
             <tbody>
               ${this._noData ? c`<tr class="nodata"><td class="nodataCell" colspan=${yt.length + (k ? 1 : 0)}>${this._noDataMsg}</td></tr>` : Ot.map((y, $) => {
       if (C(y)) {
-        const at = et(y.time), q = !!at.start && !!at.end && this.isNowBetween(at.start, at.end), D = !!e.highlight_breaks && q;
+        const at = et(y.time), Z = !!at.start && !!at.end && this.isNowBetween(at.start, at.end), D = !!e.highlight_breaks && Z;
         let z = `--sp-hl:${p};`, vt = "";
         return D && (z += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", vt += `--sp-hl:${p}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), D && e.highlight_current_time_text && _ && (z += `color:${_};`), c`
                     <tr class="break">
@@ -1514,7 +1516,7 @@ const j = (ct = class extends tt {
                     </tr>
                   `;
       }
-      const x = y, R = x.cells ?? [], P = x.cell_styles ?? [], L = this.getManualRowForDate(e, x, $, Wt), Z = (L?.cell_times ?? x.cell_times)?.[zt] ?? null, se = Z?.time || L?.time || x.time, wt = Z?.start || L?.start || x.start, bt = Z?.end || L?.end || x.end, Bt = ee && !!wt && !!bt && this.isNowBetween(wt, bt), Ie = r >= 0 ? R[r] ?? "" : "", Ye = r >= 0 ? this.filterCellText(Ie, e) : "", Ke = r >= 0 ? X(Ye) : !1, Ut = !(e.free_only_column_highlight && Ke), ne = et(se), Je = !!(ne.start && ne.end), re = !Je && wt && bt ? `${wt}–${bt}` : "";
+      const x = y, R = x.cells ?? [], P = x.cell_styles ?? [], L = this.getManualRowForDate(e, x, $, Wt), q = (L?.cell_times ?? x.cell_times)?.[zt] ?? null, se = q?.time || L?.time || x.time, wt = q?.start || L?.start || x.start, bt = q?.end || L?.end || x.end, Bt = ee && !!wt && !!bt && this.isNowBetween(wt, bt), Ie = r >= 0 ? R[r] ?? "" : "", Ye = r >= 0 ? this.filterCellText(Ie, e) : "", Ke = r >= 0 ? X(Ye) : !1, Ut = !(e.free_only_column_highlight && Ke), ne = et(se), Je = !!(ne.start && ne.end), re = !Je && wt && bt ? `${wt}–${bt}` : "";
       let Ft = `--sp-hl:${p};`;
       return Ut && e.highlight_current && Bt && (Ft += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), Ut && Bt && e.highlight_current_time_text && _ && (Ft += `color:${_};`), c`
                   <tr>
@@ -1525,16 +1527,16 @@ const j = (ct = class extends tt {
                       </div>
                     </td>` : c``}
 
-                    ${yt.map((at, q) => {
-        const D = J[q], z = this.getManualRowForDate(e, x, $, E?.[q]), vt = z?.cells ?? R, Ze = z?.cell_styles ?? P, ae = this.filterCellText(vt[D] ?? "", e), qe = Ze[D] ?? null, Ge = e.highlight_today && D === r ? "today" : "", $t = e.merge_double_lessons ? Ni(Ot, $, (ot, xt) => {
-          const G = this.getManualRowForDate(e, ot, xt, E?.[q]);
+                    ${yt.map((at, Z) => {
+        const D = J[Z], z = this.getManualRowForDate(e, x, $, E?.[Z]), vt = z?.cells ?? R, qe = z?.cell_styles ?? P, ae = this.filterCellText(vt[D] ?? "", e), Ze = qe[D] ?? null, Ge = e.highlight_today && D === r ? "today" : "", $t = e.merge_double_lessons ? Ni(Ot, $, (ot, xt) => {
+          const G = this.getManualRowForDate(e, ot, xt, E?.[Z]);
           return { text: this.filterCellText((G?.cells ?? ot?.cells ?? [])[D] ?? "", e), style: (G?.cell_styles ?? ot?.cell_styles ?? [])[D] ?? null };
         }) : { covered: !1, span: 1 };
         if ($t.covered) return S;
-        let oe = `--sp-hl:${g};` + Ei(qe, h);
+        let oe = `--sp-hl:${g};` + Ei(Ze, h);
         const Qe = !X(ae), Xe = (() => {
           if (!ee || D !== zt || $t.span <= 1) return !1;
-          const ot = (z?.cell_times ?? x.cell_times)?.[D] ?? null, xt = $ + $t.span - 1, G = Ot[xt], le = this.getManualRowForDate(e, G, xt, E?.[q]), ti = (le?.cell_times ?? G?.cell_times)?.[D] ?? null, ce = ot?.start || z?.start || x.start, he = ti?.end || le?.end || G?.end;
+          const ot = (z?.cell_times ?? x.cell_times)?.[D] ?? null, xt = $ + $t.span - 1, G = Ot[xt], le = this.getManualRowForDate(e, G, xt, E?.[Z]), ti = (le?.cell_times ?? G?.cell_times)?.[D] ?? null, ce = ot?.start || z?.start || x.start, he = ti?.end || le?.end || G?.end;
           return !!ce && !!he && this.isNowBetween(ce, he);
         })();
         return Ut && Qe && (Bt || Xe) && e.highlight_current_text && d && r >= 0 && D === r && (oe += `color:${d};`), c`<td class=${Ge} style=${oe} rowspan=${$t.span}>${this.renderCell(ae, e)}</td>`;
@@ -1666,9 +1668,13 @@ const j = (ct = class extends tt {
     }
 
     table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+    }
+    table.equalColumns {
       width: 100%;
       table-layout: fixed;
-      border-collapse: collapse;
     }
     th,
     td {
@@ -1753,6 +1759,9 @@ const j = (ct = class extends tt {
       font-weight: 800;
       font-size: 14px;
       letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+    table.equalColumns .fach {
       white-space: normal;
     }
     .raum,
@@ -2481,6 +2490,14 @@ const It = class extends tt {
                   <div class="sub">Fasst direkt aufeinanderfolgende gleiche Fächer ohne Pause als Doppelstunde zusammen.</div>
                 </div>
                 <ha-switch .checked=${A(t.merge_double_lessons, !1)} @change=${(i) => this.onToggle(i, "merge_double_lessons")}></ha-switch>
+              </div>
+
+              <div class="optRow gridFull">
+                <div>
+                  <div class="optTitle">Gleichmäßige Spaltenbreiten</div>
+                  <div class="sub">Richtet die Tages-Spalten auch über mehrere gleich breite Karten hinweg einheitlich aus.</div>
+                </div>
+                <ha-switch .checked=${A(t.equal_column_widths, !1)} @change=${(i) => this.onToggle(i, "equal_column_widths")}></ha-switch>
               </div>
 
               ${(t.view_mode ?? "week") === "rolling" ? c`

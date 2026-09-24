@@ -62,6 +62,7 @@ assert.deepEqual(mergeInfo([{cells:['D'],cell_styles:[{color:'red'}]},{cells:['D
 assert.deepEqual(mergeInfo([{cells:[' E\r\nR012 '],cell_styles:[{bg_alpha:0.18}]},{cells:['E\nR012'],cell_styles:[null]}],0,info),{covered:false,span:2});
 assert(code.includes('Stundenplan Suite (Integration)'));
 assert(code.includes('attributes?.week_offset_entity || je(sid)'));
-assert(code.includes('table-layout: fixed'));
-assert(!code.includes('tableMinWidth'));
-console.log('Card contract: 19 assertions passed (actual source methods).');
+assert(code.includes('equal_column_widths: !1'));
+assert(code.includes('table.equalColumns'));
+assert(code.includes('class=${t.equal_column_widths ? "equalColumns" : ""}'));
+console.log('Card contract: 21 assertions passed (actual source methods).');

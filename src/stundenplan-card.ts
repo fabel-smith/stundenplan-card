@@ -894,6 +894,7 @@ const v = (D = class extends U {
       show_time_column: !0,
       trim_empty_rows: !1,
       merge_double_lessons: !1,
+      equal_column_widths: !1,
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
       view_mode: "week",
       display_mode: "default",
@@ -992,6 +993,7 @@ const v = (D = class extends U {
       show_time_column: t.show_time_column ?? e.show_time_column,
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
       merge_double_lessons: t.merge_double_lessons ?? e.merge_double_lessons,
+      equal_column_widths: t.equal_column_widths ?? e.equal_column_widths,
       days: s,
       view_mode: vm,
       display_mode: displayMode,
@@ -1699,7 +1701,7 @@ const v = (D = class extends U {
         </div>` : d``}
 
         <div class="card">
-          <table>
+          <table class=${t.equal_column_widths ? "equalColumns" : ""}>
             <thead>
               <tr>
                 ${showTimeColumn ? d`<th class="time">Stunde</th>` : d``}
@@ -1896,9 +1898,13 @@ const v = (D = class extends U {
     }
 
     table {
+      width: max-content;
+      min-width: 100%;
+      border-collapse: collapse;
+    }
+    table.equalColumns {
       width: 100%;
       table-layout: fixed;
-      border-collapse: collapse;
     }
     th,
     td {
@@ -1983,6 +1989,9 @@ const v = (D = class extends U {
       font-weight: 800;
       font-size: 14px;
       letter-spacing: 0.2px;
+      white-space: nowrap;
+    }
+    table.equalColumns .fach {
       white-space: normal;
     }
     .raum,
@@ -2798,6 +2807,14 @@ const ut = class ut extends U {
                   <div class="sub">Fasst direkt aufeinanderfolgende gleiche Fächer ohne Pause als Doppelstunde zusammen.</div>
                 </div>
                 <ha-switch .checked=${E(t.merge_double_lessons, !1)} @change=${(e) => this.onToggle(e, "merge_double_lessons")}></ha-switch>
+              </div>
+
+              <div class="optRow gridFull">
+                <div>
+                  <div class="optTitle">Gleichmäßige Spaltenbreiten</div>
+                  <div class="sub">Richtet die Tages-Spalten auch über mehrere gleich breite Karten hinweg einheitlich aus.</div>
+                </div>
+                <ha-switch .checked=${E(t.equal_column_widths, !1)} @change=${(e) => this.onToggle(e, "equal_column_widths")}></ha-switch>
               </div>
 
               ${(t.view_mode ?? "week") === "rolling" ? d`
