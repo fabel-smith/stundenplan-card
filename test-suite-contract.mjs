@@ -66,3 +66,26 @@ assert(code.includes('equal_column_widths: !1'));
 assert(code.includes('table.equalColumns'));
 assert(code.includes('class=${t.equal_column_widths ? "equalColumns" : ""}'));
 console.log('Card contract: 21 assertions passed (actual source methods).');
+
+const rolling = method('getRollingVisibleSlots', 'async handleCardAction');
+const rollingContext = {
+  findConfiguredDayIndexForDate: (date, days) => days.indexOf(['So','Mo','Di','Mi','Do','Fr','Sa'][date.getDay()]),
+  isConfiguredSchoolday(date, days) { return this.findConfiguredDayIndexForDate(date, days) >= 0; },
+  nextConfiguredSchoolday: method('nextConfiguredSchoolday', 'getLastLessonEnd'),
+  shouldAdvanceRollingDay: () => false,
+};
+const dateKeys = slots => slots.map(slot => [slot.date.getFullYear(), slot.date.getMonth()+1, slot.date.getDate()]);
+const rollingConfig = {days:config.days,rolling_week_only:true};
+assert.deepEqual(dateKeys(rolling.call(rollingContext, rollingConfig, 4, new Date(2026,8,24,9))), [[2026,9,24],[2026,9,25]]);
+assert.equal(rolling.call(rollingContext, {...rollingConfig,rolling_week_only:false}, 4, new Date(2026,8,24,9)).length, 5);
+assert.deepEqual(dateKeys(rolling.call(rollingContext, rollingConfig, 0, new Date(2026,8,26,9))), [[2026,9,28]]);
+assert.deepEqual(dateKeys(rolling.call({...rollingContext,shouldAdvanceRollingDay:()=>true}, rollingConfig, 1, new Date(2026,8,25,16))), [[2026,9,28],[2026,9,29]]);
+assert.deepEqual(dateKeys(rolling.call(rollingContext, rollingConfig, 6, new Date(2026,11,31,9))), [[2026,12,31],[2027,1,1]]);
+assert.deepEqual(dateKeys(rolling.call(rollingContext, {days:['Fr','Sa','So','Mo'],rolling_week_only:true}, 6, new Date(2026,8,25,9))), [[2026,9,25],[2026,9,26],[2026,9,27]]);
+const parseColor = standalone('editorColor','Te',{At:value=>Math.max(0,Math.min(1,value))});
+assert.deepEqual(parseColor('rgba(0, 150, 255, 0.12)'), {hex:'#0096ff',alpha:0.12});
+assert.deepEqual(parseColor('#abc'), {hex:'#aabbcc',alpha:1});
+assert.equal(parseColor('#11223380').alpha,128/255);
+assert.equal(parseColor('rgba(0,0,0,0)').alpha,0);
+assert.deepEqual(parseColor('var(--custom)', '#ffffff',0.18), {hex:'#ffffff',alpha:0.18});
+console.log('Rolling boundaries and color conversion: 11 behavior assertions passed.');

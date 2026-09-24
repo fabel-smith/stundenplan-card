@@ -195,6 +195,7 @@ Transparenzangabe ohne Hintergrundfarbe), verhindern die Verbindung nicht.
 
 ### Gleichmäßige Spaltenbreiten
 
+
 Für mehrere gleich breite Stundenplan-Karten untereinander kann unter
 **Allgemein → Ansicht** die Option **Gleichmäßige Spaltenbreiten** aktiviert
 werden. In YAML:
@@ -207,6 +208,36 @@ Dann werden die Tages-Spalten gleichmäßig auf die verfügbare Kartenbreite
 verteilt und lange Fachbezeichnungen innerhalb ihrer Spalte umgebrochen. Das
 funktioniert sowohl mit der ganzen Woche als auch mit einer eintägigen
 Rolling-Ansicht. Ohne diese Option bestimmt der Inhalt wie bisher die Breite.
+
+### Rolling auf eine Kalenderwoche begrenzen
+
+Unter **Allgemein → Rolling** gibt es optional **Auf Kalenderwoche begrenzen**:
+
+```yaml
+view_mode: rolling
+days_ahead: 4
+rolling_week_only: true
+```
+
+Ab Donnerstag erscheinen bei Schultagen Mo–Fr nur Donnerstag und Freitag.
+Die Grenze ist der Sonntag der Woche des Starttags. Am Wochenende springt die
+Ansicht wie bisher zum nächsten konfigurierten Schultag (normalerweise Montag).
+Auch die eingestellte Umschaltzeit bleibt wirksam: Nach der letzten Stunde am
+Freitag kann Montag bereits der neue Starttag sein. Die Option ist standardmäßig
+aus; bestehende Rolling-Ansichten bleiben wochenübergreifend.
+
+### Editor und Farben
+
+Der Editor passt seine Felder an die verfügbare Breite an. Ansichtsmodus,
+Ansichtsdichte und Tap-Aktion werden über kompakte Dropdowns ausgewählt.
+Der Bereich **Manueller Stundenplan** erscheint nur bei der Datenquelle
+**Manuell**. Gespeicherte A/B-Pläne bleiben bei einem Quellenwechsel erhalten.
+
+Unter **Farben** und bei manuellen Zellen stehen eine Farbpalette, ein freier
+Farbwähler und ein Transparenzregler bereit: **0 % = deckend, 100 % = durchsichtig**.
+Bestehende Farbwerte werden beim Öffnen nicht verändert. Individuelle CSS-Werte
+können weiterhin unter **Farbcode** eingetragen werden. Die Schalter für farbige
+Fach- und Zeittexte befinden sich unter **Highlights**.
 
 Mehrere Fächer innerhalb einer Stunde sind möglich (z. B.
 Gruppenunterricht / AG / Teilung).\

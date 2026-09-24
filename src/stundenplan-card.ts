@@ -576,6 +576,20 @@ function Me(r) {
   const s = typeof r.bg_alpha == "number" ? At(r.bg_alpha) : 0.18;
   return `rgba(${e.r}, ${e.g}, ${e.b}, ${s})`;
 }
+function editorColor(value, fallback = "#2196f3", defaultAlpha = 1) {
+  const text = String(value ?? "").trim();
+  const hex = text.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+  if (hex) {
+    const full = hex[1].length === 3 ? [...hex[1]].map(x => x + x).join("") : hex[1];
+    return { hex: "#" + full.slice(0, 6), alpha: full.length === 8 ? parseInt(full.slice(6), 16) / 255 : defaultAlpha };
+  }
+  const rgb = text.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
+  if (rgb) return {
+    hex: "#" + rgb.slice(1, 4).map(x => Math.min(255, Number(x)).toString(16).padStart(2, "0")).join(""),
+    alpha: rgb[4] == null ? 1 : At(Number(rgb[4]))
+  };
+  return { hex: fallback, alpha: defaultAlpha };
+}
 function Te(r, t) {
   const e = [], s = Me(r);
   return s && e.push(`background:${s}`), r?.color && e.push(`color:${r.color}`), e.push(`border:${r?.border ?? t}`), e.join(";") + ";";
@@ -900,6 +914,7 @@ const v = (D = class extends U {
       display_mode: "default",
       days_ahead: 0,
       rolling_switch_mode: "midnight",
+      rolling_week_only: !1,
       rolling_switch_time: "",
       tap_action: { action: "none" },
       highlight_today: !0,
@@ -999,6 +1014,7 @@ const v = (D = class extends U {
       display_mode: displayMode,
       days_ahead: daysAhead,
       rolling_switch_mode: rollingSwitchMode,
+      rolling_week_only: t.rolling_week_only === !0,
       rolling_switch_time: rollingSwitchTime,
       tap_action: this.normalizeTapAction(t.tap_action ?? e.tap_action),
       highlight_today: t.highlight_today ?? e.highlight_today,
@@ -1236,10 +1252,10 @@ const v = (D = class extends U {
     }
     return !1;
   }
-  getRollingVisibleSlots(t, e) {
+  getRollingVisibleSlots(t, e, now = new Date()) {
     const s = t.days ?? [];
     if (!s.length) return [];
-    const i = new Date();
+    const i = now;
     let n = new Date(i.getFullYear(), i.getMonth(), i.getDate(), 12, 0, 0, 0);
     if (!this.isConfiguredSchoolday(n, s)) {
       n = this.nextConfiguredSchoolday(n, s);
@@ -1249,7 +1265,11 @@ const v = (D = class extends U {
     const o = [];
     const l = Math.max(0, Math.min(6, e));
     let a = new Date(n);
+    const weekEnd = new Date(n);
+    weekEnd.setDate(n.getDate() + (7 - (n.getDay() || 7)));
+    weekEnd.setHours(23, 59, 59, 999);
     for (let c = 0; c <= l; c++) {
+      if (t.rolling_week_only && a > weekEnd) break;
       const _ = this.findConfiguredDayIndexForDate(a, s);
       if (_ >= 0) o.push({ orig: _, date: new Date(a) });
       a = this.nextConfiguredSchoolday(a, s);
@@ -2298,7 +2318,7 @@ const ut = class ut extends U {
       // Single-Source: keep its own field + effective source_entity
       this.emit({
         ...this._config,
-        source_type: "legacy",
+        source_type: "sensor",
         source_entity: e,
         source_entity_legacy: e
       });
@@ -2616,14 +2636,11 @@ const ut = class ut extends U {
                       ></ha-input>
                     </div>
 
-                    <div class="cellsGrid" style=${`grid-template-columns: repeat(${days.length}, minmax(220px, 1fr));`}>
+                    <div class="cellsGrid">
                       ${days.map((day, i) => {
                         const val = (lr.cells?.[i] ?? "").toString();
                         const st = (Array.isArray(lr.cell_styles) ? lr.cell_styles?.[i] : void 0) ?? {};
-                        const bg = (st?.bg ?? "#000000").toString();
                         const a = typeof st?.bg_alpha === "number" && !Number.isNaN(st.bg_alpha) ? st.bg_alpha : 0.18;
-                        const alphaPct = Math.round(a * 100);
-                        const tx = (st?.color ?? "#ffffff").toString();
 
                         return d`
                           <div class="cellEditor">
@@ -2637,29 +2654,11 @@ const ut = class ut extends U {
                             ></textarea>
 
                             <div class=${this._showCellStyles ? "cellStyles" : "cellStyles cellStyles--hidden"}>
-                              <div class="styleLine">
-                                <div class="styleLbl">Hintergrund</div>
-                                <input class="col" type="color" .value=${bg} @input=${(e) => this.updateManualCellStyle(idx, i, { bg: e?.target?.value })} />
-                              </div>
-
-                              <div class="styleLine">
-                                <div class="styleLbl">Transparenz</div>
-                                <div class="range">
-                                  <input
-                                    type="range"
-                                    min="0"
-                                    max="100"
-                                    .value=${String(alphaPct)}
-                                    @input=${(e) => this.updateManualCellStyle(idx, i, { bg_alpha: Number(e?.target?.value ?? 0) / 100 })}
-                                  />
-                                  <div class="pct">${alphaPct}%</div>
-                                </div>
-                              </div>
-
-                              <div class="styleLine">
-                                <div class="styleLbl">Text</div>
-                                <input class="col" type="color" .value=${tx} @input=${(e) => this.updateManualCellStyle(idx, i, { color: e?.target?.value })} />
-                              </div>
+                              ${this.renderColorPicker("Hintergrund", Me(st) ?? "", value => {
+                                const parsed = editorColor(value);
+                                this.updateManualCellStyle(idx, i, value ? { bg: value, bg_alpha: parsed.alpha } : { bg: "", bg_alpha: 0.18 });
+                              }, "#2196f3", a)}
+                              ${this.renderColorPicker("Text", st.color ?? "", value => this.updateManualCellStyle(idx, i, { color: value }), "#ffffff")}
                             </div>
                           </div>
                         `;
@@ -2683,6 +2682,50 @@ const ut = class ut extends U {
   isHaEntityPickerAvailable() {
     return typeof customElements < "u" && !!customElements.get("ha-entity-picker");
   }
+  renderToggle(key, label, fallback = !1) {
+    return d`<label class="toggleRow"><span>${label}</span><ha-switch
+      .checked=${E(this._config[key], fallback)}
+      @change=${(event) => this.onToggle(event, key)}></ha-switch></label>`;
+  }
+  renderColorPicker(label, value, onChange, fallback = "#2196f3", defaultAlpha = 1) {
+    const color = editorColor(value, fallback, defaultAlpha);
+    const palette = [["#03a9f4", "Blau"], ["#009688", "Türkis"], ["#4caf50", "Grün"],
+      ["#ffeb3b", "Gelb"], ["#ff9800", "Orange"], ["#f44336", "Rot"],
+      ["#e91e63", "Pink"], ["#9c27b0", "Violett"], ["#ffffff", "Weiß"], ["#212121", "Dunkel"]];
+    const change = (hex, alpha) => {
+      const rgb = Qt(hex);
+      if (rgb) onChange(`rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${Math.round(alpha * 100) / 100})`);
+    };
+    return d`<fieldset class="colorPicker">
+      <legend>${label}</legend>
+      <div class="palette">
+        ${palette.map(([hex, name]) => d`<button type="button" class="swatch"
+          style=${`--swatch:${hex}`} title=${name} aria-label=${`${label}: ${name}`}
+          aria-pressed=${color.hex.toLowerCase() === hex}
+          @click=${() => change(hex, color.alpha)}></button>`)}
+        <input type="color" class="customColor" aria-label=${`${label}: eigene Farbe`}
+          title="Eigene Farbe" .value=${color.hex} @input=${event => change(event.target.value, color.alpha)} />
+      </div>
+      <label class="opacityControl"><span>Transparenz</span>
+        <input type="range" min="0" max="100" aria-label=${`${label}: Transparenz`}
+          .value=${String(Math.round((1 - color.alpha) * 100))}
+          @input=${event => change(color.hex, 1 - Number(event.target.value) / 100)} />
+        <output>${Math.round((1 - color.alpha) * 100)}%</output>
+      </label>
+      <div class="colorFooter"><span class="colorPreview" style=${`background:${value || fallback}`}></span>
+        <button type="button" class="resetColor" @click=${() => onChange("")}>Zurücksetzen</button>
+        <details class="colorAdvanced"><summary>Farbcode</summary>
+          <input aria-label=${`${label}: Farbcode`} .value=${value ?? ""}
+            @change=${event => onChange(event.target.value)} />
+        </details>
+      </div>
+    </fieldset>`;
+  }
+  renderConfigColor(label, key, fallback, alpha = 1) {
+    return this.renderColorPicker(label, this._config[key], value => {
+      this.setValue(key, value || Xt.getStubConfig()[key]);
+    }, fallback, alpha);
+  }
   render() {
     if (!this._config) return d``;
     const t = this._config;
@@ -2705,20 +2748,12 @@ const ut = class ut extends U {
             </div>
 
             <div class="generalDivider">Titel & Kopfzeile</div>
-            <div class="grid3">
-              <ha-switch .checked=${E(t.show_title, !0)} @change=${(e) => this.onToggle(e, "show_title")}></ha-switch>
-              <div class="switchLabel">Titelzeile anzeigen</div>
-              <div></div>
-
-              <ha-switch .checked=${E(t.show_header_date, !0)} @change=${(e) => this.onToggle(e, "show_header_date")}></ha-switch>
-              <div class="switchLabel">Datum anzeigen</div>
-              <div></div>
-
-              <ha-switch .checked=${E(t.show_time_column, !0)} @change=${(e) => this.onToggle(e, "show_time_column")}></ha-switch>
-              <div class="switchLabel">Spalte „Stunde“ anzeigen</div>
-              <div></div>
-
-              <div></div>
+            <div class="toggleGroup">
+              ${this.renderToggle("show_title", "Titelzeile anzeigen", !0)}
+              ${this.renderToggle("show_header_date", "Datum anzeigen", !0)}
+              ${this.renderToggle("show_time_column", "Spalte „Stunde“ anzeigen", !0)}
+            </div>
+            ${t.show_title !== !1 ? d`<div class="grid2">
               <ha-input
                 label="Titelgröße (px)"
                 type="number"
@@ -2733,7 +2768,7 @@ const ut = class ut extends U {
                 .value=${t.title_font_family ?? ""}
                 @input=${(e) => this.onText(e, "title_font_family")}
               ></ha-input>
-            </div>
+            </div>` : f}
 
             <div class="generalDivider">Ansicht</div>
             <div class="grid2">
@@ -2745,6 +2780,7 @@ const ut = class ut extends U {
                     name: "view_mode",
                     selector: {
                       select: {
+                        mode: "dropdown",
                         options: [
                           { value: "week", label: "Ganze Woche" },
                           { value: "rolling", label: "Ab heute (rolling)" }
@@ -2773,6 +2809,7 @@ const ut = class ut extends U {
                     name: "display_mode",
                     selector: {
                       select: {
+                        mode: "dropdown",
                         options: [
                           { value: "default", label: "Normal" },
                           { value: "compact", label: "Kompakt" }
@@ -2796,7 +2833,7 @@ const ut = class ut extends U {
               <div class="optRow gridFull">
                 <div>
                   <div class="optTitle">Leere Endstunden ausblenden</div>
-                  <div class="sub">Kürzt die Tabelle nach der letzten belegten Stunde der sichtbaren Tage.</div>
+                  <div class="sub">Nur bis zur letzten belegten Stunde anzeigen.</div>
                 </div>
                 <ha-switch .checked=${E(t.trim_empty_rows, !1)} @change=${(e) => this.onToggle(e, "trim_empty_rows")}></ha-switch>
               </div>
@@ -2804,7 +2841,7 @@ const ut = class ut extends U {
               <div class="optRow gridFull">
                 <div>
                   <div class="optTitle">Gleiche Folgestunden verbinden</div>
-                  <div class="sub">Fasst direkt aufeinanderfolgende gleiche Fächer ohne Pause als Doppelstunde zusammen.</div>
+                  <div class="sub">Identische Fächer ohne Pausenzeile zusammenfassen.</div>
                 </div>
                 <ha-switch .checked=${E(t.merge_double_lessons, !1)} @change=${(e) => this.onToggle(e, "merge_double_lessons")}></ha-switch>
               </div>
@@ -2812,13 +2849,15 @@ const ut = class ut extends U {
               <div class="optRow gridFull">
                 <div>
                   <div class="optTitle">Gleichmäßige Spaltenbreiten</div>
-                  <div class="sub">Richtet die Tages-Spalten auch über mehrere gleich breite Karten hinweg einheitlich aus.</div>
+                  <div class="sub">Für mehrere gleich breite Karten untereinander.</div>
                 </div>
                 <ha-switch .checked=${E(t.equal_column_widths, !1)} @change=${(e) => this.onToggle(e, "equal_column_widths")}></ha-switch>
               </div>
 
               ${(t.view_mode ?? "week") === "rolling" ? d`
                 <div class="generalDivider gridFull">Rolling</div>
+                <div class="gridFull">${this.renderToggle("rolling_week_only", "Auf Kalenderwoche begrenzen")}</div>
+                ${t.rolling_week_only ? d`<div class="hint gridFull">Endet am Sonntag der Startwoche. Am Wochenende beginnt die Ansicht beim nächsten Schultag; auch „Nach der letzten Stunde“ bleibt wirksam.</div>` : f}
                 <ha-input
                   label="Zusätzliche Tage im Voraus"
                   type="number"
@@ -2838,6 +2877,7 @@ const ut = class ut extends U {
                       name: "rolling_switch_mode",
                       selector: {
                         select: {
+                          mode: "dropdown",
                           options: [
                             { value: "midnight", label: "Ab 00:00 Uhr" },
                             { value: "after_last_lesson", label: "Nach der letzten Stunde" },
@@ -2860,7 +2900,7 @@ const ut = class ut extends U {
                 ></ha-form>
 
                 ${(t.rolling_switch_mode ?? "midnight") === "fixed_time" ? d`
-                  <ha-input
+                  <ha-input class="gridFull"
                     label="Umschaltzeit (HH:MM)"
                     .value=${t.rolling_switch_time ?? ""}
                     @input=${(e) => this.onText(e, "rolling_switch_time")}
@@ -2872,10 +2912,10 @@ const ut = class ut extends U {
               ` : d``}
             </div>
 
-            <div class="hint">„Ab heute (rolling)“ zeigt ab dem Starttag die nächsten passenden Schultage. Beim Blättern in andere Wochen beginnt die Ansicht automatisch am Montag.</div>
+            ${(t.view_mode ?? "week") === "rolling" ? d`<div class="hint">Ab dem Starttag werden die nächsten passenden Schultage angezeigt. Beim Blättern in andere Wochen beginnt die Ansicht am Montag.</div>` : f}
 
-            <div class="generalDivider">Tap-Aktion</div>
-            <div class="grid2">
+            <div class="generalDivider">Beim Antippen</div>
+            <div class="stack">
               <ha-form
                 .hass=${this.hass}
                 .data=${{ tap_action_action: ((t.tap_action?.action ?? "none") + "").toString() }}
@@ -2884,6 +2924,7 @@ const ut = class ut extends U {
                     name: "tap_action_action",
                     selector: {
                       select: {
+                        mode: "dropdown",
                         options: [
                           { value: "none", label: "Keine Aktion" },
                           { value: "toggle_view", label: "Ansicht umschalten" },
@@ -2918,33 +2959,13 @@ const ut = class ut extends U {
       "Highlights",
       "highlights",
       d`
-            <div class="grid3">
-              <ha-switch .checked=${E(t.highlight_today, !0)} @change=${(e) => this.onToggle(e, "highlight_today")}></ha-switch>
-              <div class="switchLabel">Heute-Spalte hervorheben</div>
-              <div></div>
-
-              <ha-switch .checked=${E(t.highlight_current, !0)} @change=${(e) => this.onToggle(e, "highlight_current")}></ha-switch>
-              <div class="switchLabel">Aktuelle Stunde hervorheben</div>
-              <div></div>
-
-              <ha-switch .checked=${E(t.highlight_breaks, !1)} @change=${(e) => this.onToggle(e, "highlight_breaks")}></ha-switch>
-              <div class="switchLabel">Pause hervorheben</div>
-              <div></div>
-
-              <ha-switch
-                .checked=${E(t.free_only_column_highlight, !0)}
-                @change=${(e) => this.onToggle(e, "free_only_column_highlight")}
-              ></ha-switch>
-              <div class="switchLabel">Nur wenn heute-Spalte nicht frei</div>
-              <div></div>
-
-              <ha-switch .checked=${E(t.highlight_current_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_text")}></ha-switch>
-              <div class="switchLabel">Textfarbe in aktueller Stunde</div>
-              <ha-input label="Textfarbe" .value=${t.highlight_current_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_text_color")}></ha-input>
-
-              <ha-switch .checked=${E(t.highlight_current_time_text, !1)} @change=${(e) => this.onToggle(e, "highlight_current_time_text")}></ha-switch>
-              <div class="switchLabel">Zeitspalte Textfarbe (aktuell)</div>
-              <ha-input label="Zeitfarbe" .value=${t.highlight_current_time_text_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_time_text_color")}></ha-input>
+            <div class="toggleGroup">
+              ${this.renderToggle("highlight_today", "Heute-Spalte hervorheben", !0)}
+              ${this.renderToggle("highlight_current", "Aktuelle Stunde hervorheben", !0)}
+              ${this.renderToggle("highlight_breaks", "Pause hervorheben")}
+              ${this.renderToggle("free_only_column_highlight", "Freistunden nicht hervorheben", !0)}
+              ${this.renderToggle("highlight_current_text", "Aktuelles Fach farbig anzeigen")}
+              ${t.show_time_column !== !1 ? this.renderToggle("highlight_current_time_text", "Aktuelle Zeit farbig anzeigen") : f}
             </div>
           `
     )}
@@ -2953,9 +2974,11 @@ const ut = class ut extends U {
       "Farben",
       "colors",
       d`
-            <div class="grid2">
-              <ha-input label="Heute Overlay" .value=${t.highlight_today_color ?? ""} @input=${(e) => this.onText(e, "highlight_today_color")}></ha-input>
-              <ha-input label="Aktuell Overlay" .value=${t.highlight_current_color ?? ""} @input=${(e) => this.onText(e, "highlight_current_color")}></ha-input>
+            <div class="stack">
+              ${this.renderConfigColor("Heute-Spalte", "highlight_today_color", "#0096ff", 0.12)}
+              ${this.renderConfigColor("Aktuelle Stunde / Pause", "highlight_current_color", "#4caf50", 0.18)}
+              ${t.highlight_current_text ? this.renderConfigColor("Aktuelles Fach: Text", "highlight_current_text_color", "#ff1744") : f}
+              ${t.highlight_current_time_text && t.show_time_column !== !1 ? this.renderConfigColor("Aktuelle Zeit: Text", "highlight_current_time_text_color", "#ff9100") : f}
             </div>
           `
     )}
@@ -2974,6 +2997,7 @@ const ut = class ut extends U {
           name: "source_type",
           selector: {
             select: {
+              mode: "dropdown",
               options: [
                 { value: "manual", label: "Manuell (rows)" },
                 { value: "entity", label: "Stundenplan Suite (Integration)" },
@@ -3036,12 +3060,12 @@ const ut = class ut extends U {
                     ></ha-entity-picker>
                   ` : d``}
 
-                  <ha-input
-                    label="Stundenplan24 Entity-ID (manuell)"
+                  ${!this.isHaEntityPickerAvailable() ? d`<ha-input
+                    label="Stundenplan Suite Entity-ID"
                     .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
                     @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
 placeholder="sensor.05b_woche"
-                  ></ha-input>
+                  ></ha-input>` : f}
                 ` : d``}
 
             ${(t.source_type ?? "manual") === "sensor" ? d`
@@ -3073,12 +3097,12 @@ placeholder="sensor.05b_woche"
                     ></ha-entity-picker>
                   ` : d``}
 
-                  <ha-input
+                  ${!this.isHaEntityPickerAvailable() ? d`<ha-input
                     label="Sensor Entity-ID (manuell)"
                     .value=${(t.source_entity ?? "")}
                     @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
 placeholder="sensor.stundenplan"
-                  ></ha-input>
+                  ></ha-input>` : f}
 
                   <div class="grid2">
                     <ha-input label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} @change=${(e) => this.onText(e, "source_attribute")} @value-changed=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-input>
@@ -3142,7 +3166,7 @@ placeholder="sensor.stundenplan"
           `
     )}
 
-        ${this.renderSection("Manuell (rows)", "manual", this.renderManualRows())}
+        ${(t.source_type ?? "manual") === "manual" ? this.renderSection("Manueller Stundenplan", "manual", this.renderManualRows()) : f}
       </div>
     `;
   }
@@ -3151,8 +3175,17 @@ ut.properties = {
   hass: {},
   _config: { state: !0 }
 }, ut.styles = It`
+    :host {
+      display: block;
+      min-width: 0;
+      container-type: inline-size;
+      color: var(--primary-text-color);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    ha-input, ha-form, ha-entity-picker { display: block; min-width: 0; width: 100%; }
+    ha-switch { flex: 0 0 auto; }
     .wrap {
-      padding: 12px;
+      padding: 8px;
       display: grid;
       gap: 12px;
     }
@@ -3180,11 +3213,19 @@ ut.properties = {
     .sectionBody {
       padding: 12px;
       display: grid;
-      gap: 12px;
+      gap: 10px;
     }
+    .sectionBody > *, .grid2 > *, .optRow > div { min-width: 0; }
+    .stack, .toggleGroup { display: grid; gap: 10px; min-width: 0; }
+    .toggleGroup { gap: 0; }
+    .toggleRow {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 7px 0; font-size: 14px; cursor: pointer;
+    }
+    .toggleRow span { min-width: 0; overflow-wrap: anywhere; }
     .grid2 {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 10px;
       align-items: start;
     }
@@ -3202,8 +3243,10 @@ ut.properties = {
       opacity: 0.85;
       line-height: 1.4;
     }
+    .sub { font-size: 12px; line-height: 1.4; opacity: 0.75; }
+    .hint, .sub, .optTitle { overflow-wrap: anywhere; }
     .infoBox {
-      padding: 12px 14px;
+      padding: 10px 12px;
       border-radius: 14px;
       background: rgba(3, 169, 244, 0.10);
       border: 1px solid rgba(3, 169, 244, 0.35);
@@ -3214,10 +3257,10 @@ ut.properties = {
       margin-bottom: 0;
       display: flex;
       align-items: center;
-      min-height: 56px;
+      min-height: 0;
     }
     .generalDivider {
-      margin: 18px 0 8px;
+      margin: 8px 0 0;
       padding-top: 12px;
       border-top: 1px solid rgba(255,255,255,0.08);
       font-size: 13px;
@@ -3313,9 +3356,9 @@ ut.properties = {
       box-sizing: border-box;
     }
 
-    @media (max-width: 900px) {
+    @container (max-width: 390px) {
       .grid2 {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
       .grid3 {
         grid-template-columns: 1fr;
@@ -3347,6 +3390,7 @@ ut.properties = {
       align-items: center;
       gap: 12px;
       margin-top: 6px;
+      flex-wrap: wrap;
     }
     .rowsTitle {
       font-weight: 700;
@@ -3411,8 +3455,8 @@ ut.properties = {
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      padding: 10px 12px;
-      border-radius: 14px;
+      padding: 8px 10px;
+      border-radius: 10px;
       background: rgba(255,255,255,0.03);
       border: 1px solid rgba(255,255,255,0.06);
     }
@@ -3423,6 +3467,7 @@ ut.properties = {
     .cellsGrid {
       margin-top: 12px;
       display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
       gap: 10px;
       overflow-x: auto;
       padding-bottom: 4px;
@@ -3454,6 +3499,21 @@ ut.properties = {
       gap: 8px;
     }
     .cellStyles--hidden { display: none !important; }
+    .colorPicker { min-width: 0; margin: 0; padding: 10px; border: 1px solid var(--divider-color); border-radius: 10px; }
+    .colorPicker legend { padding: 0 5px; font-size: 13px; font-weight: 600; }
+    .palette { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+    .swatch { width: 25px; height: 25px; padding: 0; border: 1px solid var(--divider-color); border-radius: 50%; background: var(--swatch); cursor: pointer; }
+    .swatch[aria-pressed="true"] { outline: 2px solid var(--primary-color); outline-offset: 2px; }
+    .customColor { width: 32px; height: 28px; padding: 1px; border: 1px solid var(--divider-color); border-radius: 5px; background: transparent; cursor: pointer; }
+    .opacityControl { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-size: 12px; }
+    .opacityControl input { min-width: 40px; width: 0; flex: 1; accent-color: var(--primary-color); }
+    .opacityControl output { width: 35px; text-align: right; }
+    .colorFooter { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; font-size: 12px; }
+    .colorPreview { width: 24px; height: 18px; border: 1px solid var(--divider-color); border-radius: 4px; }
+    .resetColor { border: 0; background: transparent; color: var(--primary-color); cursor: pointer; font: inherit; padding: 4px 0; }
+    .colorAdvanced { flex: 1; min-width: 0; }
+    .colorAdvanced summary { cursor: pointer; opacity: 0.75; }
+    .colorAdvanced input { width: 100%; min-width: 0; margin-top: 6px; background: var(--secondary-background-color); color: var(--primary-text-color); border: 1px solid var(--divider-color); padding: 6px; border-radius: 4px; }
     .styleLine {
       display: flex;
       justify-content: space-between;
@@ -3544,14 +3604,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.2.6";
+window.__STUNDENPLAN_CARD_VERSION = "v3.4.0";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.2.6 (marker: STUNDENPLAN_CARD_v3.2.6)",
+  description: "Stundenplan Card v3.4.0 (marker: STUNDENPLAN_CARD_v3.4.0)",
   preview: !0
 });
 export {
