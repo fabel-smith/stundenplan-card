@@ -87,5 +87,6 @@ assert.deepEqual(parseColor('rgba(0, 150, 255, 0.12)'), {hex:'#0096ff',alpha:0.1
 assert.deepEqual(parseColor('#abc'), {hex:'#aabbcc',alpha:1});
 assert.equal(parseColor('#11223380').alpha,128/255);
 assert.equal(parseColor('rgba(0,0,0,0)').alpha,0);
+assert.equal(parseColor('transparent').alpha,0);
 assert.deepEqual(parseColor('var(--custom)', '#ffffff',0.18), {hex:'#ffffff',alpha:0.18});
-console.log('Rolling boundaries and color conversion: 11 behavior assertions passed.');
+console.log('Rolling boundaries and color conversion: 12 behavior assertions passed.');

@@ -579,6 +579,7 @@ function Me(r) {
 }
 function editorColor(value, fallback = "#2196f3", defaultAlpha = 1) {
   const text = String(value ?? "").trim();
+  if (text.toLowerCase() === "transparent") return { hex: fallback, alpha: 0 };
   const hex = text.match(/^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
   if (hex) {
     const full = hex[1].length === 3 ? [...hex[1]].map(x => x + x).join("") : hex[1];
@@ -723,6 +724,20 @@ function je(r) {
 function Oe(r) {
   const t = wt(r);
   return ["mo", "montag", "mon", "monday"].includes(t) ? 1 : ["di", "dienstag", "tue", "tues", "tuesday"].includes(t) ? 2 : ["mi", "mittwoch", "wed", "wednesday"].includes(t) ? 3 : ["do", "donnerstag", "thu", "thurs", "thursday"].includes(t) ? 4 : ["fr", "freitag", "fri", "friday"].includes(t) ? 5 : ["sa", "samstag", "sat", "saturday"].includes(t) ? 6 : ["so", "sonntag", "sun", "sunday"].includes(t) ? 7 : null;
+}
+const appearanceFields = [
+  { key: "card_background", variable: "--stundenplan-card-background", label: "Kartenhintergrund", theme: "--card-background-color", fallback: "#ffffff" },
+  { key: "header_background", variable: "--stundenplan-header-background", label: "Tabellenkopf & Navigation", theme: "--secondary-background-color", fallback: "#eeeeee" },
+  { key: "row_background", variable: "--stundenplan-row-background", label: "Zeilenhintergrund", theme: "--card-background-color", fallback: "#ffffff" },
+  { key: "divider_color", variable: "--stundenplan-divider-color", label: "Trennlinien", theme: "--divider-color", fallback: "#e0e0e0" }
+];
+function normalizeAppearance(config) {
+  const values = {};
+  for (const { key } of appearanceFields) {
+    const value = typeof config[key] === "string" ? config[key].trim() : "";
+    if (value && !/[;{}]/.test(value) && CSS.supports("color", value)) values[key] = value;
+  }
+  return values;
 }
 const typographyFields = [
   { key: "font_size_subject", variable: "--stundenplan-font-size-subject", label: "Fächer (px)", min: 8, max: 64 },
@@ -1024,6 +1039,7 @@ const v = (D = class extends U {
       title_font_size: Number.isFinite(Number(t.title_font_size)) ? Math.max(0, Math.min(40, Number(t.title_font_size))) : e.title_font_size,
       title_font_family: (t.title_font_family ?? e.title_font_family ?? "").toString(),
       ...normalizeTypography(t),
+      ...normalizeAppearance(t),
       show_header_date: t.show_header_date ?? e.show_header_date,
       show_time_column: t.show_time_column ?? e.show_time_column,
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
@@ -1234,6 +1250,11 @@ const v = (D = class extends U {
     const values = normalizeTypography(t);
     return typographyFields.filter(({ key }) => values[key] != null)
       .map(({ key, variable }) => `${variable}:${values[key]}px`).join(";");
+  }
+  getAppearanceStyle(t) {
+    const values = normalizeAppearance(t);
+    return appearanceFields.filter(({ key }) => values[key] != null)
+      .map(({ key, variable }) => `${variable}:${values[key]}`).join(";");
   }
   fmtYMD(t) {
     return `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, "0")}${String(t.getDate()).padStart(2, "0")}`;
@@ -1723,7 +1744,7 @@ const v = (D = class extends U {
   }
 
   renderCardLayout(t, vmOverride = null, popup = !1) {
-    const e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], u), vm = ((vmOverride ?? this._uiViewMode ?? t.view_mode ?? "week") + "").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, i = "1px solid var(--divider-color)", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(), showTimeColumn = t.show_time_column !== !1,
+    const e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], u), vm = ((vmOverride ?? this._uiViewMode ?? t.view_mode ?? "week") + "").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, i = "1px solid var(--stundenplan-divider-color, var(--divider-color))", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(), showTimeColumn = t.show_time_column !== !1,
         p = !popup && (t.week_offset_entity ?? "").trim().length > 0,
         showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), g = u && u.length >= (t.days?.length ?? 0) ? u : null, upd = this.getHeaderUpdatedFromEntity(t), O = this.getBaseDate(t), B = this.mondayOfWeek(O), tapAction = this.normalizeTapAction(t.tap_action), displayMode = popup ? "default" : (t.display_mode ?? "default"), cardClass = `${displayMode === "compact" ? "compact" : ""}${!popup && tapAction.action !== "none" ? " tappable" : ""}${popup ? " popupCard" : ""}`, showTitle = t.show_title !== !1 && ((t.title ?? "").toString().trim().length > 0), titleStyle = this.getTitleStyle(t), showHeaderRow = showTitle || c || showPager,
         rollingActive = vm === "rolling" && (popup || !showPager || (h ?? 0) === 0),
@@ -1749,7 +1770,7 @@ const v = (D = class extends U {
           return y;
         })();
     return d`
-      <ha-card class=${cardClass} style=${this.getTypographyStyle(t)} @click=${popup ? (y) => this.closeWeekPopup(y) : (y) => this.handleCardAction(t, y)}>
+      <ha-card class=${cardClass} style=${[this.getTypographyStyle(t), this.getAppearanceStyle(t)].filter(Boolean).join(";")} @click=${popup ? (y) => this.closeWeekPopup(y) : (y) => this.handleCardAction(t, y)}>
         ${showHeaderRow ? d`<div class="headerRow">
           ${showTitle ? d`<div class="title" style=${titleStyle}>${t.title ?? ""}</div>` : d`<div class="titleSpacer"></div>`}
 
@@ -1868,6 +1889,8 @@ const v = (D = class extends U {
     }
     ha-card {
       display: block;
+      background: var(--stundenplan-card-background, var(--ha-card-background, var(--card-background-color, white)));
+      border-color: var(--stundenplan-divider-color, var(--ha-card-border-color, var(--divider-color, #e0e0e0)));
       width: 100%;
       max-width: 100%;
       box-sizing: border-box;
@@ -1921,9 +1944,9 @@ const v = (D = class extends U {
 
     .weekBadgeInline {
       padding: 6px 10px;
-      border: 1px solid var(--divider-color);
+      border: 1px solid var(--stundenplan-divider-color, var(--divider-color));
       border-radius: 12px;
-      background: var(--secondary-background-color);
+      background: var(--stundenplan-header-background, var(--secondary-background-color));
       font-size: 13px;
       opacity: 0.95;
       white-space: nowrap;
@@ -1934,13 +1957,13 @@ const v = (D = class extends U {
       gap: 8px;
       align-items: start;
       padding: 6px 8px;
-      border: 1px solid var(--divider-color);
+      border: 1px solid var(--stundenplan-divider-color, var(--divider-color));
       border-radius: 12px;
-      background: var(--secondary-background-color);
+      background: var(--stundenplan-header-background, var(--secondary-background-color));
     }
     .btnMini {
-      border: 1px solid var(--divider-color);
-      background: var(--card-background-color);
+      border: 1px solid var(--stundenplan-divider-color, var(--divider-color));
+      background: var(--stundenplan-card-background, var(--card-background-color));
       color: var(--primary-text-color);
       border-radius: 10px;
       padding: 6px 10px;
@@ -1976,15 +1999,18 @@ const v = (D = class extends U {
     td {
       padding: 6px;
       text-align: center;
-      border: 1px solid var(--divider-color);
+      border: 1px solid var(--stundenplan-divider-color, var(--divider-color));
       vertical-align: middle;
       word-break: normal;
       overflow-wrap: anywhere;
     }
     th {
-      background: var(--secondary-background-color);
+      background: var(--stundenplan-header-background, var(--secondary-background-color));
       font-weight: 700;
       font-size: var(--stundenplan-font-size-header, inherit);
+    }
+    td {
+      background: var(--stundenplan-row-background, transparent);
     }
     /* A table row's height is a minimum; wrapped content can still grow. */
     tbody tr:not(.break):not(.nodata) {
@@ -2052,7 +2078,7 @@ const v = (D = class extends U {
       align-items: flex-start;
     }
     .cellMulti > * + * {
-      border-left: 1px solid var(--divider-color);
+      border-left: 1px solid var(--stundenplan-divider-color, var(--divider-color));
       padding-left: 10px;
     }
     .cellMulti .cellWrap {
@@ -2121,8 +2147,8 @@ const v = (D = class extends U {
   
 
     tr.nodata td {
-      border: 1px solid var(--divider-color);
-      background: var(--secondary-background-color);
+      border: 1px solid var(--stundenplan-divider-color, var(--divider-color));
+      background: var(--stundenplan-row-background, var(--secondary-background-color));
     }
     .nodataCell {
       text-align: center;
@@ -2268,6 +2294,7 @@ const ut = class ut extends U {
     this._open = {
       general: !1,
       typography: !1,
+      appearance: !1,
       highlights: !1,
       colors: !1,
       sources: !1,
@@ -2815,6 +2842,17 @@ const ut = class ut extends U {
       this.setValue(key, value || Xt.getStubConfig()[key]);
     }, fallback, alpha);
   }
+  renderAppearanceColor(field) {
+    const theme = getComputedStyle(this).getPropertyValue(field.theme).trim();
+    const fallback = editorColor(theme, field.fallback).hex;
+    return this.renderColorPicker(field.label, this._config[field.key] ?? "", value => {
+      const config = { ...this._config };
+      const normalized = normalizeAppearance({ [field.key]: value })[field.key];
+      if (normalized) config[field.key] = normalized;
+      else delete config[field.key];
+      this.emit(config);
+    }, fallback);
+  }
   renderTypographyInput(field) {
     return d`<ha-input
       label=${field.label} type="number" min=${field.min} max=${field.max} step="1"
@@ -3096,6 +3134,16 @@ const ut = class ut extends U {
               ${t.highlight_current_time_text && t.show_time_column !== !1 ? this.renderConfigColor("Aktuelle Zeit: Text", "highlight_current_time_text_color", "#ff9100") : f}
             </div>
           `
+    )}
+        ${this.renderSection(
+      "Hintergründe & Linien",
+      "appearance",
+      d`
+        <div class="hint">Optional für transparente Dashboards. Zurücksetzen verwendet wieder Theme oder CSS-Vorgaben. Eigene Fachfarben und Highlights bleiben erhalten.</div>
+        <div class="stack">
+          ${appearanceFields.map(field => this.renderAppearanceColor(field))}
+        </div>
+      `
     )}
         ${this.renderSection(
       "Datenquellen",
@@ -3719,14 +3767,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.5.1";
+window.__STUNDENPLAN_CARD_VERSION = "v3.6.0";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.5.1 (marker: STUNDENPLAN_CARD_v3.5.1)",
+  description: "Stundenplan Card v3.6.0 (marker: STUNDENPLAN_CARD_v3.6.0)",
   preview: !0
 });
 export {

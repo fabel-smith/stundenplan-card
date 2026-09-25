@@ -25,9 +25,14 @@ class Switch extends HTMLElement {
  connectedCallback(){this.shadowRoot.innerHTML='<style>input{accent-color:#03a9f4;width:32px;height:24px}</style><input type="checkbox">';const input=this.shadowRoot.querySelector('input');input.checked=this.checked;input.onchange=()=>{this.checked=input.checked;this.dispatchEvent(new Event('change',{bubbles:true,composed:true}));};}
 }
 customElements.define('ha-input',Input);customElements.define('ha-form',Form);customElements.define('ha-switch',Switch);
+class HaCard extends HTMLElement {
+ constructor(){super();this.attachShadow({mode:'open'}).innerHTML='<style>:host{background:var(--ha-card-background,var(--card-background-color,white));border-color:var(--ha-card-border-color,var(--divider-color,#e0e0e0));}</style><slot></slot>';}
+}
+customElements.define('ha-card',HaCard);
 </script><script type="module" src="/bundle.js"></script></body></html>`;
 (async()=>{
- const previousBundle=execFileSync('git',['show','v3.4.1:dist/stundenplan-card.js'],{cwd:__dirname,maxBuffer:1024*1024});
+ const baselineRef=process.env.BASELINE_REF || 'v3.4.1';
+ const previousBundle=execFileSync('git',['show',baselineRef+':dist/stundenplan-card.js'],{cwd:__dirname,maxBuffer:1024*1024});
  const server=http.createServer((req,res)=>{
    res.setHeader('Content-Type',req.url.endsWith('.js')?'text/javascript':'text/html');
    res.end(req.url==='/bundle.js'?fs.readFileSync(path.join(__dirname,'dist/stundenplan-card.js')):
@@ -46,7 +51,7 @@ customElements.define('ha-input',Input);customElements.define('ha-form',Form);cu
    editor.setConfig({type:'custom:stundenplan-card',source_type:'manual',view_mode:'rolling',rolling_week_only:true,days_ahead:4,
     rows:[{time:'1.',start:'08:00',end:'08:45',cells:['D','E','M','Sp','D']}],rows_b:[{time:'1.',cells:['M']}],
     highlight_current_text:true,highlight_current_time_text:true});
-   editor._open={general:true,typography:true,colors:true,highlights:true,sources:true,manual:true};
+   editor._open={general:true,typography:true,appearance:true,colors:true,highlights:true,sources:true,manual:true};
    editor._showCellStyles=true;
    document.querySelector('#editor').append(editor);await editor.updateComplete;
   });
@@ -74,6 +79,8 @@ customElements.define('ha-input',Input);customElements.define('ha-form',Form);cu
     await page.locator('#editor').screenshot({path:path.join(output,'editor-'+width+'.png')});
     await page.locator('.section').filter({has:page.getByText('Schrift & Abstände',{exact:true})})
       .screenshot({path:path.join(output,'typography-'+width+'.png')});
+    await page.locator('.section').filter({has:page.getByText('Hintergründe & Linien',{exact:true})})
+      .screenshot({path:path.join(output,'backgrounds-'+width+'.png')});
    }
   }
   await page.evaluate(async()=>{editor.setSourceType('manual');editor._rowOpen={0:true};await editor.updateComplete;});
@@ -310,9 +317,111 @@ customElements.define('ha-input',Input);customElements.define('ha-form',Form);cu
     height:previewFixture.card.config.row_height,title:previewFixture.card.config.font_size_title_compact
   })),{invalid:[],height:240,title:24});
   assert.deepEqual(errors,[]);
+  // Background layers: no stacking on rows/table, inherited CSS, explicit config and cell overrides.
+  const backgroundSnapshot=()=>newPage.evaluate(()=>{
+    const root=document.querySelector('#editor stundenplan-card').shadowRoot;
+    const css=selector=>getComputedStyle(root.querySelector(selector));
+    return {card:css('ha-card').backgroundColor,header:css('th').backgroundColor,
+      row:css('tbody td').backgroundColor,pause:css('.break td').backgroundColor,
+      line:css('tbody td').borderTopColor,cellLine:css('td[rowspan]').borderTopColor,
+      highlight:css('td.today').boxShadow,custom:css('td.today').backgroundColor,
+      tr:css('tbody tr').backgroundColor,table:css('table').backgroundColor};
+  });
+  for(const display_mode of ['default','compact']) {
+    const cfg={...base,display_mode,view_mode:'week',tap_action:{action:'popup_week'}};
+    await renderSnapshot(oldPage,cfg);await renderSnapshot(newPage,cfg);
+    for(const selector of ['ha-card','th','.break td','tbody td']) {
+      const background=p=>p.locator('#editor stundenplan-card').evaluate((card,selector)=>getComputedStyle(card.shadowRoot.querySelector(selector)).backgroundColor,selector);
+      assert.equal(await background(newPage),await background(oldPage),'Default background changed: '+selector);
+    }
+    const defaults=await backgroundSnapshot();
+    await newPage.evaluate(()=>{
+      const host=document.querySelector('#editor stundenplan-card');
+      for(const name of ['card-background','header-background','row-background','divider-color'])
+        host.style.setProperty('--stundenplan-'+name,'transparent');
+    });
+    let bg=await backgroundSnapshot();
+    for(const key of ['card','header','row','pause','line','cellLine']) assert.equal(bg[key],'rgba(0, 0, 0, 0)',key);
+    assert.equal(bg.custom,defaults.custom);assert.equal(bg.highlight,defaults.highlight);
+    await newPage.evaluate(async()=>{
+      const card=document.querySelector('#editor stundenplan-card');
+      card.setConfig({...card.config,card_background:'rgba(10, 20, 30, 0.3)',header_background:'#11223380',
+        row_background:'rgba(40, 50, 60, 0.2)',divider_color:'rgba(70, 80, 90, 0.4)'});await card.updateComplete;
+    });
+    bg=await backgroundSnapshot();
+    assert.equal(bg.card,'rgba(10, 20, 30, 0.3)');assert.equal(bg.header,'rgba(17, 34, 51, 0.5)');
+    assert.equal(bg.row,'rgba(40, 50, 60, 0.2)');assert.equal(bg.pause,bg.row);
+    assert.equal(bg.line,'rgba(70, 80, 90, 0.4)');assert.equal(bg.cellLine,bg.line);
+    assert.equal(bg.tr,'rgba(0, 0, 0, 0)');assert.equal(bg.table,bg.tr);
+    assert.equal(bg.custom,defaults.custom);assert.equal(bg.highlight,defaults.highlight);
+    await newPage.locator('#editor stundenplan-card tbody td').first().click();
+    assert.equal(await newPage.locator('#editor stundenplan-card .popupCard').evaluate(el=>getComputedStyle(el).backgroundColor),bg.card);
+    await newPage.evaluate(async()=>{
+      const card=document.querySelector('#editor stundenplan-card');
+      card.setConfig({...card.config,card_background:'',header_background:null,row_background:'bad color',divider_color:'red;opacity:0'});
+      await card.updateComplete;
+    });
+    bg=await backgroundSnapshot();assert.equal(bg.card,'rgba(0, 0, 0, 0)');assert.equal(bg.line,bg.card);
+    assert.deepEqual(await newPage.evaluate(()=>['card_background','header_background','row_background','divider_color']
+      .filter(key=>Object.hasOwn(document.querySelector('#editor stundenplan-card').config,key))),[]);
+  }
+  // Standard HA variables and light themes keep working when no explicit override is set.
+  await renderSnapshot(newPage,base);
+  await newPage.evaluate(()=>{
+    const host=document.querySelector('#editor stundenplan-card');
+    for(const key of ['--ha-card-background','--card-background-color','--secondary-background-color']) host.style.setProperty(key,'transparent');
+  });
+  let legacyBackground=await backgroundSnapshot();
+  assert.equal(legacyBackground.card,'rgba(0, 0, 0, 0)');assert.equal(legacyBackground.header,legacyBackground.card);
+  for(const testPage of [oldPage,newPage]) {
+    await renderSnapshot(testPage,base);
+    await testPage.evaluate(()=>{
+      const host=document.querySelector('#editor stundenplan-card');
+      host.style.setProperty('--card-background-color','#ffffff');
+      host.style.setProperty('--secondary-background-color','#eeeeee');
+    });
+  }
+  legacyBackground=await backgroundSnapshot();
+  assert.equal(legacyBackground.card,'rgb(255, 255, 255)');assert.equal(legacyBackground.header,'rgb(238, 238, 238)');
+  await renderSnapshot(newPage,{...typographyBase,merge_double_lessons:true,row_background:'rgba(1, 2, 3, 0.25)'});
+  assert.equal(await newPage.locator('#editor stundenplan-card td[rowspan="2"]').first()
+    .evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(1, 2, 3, 0.25)');
+  // JSON/Suite sources use the same styling and retain their own cell colors/borders.
+  for(const source_type of ['sensor','entity']) {
+    await renderSnapshot(newPage,{...base,source_type,source_entity:'sensor.child_woche',source_entity_legacy:'sensor.child_woche',source_entity_integration:'sensor.child_woche',source_attribute:'rows_table',
+      card_background:'transparent',header_background:'transparent',row_background:'rgba(1, 2, 3, 0.25)',divider_color:'transparent'});
+    await newPage.evaluate(async()=>{
+      const card=document.querySelector('#editor stundenplan-card');
+      card.hass={states:{'sensor.child_woche':{state:'ok',attributes:{rows_table:[
+        {time:'1.',cells:['Mathe'],cell_styles:[{bg:'rgba(255, 0, 0, 0.5)',border:'2px solid rgb(0, 255, 0)'}]},
+        {break:true,time:'09:15-09:30',label:'Pause'}]}}}};
+      await card.updateComplete;await card.updateComplete;
+    });
+    assert.equal(await newPage.locator('#editor stundenplan-card td[rowspan]').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(255, 0, 0, 0.5)');
+    assert.equal(await newPage.locator('#editor stundenplan-card td[rowspan]').first().evaluate(el=>getComputedStyle(el).borderTopColor),'rgb(0, 255, 0)');
+  }
+  await setupPreview({...base,card_background:'transparent'});
+  await newPage.evaluate(async()=>{
+    const editor=previewFixture.editor;editor._open={appearance:true};editor.requestUpdate();await editor.updateComplete;
+    editor.addEventListener('config-changed',event=>previewFixture.card.setConfig(event.detail.config));
+  });
+  assert.equal(await newPage.getByRole('slider',{name:'Kartenhintergrund: Transparenz',exact:true}).inputValue(),'100');
+  await newPage.getByRole('button',{name:'Kartenhintergrund: Blau',exact:true}).click();
+  await newPage.getByRole('slider',{name:'Kartenhintergrund: Transparenz',exact:true}).fill('65');
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._config.card_background),'rgba(3, 169, 244, 0.35)');
+  await newPage.evaluate(async()=>{
+    const editor=previewFixture.editor;editor.setConfig(JSON.parse(JSON.stringify(editor._config)));
+    editor.setSourceType('entity');editor.setSourceType('sensor');editor.setSourceType('manual');await editor.updateComplete;
+  });
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._config.card_background),'rgba(3, 169, 244, 0.35)');
+  await newPage.locator('fieldset').filter({has:newPage.locator('legend').getByText('Kartenhintergrund',{exact:true})})
+    .getByRole('button',{name:'Zurücksetzen',exact:true}).click();
+  assert.equal(await newPage.evaluate(()=>Object.hasOwn(previewFixture.editor._config,'card_background')),false);
+  assert.deepEqual(errors,[]);
+  console.log('Backgrounds passed: defaults, transparency, CSS inheritance, config precedence, cell styles, popup, JSON/Suite and editor reset/persistence.');
   console.log('Preview clicks passed: tap actions, merged rows, empty cells, pauses, A/B rolling, source edits and dashboard isolation.');
   console.log('Browser checks passed: color/opacity persistence, source switching, retained A/B data, editor widths 320/440px.');
   console.log('Typography passed: normal/compact sizes, CSS inheritance, row growth, merged cells, popup and editor persistence/reset.');
-  console.log('Existing card rendering matches v3.4.1 in eight weekly/rolling/column-layout/density combinations.');
+  console.log('Existing card rendering matches '+baselineRef+' in eight weekly/rolling/column-layout/density combinations.');
  } finally { if(browser)await browser.close();await new Promise(resolve=>server.close(resolve)); }
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -46,6 +46,7 @@ Stundenplan Suite an und kann den aktuellen Unterricht hervorheben.
 -   Kompletter Stundenplan direkt im UI pflegbar
 -   Pausen-Zeilen (`break: true` + `label`)
 -   Farbpalette, freier Farbwähler und Transparenzregler für Highlights und manuelle Zellen
+-   Optionale transparente Hintergründe und Trennlinien unter **Hintergründe & Linien**, auch per CSS-Variablen
 -   Hintergrund- und Textfarben pro Fachzelle; JSON-/Sensorquellen unterstützen `cell_styles`
 -   Heute-Highlight (`highlight_today`)
 -   Aktuelles Fach hervorheben (`highlight_current`)
@@ -253,6 +254,46 @@ verteilt und lange Fachbezeichnungen innerhalb ihrer Spalte umgebrochen. Das
 funktioniert sowohl mit der ganzen Woche als auch mit einer eintägigen
 Rolling-Ansicht. Ohne diese Option bestimmt der Inhalt wie bisher die Breite.
 
+### Transparente Hintergründe
+
+Im visuellen Editor unter **Hintergründe & Linien** lassen sich Kartenfläche,
+Tabellenkopf und Navigation, Zeilenzellen sowie Trennlinien unabhängig einstellen.
+Alle Felder bieten Farbpalette, freie Farbwahl und Transparenzregler.
+**100 % Transparenz** macht die jeweilige Fläche vollständig durchsichtig.
+
+Beispiel für ein Dashboard mit Hintergrundbild (zusätzlich zur bisherigen Konfiguration):
+
+```yaml
+card_background: transparent
+header_background: transparent
+row_background: transparent
+divider_color: "rgba(255, 255, 255, 0.15)"
+```
+
+Für eine leicht getönte Kartenfläche kann beispielsweise
+`card_background: "rgba(20, 25, 30, 0.35)"` verwendet werden.
+Unterstützt werden auch Hex-Farben, Hex-Farben mit Alpha und CSS-Farbvariablen.
+Die Transparenz betrifft nur die Flächen, nicht die Lesbarkeit des gesamten Karteninhalts.
+
+| YAML-Option | CSS-Variable am Element `stundenplan-card` |
+| --- | --- |
+| `card_background` | `--stundenplan-card-background` |
+| `header_background` | `--stundenplan-header-background` |
+| `row_background` | `--stundenplan-row-background` |
+| `divider_color` | `--stundenplan-divider-color` |
+
+Explizite Kartenoptionen haben Vorrang vor geerbten CSS-Variablen.
+**Zurücksetzen** entfernt die jeweilige Option. Ohne Vorgaben bleiben die bisherigen
+Theme-Farben erhalten; Zeilenzellen sind standardmäßig transparent zur Kartenfläche.
+Die Kartenfläche berücksichtigt weiterhin `--ha-card-background` beziehungsweise
+`--card-background-color`, der Tabellenkopf `--secondary-background-color`.
+
+Die Optionen gelten für alle Datenquellen und das Wochen-Popup.
+Individuelle Zellfarben und Zellrahmen haben Vorrang. Heute-/Stunden-Highlights
+sowie Hinweisfarben bleiben unabhängig davon erhalten und können weiterhin
+über ihre bisherigen Einstellungen angepasst werden. Der abgedunkelte Bereich
+hinter dem Wochen-Popup bleibt unverändert.
+
 ### Rolling auf eine Kalenderwoche begrenzen
 
 Unter **Allgemein → Rolling** gibt es optional **Auf Kalenderwoche begrenzen**:
@@ -403,6 +444,11 @@ Raumänderungen oder Unterrichtsausfall.
 ------------------------------------------------------------------------
 
 ## Update-Hinweise
+
+**v3.6.0** ergänzt **Hintergründe & Linien** mit optionalen Farben und Transparenz
+für Kartenfläche, Tabellenkopf, Zeilenzellen und Trennlinien. Die vier Optionen
+sind auch per CSS-Variablen verfügbar. Ohne neue Vorgaben bleiben Darstellung,
+Fachfarben und Highlights wie bisher.
 
 **v3.5.1** ergänzt die MIT-Lizenz, Lizenzhinweise für eingebundenen Lit-Code und
 die automatische HACS-Validierung. Die HACS-Installationsanleitung wurde berichtigt.
