@@ -51,11 +51,38 @@ customElements.define('ha-card',HaCard);
    editor.setConfig({type:'custom:stundenplan-card',source_type:'manual',view_mode:'rolling',rolling_week_only:true,days_ahead:4,
     rows:[{time:'1.',start:'08:00',end:'08:45',cells:['D','E','M','Sp','D']}],rows_b:[{time:'1.',cells:['M']}],
     highlight_current_text:true,highlight_current_time_text:true});
-   editor._open={general:true,typography:true,appearance:true,colors:true,highlights:true,sources:true,manual:true};
+   editor._open={general:true,rolling:true,typography:true,appearance:true,colors:true,highlights:true,sources:true,manual:true};
    editor._showCellStyles=true;
    document.querySelector('#editor').append(editor);await editor.updateComplete;
   });
   assert.equal(await page.getByText('Auf Kalenderwoche begrenzen',{exact:true}).count(),1);
+  const rollingSection=page.locator('.section').filter({has:page.locator('.sectionTitle').getByText('Rolling',{exact:true})});
+  const generalSection=page.locator('.section').filter({has:page.locator('.sectionTitle').getByText('Allgemein',{exact:true})});
+  assert.equal(await generalSection.getByText('Auf Kalenderwoche begrenzen',{exact:true}).count(),0);
+  assert.equal(await generalSection.locator('ha-input[label="Zusätzliche Tage im Voraus"]').count(),0);
+  await page.evaluate(()=>{window.originalRollingConfig=JSON.parse(JSON.stringify(editor._config));window.accordionChanges=0;
+    editor.addEventListener('config-changed',()=>window.accordionChanges++);});
+  await rollingSection.locator('.sectionHead').click();
+  assert.equal(await rollingSection.locator('.sectionBody').count(),0);
+  assert.equal(await generalSection.locator('.sectionBody').count(),1);
+  await rollingSection.locator('.sectionHead').click();
+  assert.equal(await page.evaluate(()=>window.accordionChanges),0,'Accordion toggles must not change card configuration');
+  await rollingSection.locator('ha-input[label="Zusätzliche Tage im Voraus"]').evaluate(el=>{
+    el.value='6';el.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  await rollingSection.locator('select').selectOption('fixed_time');
+  await rollingSection.locator('ha-input[label="Umschaltzeit (HH:MM)"]').evaluate(el=>{
+    el.value='16:00';el.dispatchEvent(new Event('input',{bubbles:true}));
+  });
+  assert.deepEqual(await page.evaluate(()=>[editor._config.days_ahead,editor._config.rolling_switch_mode,editor._config.rolling_switch_time]),[6,'fixed_time','16:00']);
+  await generalSection.locator('ha-form').filter({has:page.locator('option[value="rolling"]')}).locator('select').selectOption('week');
+  assert.equal(await page.locator('.sectionTitle').getByText('Rolling',{exact:true}).count(),0);
+  await generalSection.locator('ha-form').filter({has:page.locator('option[value="rolling"]')}).locator('select').selectOption('rolling');
+  assert.equal(await rollingSection.locator('ha-input[label="Umschaltzeit (HH:MM)"]').getAttribute('label'),'Umschaltzeit (HH:MM)');
+  assert.deepEqual(await page.evaluate(()=>[editor._config.days_ahead,editor._config.rolling_switch_mode,editor._config.rolling_switch_time,editor._config.rolling_week_only]),[6,'fixed_time','16:00',true]);
+  assert.equal(await page.evaluate(()=>document.createElement('stundenplan-card-editor')._open.rolling),false);
+  await page.evaluate(async()=>{editor.setConfig(window.originalRollingConfig);await editor.updateComplete;});
+  console.log('Rolling accordion passed: independent section, no settings in General, collapsed by default, edits and values preserved across view switches.');
   await page.getByRole('button',{name:'Heute-Spalte: Rot',exact:true}).click();
   assert.equal(await page.evaluate(()=>editor._config.highlight_today_color),'rgba(244, 67, 54, 0.12)');
   await page.getByRole('slider',{name:'Heute-Spalte: Transparenz',exact:true}).fill('50');
@@ -417,7 +444,135 @@ customElements.define('ha-card',HaCard);
   await newPage.locator('fieldset').filter({has:newPage.locator('legend').getByText('Kartenhintergrund',{exact:true})})
     .getByRole('button',{name:'Zurücksetzen',exact:true}).click();
   assert.equal(await newPage.evaluate(()=>Object.hasOwn(previewFixture.editor._config,'card_background')),false);
+  const headerConfig={...base,source_type:'entity',source_entity:'sensor.demo',
+    source_entity_integration:'sensor.demo',week_offset_entity:'number.demo_offset',
+    week_mode:'off',title:'Demo',title_font_size:22,font_size_title_compact:18};
+  const headerSnapshot=async(config,offset=0,popup=false)=>newPage.evaluate(async({config,offset,popup})=>{
+    document.querySelector('hui-dialog-edit-card')?.remove();
+    document.querySelector('#editor').replaceChildren();
+    const card=document.createElement('stundenplan-card');card.setConfig(config);
+    card.hass={states:{'sensor.demo':{state:'ok',attributes:{plan:config.rows}},
+      'number.demo_offset':{state:String(offset),attributes:{}}}};
+    document.querySelector('#editor').append(card);
+    await card.updateComplete;await card.updateComplete;
+    if(popup){card._uiPopupOpen=true;card.requestUpdate();await card.updateComplete;}
+    const root=popup?card.shadowRoot.querySelector('.popupCard'):card.shadowRoot.querySelector('ha-card');
+    const header=root.querySelector('.headerRow'),tableWrapper=root.querySelector('.card');
+    return {buttons:root.querySelectorAll('.offsetInline .btnMini').length,header:!!header,
+      gap:header?parseFloat(getComputedStyle(header).paddingBottom)+parseFloat(getComputedStyle(tableWrapper).paddingTop):null,
+      top:root.querySelector('table').getBoundingClientRect().top-root.getBoundingClientRect().top,
+      titleSize:root.querySelector('.title')?getComputedStyle(root.querySelector('.title')).fontSize:null,
+      days:[...root.querySelectorAll('thead th:not(.time)')].map(el=>el.textContent.trim()),
+      offsetEntity:card.config.week_offset_entity,
+      configuredGap:card.config.header_table_gap??null};
+  },{config,offset,popup});
+  for(const display_mode of ['default','compact']) {
+    const config={...headerConfig,display_mode};
+    const normal=await headerSnapshot(config);
+    assert.equal(normal.buttons,2);
+    assert.equal(normal.gap,display_mode==='compact'?12:20);
+    assert.equal(normal.titleSize,display_mode==='compact'?'18px':'22px');
+    for(const header_table_gap of [0,4,24]) {
+      const custom=await headerSnapshot({...config,header_table_gap});
+      assert.equal(custom.gap,header_table_gap);
+      assert.equal(custom.top-normal.top,header_table_gap-normal.gap);
+    }
+    const hidden=await headerSnapshot({...config,show_week_navigation:false});
+    assert.equal(hidden.buttons,0);
+    assert.equal(hidden.offsetEntity,'number.demo_offset');
+    for(const offset of [0,1]) {
+      const shown=await headerSnapshot({...config,view_mode:'rolling',days_ahead:0},offset);
+      const hidden=await headerSnapshot({...config,view_mode:'rolling',days_ahead:0,show_week_navigation:false},offset);
+      assert.deepEqual(hidden.days,shown.days,'Hiding navigation must not change the selected rolling week');
+    }
+    const noHeader={...config,show_title:false,show_week_navigation:false};
+    assert.equal((await headerSnapshot(noHeader)).header,false);
+    assert.equal((await headerSnapshot({...noHeader,header_table_gap:24})).top,(await headerSnapshot(noHeader)).top);
+    const popup=await headerSnapshot({...config,header_table_gap:4,show_week_navigation:false},0,true);
+    assert.equal(popup.buttons,0);
+    assert.equal(popup.gap,4);
+    assert.equal(popup.titleSize,'22px');
+  }
+  for(const invalid of ['',null,-1,'not-a-number',true]) {
+    assert.equal((await headerSnapshot({...headerConfig,header_table_gap:invalid})).configuredGap,null);
+  }
+  assert.equal((await headerSnapshot({...headerConfig,header_table_gap:100})).configuredGap,64);
+  await setupPreview({...headerConfig,header_table_gap:4});
+  await newPage.evaluate(async()=>{
+    const editor=previewFixture.editor;editor._open={general:true,typography:true};editor.requestUpdate();await editor.updateComplete;
+  });
+  const navigation=newPage.locator('.toggleRow').filter({has:newPage.getByText('Wochennavigation anzeigen',{exact:true})}).locator('ha-switch');
+  await navigation.locator('input').uncheck();
+  const gapInput=newPage.locator('ha-input[label="Abstand Kopfzeile / Tabelle (px)"]');
+  await gapInput.evaluate(el=>{el.value='0';el.dispatchEvent(new Event('change',{bubbles:true}));});
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._config.header_table_gap),0);
+  await newPage.evaluate(async()=>{const editor=previewFixture.editor;editor.setConfig(JSON.parse(JSON.stringify(editor._config)));await editor.updateComplete;});
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._config.show_week_navigation),false);
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._config.header_table_gap),0);
+  await gapInput.evaluate(el=>{el.value='';el.dispatchEvent(new Event('change',{bubbles:true}));});
+  assert.equal(await newPage.evaluate(()=>Object.hasOwn(previewFixture.editor._config,'header_table_gap')),false);
+  await gapInput.evaluate(el=>{el.value='8';el.dispatchEvent(new Event('change',{bubbles:true}));});
+  await newPage.getByRole('button',{name:'Größen zurücksetzen',exact:true}).click();
+  assert.equal(await newPage.evaluate(()=>Object.hasOwn(previewFixture.editor._config,'header_table_gap')),false);
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._config.show_week_navigation),false);
+  console.log('Header controls passed: navigation visibility preserves offsets/rolling; optional gap supports zero, reset, hidden headers and popup; title sizes remain independent.');
+  const repeatedDayPage=await browser.newPage();
+  repeatedDayPage.on('pageerror',error=>errors.push(error.message));
+  await repeatedDayPage.addInitScript(()=>{
+    const RealDate=Date;
+    window.testNow='2026-09-25T09:10:00';
+    window.Date=class extends RealDate {
+      constructor(...args){super(...(args.length?args:[window.testNow]));}
+      static now(){return new RealDate(window.testNow).getTime();}
+    };
+  });
+  await repeatedDayPage.goto('http://127.0.0.1:'+server.address().port);
+  for(const source_type of ['manual','sensor','entity']) for(const merge_double_lessons of [false,true]) {
+    for(const now of ['2026-09-25T09:10:00','2026-09-25T10:05:00']) {
+      const result=await repeatedDayPage.evaluate(async({source_type,merge_double_lessons,now})=>{
+        await customElements.whenDefined('stundenplan-card');
+        window.testNow=now;
+        const rows=[
+          {time:'1.',start:'09:00',end:'09:45',cells:['D','E','M','Sp','Kunst']},
+          {time:'2.',start:'09:45',end:'10:30',cells:['D','E','M','Sp','Kunst']}
+        ];
+        const config={type:'custom:stundenplan-card',source_type,rows,
+          source_entity:'sensor.demo',source_entity_integration:'sensor.demo',source_entity_legacy:'sensor.demo',
+          view_mode:'rolling',days_ahead:6,rolling_week_only:false,
+          days:['Mo','Di','Mi','Do','Fr'],merge_double_lessons,show_header_date:false,
+          highlight_today:true,highlight_current:true,highlight_current_text:true,
+          highlight_current_text_color:'#03a9f4',highlight_current_time_text:true,
+          highlight_current_time_text_color:'#03a9f4'};
+        document.querySelector('#editor').replaceChildren();
+        const card=document.createElement('stundenplan-card');
+        card.setConfig(config);
+        card.hass={states:{'sensor.demo':{state:'ok',attributes:{plan:rows}}}};
+        document.querySelector('#editor').append(card);
+        await card.updateComplete;await card.updateComplete;
+        const root=card.shadowRoot;
+        const activeIndex=merge_double_lessons||now.includes('09:10')?0:1;
+        const cells=[...root.querySelectorAll('tbody tr')[activeIndex].querySelectorAll('td')];
+        if(cells.length!==8) throw new Error(JSON.stringify({source_type,merge_double_lessons,now,
+          rows:[...root.querySelectorAll('tbody tr')].map(row=>row.textContent.trim()),cellCount:cells.length}));
+        return {headers:[...root.querySelectorAll('thead th:not(.time)')].map(el=>el.textContent.trim()),
+          highlightedHeaders:[...root.querySelectorAll('thead th.today')].map(el=>el.textContent.trim()),
+          today:cells[1].classList.contains('today'),future:cells[6].classList.contains('today'),
+          todayColor:getComputedStyle(cells[1]).color,futureColor:getComputedStyle(cells[6]).color,
+          todaySpan:cells[1].rowSpan,futureSpan:cells[6].rowSpan};
+      },{source_type,merge_double_lessons,now});
+      assert.deepEqual(result.headers,['Fr','Mo','Di','Mi','Do','Fr','Mo']);
+      assert.deepEqual(result.highlightedHeaders,['Fr']);
+      assert.equal(result.today,true);
+      assert.equal(result.future,false,'Future Friday must not receive the today class');
+      assert.equal(result.todayColor,'rgb(3, 169, 244)');
+      assert.notEqual(result.futureColor,'rgb(3, 169, 244)','Current lesson must only be highlighted on the actual date');
+      assert.equal(result.todaySpan,merge_double_lessons?2:1);
+      assert.equal(result.futureSpan,merge_double_lessons?2:1);
+    }
+  }
+  await repeatedDayPage.close();
   assert.deepEqual(errors,[]);
+  console.log('Repeated rolling weekdays passed: only the actual Friday is highlighted, for manual/JSON/Suite and both halves of merged lessons.');
   console.log('Backgrounds passed: defaults, transparency, CSS inheritance, config precedence, cell styles, popup, JSON/Suite and editor reset/persistence.');
   console.log('Preview clicks passed: tap actions, merged rows, empty cells, pauses, A/B rolling, source edits and dashboard isolation.');
   console.log('Browser checks passed: color/opacity persistence, source switching, retained A/B data, editor widths 320/440px.');

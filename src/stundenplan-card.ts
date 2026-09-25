@@ -745,6 +745,7 @@ const typographyFields = [
   { key: "font_size_header", variable: "--stundenplan-font-size-header", label: "Wochentage / Tabellenkopf (px)", min: 8, max: 64 },
   { key: "font_size_details", variable: "--stundenplan-font-size-details", label: "Raum, Lehrer & Hinweise (px)", min: 8, max: 64 },
   { key: "row_height", variable: "--stundenplan-row-height", label: "Mindesthöhe der Stundenzeilen (px)", min: 24, max: 240 },
+  { key: "header_table_gap", variable: "--stundenplan-header-table-gap", label: "Abstand Kopfzeile / Tabelle (px)", min: 0, max: 64 },
   { key: "font_size_title_compact", variable: "--stundenplan-font-size-title-compact", label: "Titelgröße kompakt (px)", min: 8, max: 64 }
 ];
 function normalizeTypography(config) {
@@ -753,7 +754,7 @@ function normalizeTypography(config) {
     const raw = config[key];
     if ((typeof raw !== "number" && typeof raw !== "string") || String(raw).trim() === "") continue;
     const value = Number(raw);
-    if (Number.isFinite(value) && value > 0) values[key] = Math.max(min, Math.min(max, value));
+    if (Number.isFinite(value) && (value > 0 || (min === 0 && value === 0))) values[key] = Math.max(min, Math.min(max, value));
   }
   return values;
 }
@@ -940,6 +941,7 @@ const v = (D = class extends U {
       title_font_family: "",
       show_header_date: !0,
       show_time_column: !0,
+      show_week_navigation: !0,
       trim_empty_rows: !1,
       merge_double_lessons: !1,
       equal_column_widths: !1,
@@ -1042,6 +1044,7 @@ const v = (D = class extends U {
       ...normalizeAppearance(t),
       show_header_date: t.show_header_date ?? e.show_header_date,
       show_time_column: t.show_time_column ?? e.show_time_column,
+      show_week_navigation: t.show_week_navigation ?? e.show_week_navigation,
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
       merge_double_lessons: t.merge_double_lessons ?? e.merge_double_lessons,
       equal_column_widths: t.equal_column_widths ?? e.equal_column_widths,
@@ -1746,8 +1749,8 @@ const v = (D = class extends U {
   renderCardLayout(t, vmOverride = null, popup = !1) {
     const e = this._rowsCache, u = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], u), vm = ((vmOverride ?? this._uiViewMode ?? t.view_mode ?? "week") + "").toString(), da = Number(t.days_ahead), daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0, i = "1px solid var(--stundenplan-divider-color, var(--divider-color))", n = Lt(t.highlight_today_color ?? "", 0.12), o = Lt(t.highlight_current_color ?? "", 0.18), l = (t.highlight_current_text_color ?? "").toString().trim(), a = (t.highlight_current_time_text_color ?? "").toString().trim(), c = t.week_mode !== "off", _ = c ? this.getActiveWeek(t) : null, h = this.getWeekOffsetValue(t), sourceType = (t.source_type ?? "manual").toString(), showTimeColumn = t.show_time_column !== !1,
         p = !popup && (t.week_offset_entity ?? "").trim().length > 0,
-        showPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), g = u && u.length >= (t.days?.length ?? 0) ? u : null, upd = this.getHeaderUpdatedFromEntity(t), O = this.getBaseDate(t), B = this.mondayOfWeek(O), tapAction = this.normalizeTapAction(t.tap_action), displayMode = popup ? "default" : (t.display_mode ?? "default"), cardClass = `${displayMode === "compact" ? "compact" : ""}${!popup && tapAction.action !== "none" ? " tappable" : ""}${popup ? " popupCard" : ""}`, showTitle = t.show_title !== !1 && ((t.title ?? "").toString().trim().length > 0), titleStyle = this.getTitleStyle(t), showHeaderRow = showTitle || c || showPager,
-        rollingActive = vm === "rolling" && (popup || !showPager || (h ?? 0) === 0),
+        hasPager = p && (sourceType === "entity" || (sourceType === "sensor" && (t.week_mode ?? "off") !== "off")), showPager = hasPager && t.show_week_navigation !== !1, g = u && u.length >= (t.days?.length ?? 0) ? u : null, upd = this.getHeaderUpdatedFromEntity(t), O = this.getBaseDate(t), B = this.mondayOfWeek(O), tapAction = this.normalizeTapAction(t.tap_action), displayMode = popup ? "default" : (t.display_mode ?? "default"), cardClass = `${displayMode === "compact" ? "compact" : ""}${!popup && tapAction.action !== "none" ? " tappable" : ""}${popup ? " popupCard" : ""}${t.header_table_gap != null ? " customHeaderGap" : ""}`, showTitle = t.show_title !== !1 && ((t.title ?? "").toString().trim().length > 0), titleStyle = this.getTitleStyle(t), showHeaderRow = showTitle || c || showPager,
+        rollingActive = vm === "rolling" && (popup || !hasPager || (h ?? 0) === 0),
         rollingSlots = rollingActive ? this.getRollingVisibleSlots(t, daysAhead) : [],
         idxs = rollingSlots.length ? rollingSlots.map((y) => y.orig) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m),
         daysVis = idxs.map((y) => t.days[y]),
@@ -1843,19 +1846,21 @@ const v = (D = class extends U {
                     </td>` : d``}
 
                     ${daysVis.map((z, P) => { const orig = idxs[P], rowForDay = this.getManualRowForDate(t, m, rowIndex, rollingDates?.[P]), rowCells = rowForDay?.cells ?? W, rowStyles = rowForDay?.cell_styles ?? b;
-        const F = this.filterCellText(rowCells[orig] ?? "", t), I = rowStyles[orig] ?? null, G = t.highlight_today && orig === s ? "today" : "", merge = t.merge_double_lessons ? mergedCellInfo(visibleRows, rowIndex, (candidate, candidateIndex) => {
+        // Rolling can contain the same weekday twice; only the actual date is today.
+        const isToday = rollingDates ? this.fmtYMD(rollingDates[P]) === this.fmtYMD(new Date()) : orig === s;
+        const F = this.filterCellText(rowCells[orig] ?? "", t), I = rowStyles[orig] ?? null, G = t.highlight_today && isToday ? "today" : "", merge = t.merge_double_lessons ? mergedCellInfo(visibleRows, rowIndex, (candidate, candidateIndex) => {
           const resolved = this.getManualRowForDate(t, candidate, candidateIndex, rollingDates?.[P]);
           return { text: this.filterCellText((resolved?.cells ?? candidate?.cells ?? [])[orig] ?? "", t), style: (resolved?.cell_styles ?? candidate?.cell_styles ?? [])[orig] ?? null };
         }) : { covered: !1, span: 1 };
         if (merge.covered) return f;
         let Ct = `--sp-hl:${n};` + Te(I, i);
         const se = !yt(F), mergedCurrent = (() => {
-          if (!focusIsToday || orig !== focusDayIndex || merge.span <= 1) return !1;
+          if (!isToday || !focusIsToday || orig !== focusDayIndex || merge.span <= 1) return !1;
           const firstTime = (rowForDay?.cell_times ?? m.cell_times)?.[orig] ?? null;
           const lastIndex = rowIndex + merge.span - 1, lastBase = visibleRows[lastIndex], lastRow = this.getManualRowForDate(t, lastBase, lastIndex, rollingDates?.[P]), lastTime = (lastRow?.cell_times ?? lastBase?.cell_times)?.[orig] ?? null;
           const start = firstTime?.start || rowForDay?.start || m.start, end = lastTime?.end || lastRow?.end || lastBase?.end;
           return !!start && !!end && this.isNowBetween(start, end);
-        })(), cellCurrent = w || mergedCurrent;
+        })(), cellCurrent = isToday && (w || mergedCurrent);
         return pt && se && cellCurrent && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct} rowspan=${merge.span} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, orig, rollingDates?.[P], merge.span)}>${this.renderCell(F, t)}</td>`;
       })}
                   </tr>
@@ -2224,6 +2229,12 @@ const v = (D = class extends U {
     ha-card.compact .dot {
       font-size: 11px;
     }
+    ha-card.customHeaderGap .headerRow {
+      padding-bottom: var(--stundenplan-header-table-gap);
+    }
+    ha-card.customHeaderGap .headerRow + .card {
+      padding-top: 0;
+    }
 `, D);
 X = /* @__PURE__ */ new WeakMap();
 tt = /* @__PURE__ */ new WeakMap();
@@ -2293,6 +2304,7 @@ const ut = class ut extends U {
     this._didSubEntities = !1;
     this._open = {
       general: !1,
+      rolling: !1,
       typography: !1,
       appearance: !1,
       highlights: !1,
@@ -2871,6 +2883,58 @@ const ut = class ut extends U {
     for (const { key } of typographyFields) delete config[key];
     this.emit(config);
   }
+  renderRollingSettings() {
+    const t = this._config;
+    return this.renderSection("Rolling", "rolling", d`
+      <div class="grid2">
+        <div class="gridFull">${this.renderToggle("rolling_week_only", "Auf Kalenderwoche begrenzen")}</div>
+        ${t.rolling_week_only ? d`<div class="hint gridFull">Endet am Sonntag der Startwoche. Am Wochenende beginnt die Ansicht beim nächsten Schultag; auch „Nach der letzten Stunde“ bleibt wirksam.</div>` : f}
+        <ha-input
+          label="Zusätzliche Tage im Voraus"
+          type="number"
+          .value=${String(t.days_ahead ?? 0)}
+          @input=${(e) => {
+            const n = Number(e.target.value);
+            this.setValue("days_ahead", Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0);
+          }}
+          hint="0 = nur Starttag, 1 = Starttag + nächster Schultag"
+        ></ha-input>
+        <ha-form
+          .hass=${this.hass}
+          .data=${{ rolling_switch_mode: (t.rolling_switch_mode ?? "midnight") }}
+          .schema=${[{
+            name: "rolling_switch_mode",
+            selector: { select: { mode: "dropdown", options: [
+              { value: "midnight", label: "Ab 00:00 Uhr" },
+              { value: "after_last_lesson", label: "Nach der letzten Stunde" },
+              { value: "fixed_time", label: "Feste Umschaltzeit" }
+            ] } }
+          }]}
+          .computeLabel=${(e) => e?.name === "rolling_switch_mode" ? "Auf nächsten Tag springen" : e?.name}
+          @value-changed=${(e) => {
+            try {
+              e?.stopPropagation?.();
+              const v = (e?.detail?.value ?? {}).rolling_switch_mode ?? "midnight";
+              this.setValue("rolling_switch_mode", v);
+            } catch (s) {
+              console.error("stundenplan-card editor: rolling_switch_mode change failed", s);
+            }
+          }}
+        ></ha-form>
+        ${(t.rolling_switch_mode ?? "midnight") === "fixed_time" ? d`
+          <ha-input class="gridFull"
+            label="Umschaltzeit (HH:MM)"
+            .value=${t.rolling_switch_time ?? ""}
+            @input=${(e) => this.onText(e, "rolling_switch_time")}
+            hint="Beispiel: 15:00"
+          ></ha-input>
+        ` : d`<div class="infoBox slim gridFull">${(t.rolling_switch_mode ?? "midnight") === "after_last_lesson"
+          ? "Der Sprung auf den nächsten Schultag folgt nach der letzten Endzeit aus deinem Plan."
+          : "Der Sprung auf den nächsten Schultag folgt direkt ab Mitternacht."}</div>`}
+      </div>
+      <div class="hint">Ab dem Starttag werden die nächsten passenden Schultage angezeigt. Beim Blättern in andere Wochen beginnt die Ansicht am Montag.</div>
+    `);
+  }
   render() {
     if (!this._config) return d``;
     const t = this._config;
@@ -2897,6 +2961,7 @@ const ut = class ut extends U {
               ${this.renderToggle("show_title", "Titelzeile anzeigen", !0)}
               ${this.renderToggle("show_header_date", "Datum anzeigen", !0)}
               ${this.renderToggle("show_time_column", "Spalte „Stunde“ anzeigen", !0)}
+              ${this.renderToggle("show_week_navigation", "Wochennavigation anzeigen", !0)}
             </div>
             <div class="generalDivider">Ansicht</div>
             <div class="grid2">
@@ -2982,65 +3047,7 @@ const ut = class ut extends U {
                 <ha-switch .checked=${E(t.equal_column_widths, !1)} @change=${(e) => this.onToggle(e, "equal_column_widths")}></ha-switch>
               </div>
 
-              ${(t.view_mode ?? "week") === "rolling" ? d`
-                <div class="generalDivider gridFull">Rolling</div>
-                <div class="gridFull">${this.renderToggle("rolling_week_only", "Auf Kalenderwoche begrenzen")}</div>
-                ${t.rolling_week_only ? d`<div class="hint gridFull">Endet am Sonntag der Startwoche. Am Wochenende beginnt die Ansicht beim nächsten Schultag; auch „Nach der letzten Stunde“ bleibt wirksam.</div>` : f}
-                <ha-input
-                  label="Zusätzliche Tage im Voraus"
-                  type="number"
-                  .value=${String(t.days_ahead ?? 0)}
-                  @input=${(e) => {
-                    const n = Number(e.target.value);
-                    this.setValue("days_ahead", Number.isFinite(n) ? Math.max(0, Math.min(6, Math.floor(n))) : 0);
-                  }}
-                  hint="0 = nur Starttag, 1 = Starttag + nächster Schultag"
-                ></ha-input>
-
-                <ha-form
-                  .hass=${this.hass}
-                  .data=${{ rolling_switch_mode: (t.rolling_switch_mode ?? "midnight") }}
-                  .schema=${[
-                    {
-                      name: "rolling_switch_mode",
-                      selector: {
-                        select: {
-                          mode: "dropdown",
-                          options: [
-                            { value: "midnight", label: "Ab 00:00 Uhr" },
-                            { value: "after_last_lesson", label: "Nach der letzten Stunde" },
-                            { value: "fixed_time", label: "Feste Umschaltzeit" }
-                          ]
-                        }
-                      }
-                    }
-                  ]}
-                  .computeLabel=${(e) => e?.name === "rolling_switch_mode" ? "Auf nächsten Tag springen" : e?.name}
-                  @value-changed=${(e) => {
-                    try {
-                      e?.stopPropagation?.();
-                      const v = (e?.detail?.value ?? {}).rolling_switch_mode ?? "midnight";
-                      this.setValue("rolling_switch_mode", v);
-                    } catch (s) {
-                      console.error("stundenplan-card editor: rolling_switch_mode change failed", s);
-                    }
-                  }}
-                ></ha-form>
-
-                ${(t.rolling_switch_mode ?? "midnight") === "fixed_time" ? d`
-                  <ha-input class="gridFull"
-                    label="Umschaltzeit (HH:MM)"
-                    .value=${t.rolling_switch_time ?? ""}
-                    @input=${(e) => this.onText(e, "rolling_switch_time")}
-                    hint="Beispiel: 15:00"
-                  ></ha-input>
-                ` : d`<div class="infoBox slim gridFull">${(t.rolling_switch_mode ?? "midnight") === "after_last_lesson"
-                  ? "Der Sprung auf den nächsten Schultag folgt nach der letzten Endzeit aus deinem Plan."
-                  : "Der Sprung auf den nächsten Schultag folgt direkt ab Mitternacht."}</div>`}
-              ` : d``}
             </div>
-
-            ${(t.view_mode ?? "week") === "rolling" ? d`<div class="hint">Ab dem Starttag werden die nächsten passenden Schultage angezeigt. Beim Blättern in andere Wochen beginnt die Ansicht am Montag.</div>` : f}
 
             <div class="generalDivider">Beim Antippen</div>
             <div class="stack">
@@ -3083,11 +3090,13 @@ const ut = class ut extends U {
           `
     )}
 
+        ${(t.view_mode ?? "week") === "rolling" ? this.renderRollingSettings() : f}
+
         ${this.renderSection("Schrift & Abstände", "typography", d`
           <div class="hint">Alle Größen in Pixeln. Leere Felder verwenden die bisherigen Vorgaben der normalen oder kompakten Ansicht.</div>
           <div class="grid2">
             ${typographyFields.filter(({ key }) => key !== "font_size_title_compact").map(field => this.renderTypographyInput(field))}
-            <div class="hint gridFull">Die Mindesthöhe gilt pro Stundenzeile. Mehrzeilige Inhalte dürfen die Zeile vergrößern; Pausenzeilen bleiben kompakt.</div>
+            <div class="hint gridFull">Die Mindesthöhe gilt pro Stundenzeile. Mehrzeilige Inhalte dürfen die Zeile vergrößern; Pausenzeilen bleiben kompakt. Der Kopfzeilenabstand gilt unterhalb von Titel und Navigation: leer = bisheriger Abstand, 0 = kein zusätzlicher Abstand.</div>
           </div>
           ${t.show_title !== !1 ? d`
             <div class="generalDivider">Kartentitel</div>
@@ -3767,14 +3776,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.6.0";
+window.__STUNDENPLAN_CARD_VERSION = "v3.7.0";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.6.0 (marker: STUNDENPLAN_CARD_v3.6.0)",
+  description: "Stundenplan Card v3.7.0 (marker: STUNDENPLAN_CARD_v3.7.0)",
   preview: !0
 });
 export {

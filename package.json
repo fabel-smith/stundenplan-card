@@ -1,6 +1,6 @@
 {
   "name": "stundenplan-card",
-  "version": "3.6.0",
+  "version": "3.7.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -9,10 +9,10 @@
     "dev": "vite build --watch"
   },
   "devDependencies": {
-    "esbuild": "^0.27.2",
+    "esbuild": "^0.28.2",
     "lit": "^3.3.2",
     "typescript": "^5.5.4",
-    "vite": "^7.3.1"
+    "vite": "^7.3.6"
   },
   "overrides": {
     "rollup": "^4.59.0"

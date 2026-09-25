@@ -59,7 +59,9 @@ Stundenplan Suite an und kann den aktuellen Unterricht hervorheben.
 
 ## 📸 Screenshots
 
-Aktuelle Beispiele aus Home Assistant mit Schulmanager-Daten über die Stundenplan Suite.
+Beispiele mit vollständig erfundenen Stundenplänen, Räumen und Lehrkräften.
+Die Bilder werden mit der echten Karte in einer lokalen Browser-Testumgebung
+erzeugt. Home-Assistant-Bedienelemente sind dort vereinfacht nachgebildet.
 
 ### Wochenansicht
 
@@ -73,7 +75,7 @@ Hervorhebung des aktuellen Unterrichts.
 Highlights, Farbpalette und Transparenz lassen sich direkt im visuellen Editor
 einstellen. Die Vorschau zeigt Donnerstag und Freitag mit Raum- und
 Lehrerangaben, verbundenen Folgestunden und ausgeblendeten leeren Endstunden.
-Als Datenquelle ist die Stundenplan Suite ausgewählt.
+Die gezeigten Daten sind keine echten Schulmanager- oder Kinderdaten.
 
 [![Visueller Editor mit Farbpalette und Rolling-Vorschau inklusive Raum- und Lehrerangaben](docs/screenshots/editor.png)](docs/screenshots/editor.png)
 
@@ -296,7 +298,12 @@ hinter dem Wochen-Popup bleibt unverändert.
 
 ### Rolling auf eine Kalenderwoche begrenzen
 
-Unter **Allgemein → Rolling** gibt es optional **Auf Kalenderwoche begrenzen**:
+Die Auswahl **Ab heute (rolling)** bleibt unter **Allgemein → Ansichtsmodus**.
+Danach erscheint direkt unter „Allgemein“ das eigene, zunächst geschlossene
+Akkordeon **Rolling**. Dort findest du die zusätzlichen Tage, den Tageswechsel,
+die feste Umschaltzeit und optional **Auf Kalenderwoche begrenzen**.
+Beim Wechsel zur Wochenansicht wird der Abschnitt ausgeblendet; gespeicherte
+Rolling-Einstellungen bleiben erhalten.
 
 ```yaml
 view_mode: rolling
@@ -325,6 +332,23 @@ können weiterhin unter **Farbcode** eingetragen werden. Die Schalter für farbi
 Fach- und Zeittexte befinden sich unter **Highlights**.
 
 ### Schrift & Abstände
+
+Unter **Allgemein → Titel & Kopfzeile → Wochennavigation anzeigen** kannst du
+die Pfeile mit dem Wochenversatz oben rechts ausblenden. Datenquelle und
+ausgewählter Wochenversatz bleiben dabei erhalten; eine A/B-Wochenanzeige
+ist davon unabhängig. Ohne neue Einstellung bleibt die Navigation sichtbar,
+sofern die gewählte Quelle sie unterstützt.
+
+Unter **Schrift & Abstände → Abstand Kopfzeile / Tabelle (px)** kannst du den
+zusätzlichen Abstand unterhalb von Titel und Navigation festlegen (0–64 px).
+Leer lässt den bisherigen Abstand unverändert; `0` entfernt den zusätzlichen
+Zwischenraum. Ist die gesamte Kopfzeile ausgeblendet, wird kein leerer Platz
+reserviert. Die Einstellung gilt auch im Wochen-Popup.
+
+```yaml
+show_week_navigation: false
+header_table_gap: 4
+```
 
 Im aufklappbaren Bereich **Schrift & Abstände** kannst du Fachtext, Stunden und
 Uhrzeiten, Wochentage sowie Raum-, Lehrer- und Hinweistext vergrößern.
@@ -481,6 +505,24 @@ Der eigene Code der Stundenplan Card steht unter der [MIT-Lizenz](LICENSE).
 Der eingebundene Lit-Code unterliegt weiterhin der BSD-3-Clause-Lizenz;
 der vollständige Hinweis steht in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)
 und in der ausgelieferten JavaScript-Datei.
+
+## Unabhängiges Projekt & Datenschutz
+
+Die Stundenplan Card ist ein unabhängiges Community-Projekt, kein offizielles
+Produkt von Home Assistant, Indiware/Stundenplan24 oder Schulmanager Online.
+Anbieternamen beschreiben kompatible Quellen und keine Partnerschaft.
+
+Die Karte zeigt Daten in deiner Home-Assistant-Oberfläche an. Bei Verwendung
+einer JSON-URL ruft dein Browser die konfigurierte Quelle ab. Es gibt keinen
+eingebauten Telemetrie-Endpunkt des Projektbetreibers. Nutze nur berechtigte
+Datenquellen; die MIT-Lizenz verleiht keine Rechte an fremden Schulplänen.
+Prüfe wichtige Änderungen im Zweifel an der Originalquelle.
+
+Bitte verwende in öffentlichen Issues und Screenshots erfundene Beispieldaten.
+Keine Zugangsdaten, vollständigen HA-Konfigurationen, echten Namen oder
+identifizierbaren Schulpläne veröffentlichen. Auch Lehrer- und Raumkürzel können
+mit Zusatzinformationen Personen erkennbar machen. Für Sicherheitsmeldungen
+siehe [SECURITY.md](SECURITY.md).
 
 ------------------------------------------------------------------------
 
