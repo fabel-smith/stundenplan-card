@@ -1,6 +1,7 @@
 {
   "name": "stundenplan-card",
   "version": "3.5.1",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "scripts": {

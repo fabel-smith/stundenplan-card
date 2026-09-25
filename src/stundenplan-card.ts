@@ -1,3 +1,4 @@
+// Bundled Lit runtime: see THIRD_PARTY_NOTICES for its BSD-3-Clause license.
 const Q = globalThis, $t = Q.ShadowRoot && (Q.ShadyCSS === void 0 || Q.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, vt = /* @__PURE__ */ Symbol(), Dt = /* @__PURE__ */ new WeakMap();
 let Ft = class {
   constructor(t, e, s) {

@@ -404,6 +404,10 @@ Raumänderungen oder Unterrichtsausfall.
 
 ## Update-Hinweise
 
+**v3.5.1** ergänzt die MIT-Lizenz, Lizenzhinweise für eingebundenen Lit-Code und
+die automatische HACS-Validierung. Die HACS-Installationsanleitung wurde berichtigt.
+Funktionen und Darstellung bleiben unverändert; die Aufnahme in den Standardkatalog steht noch aus.
+
 **v3.5.0** ergänzt den Bereich **Schrift & Abstände** mit optionalen Schriftgrößen,
 Mindesthöhe für Stundenzeilen und CSS-Variablen. Titelgröße und Titel-Schriftfamilie
 stehen jetzt ebenfalls dort. Ohne neue Größenangaben bleibt die bisherige Darstellung erhalten.
@@ -422,6 +426,15 @@ Wochenbegrenzung ist standardmäßig ausgeschaltet.
 
 Alle Änderungen und Hinweise stehen in den
 [GitHub-Releases](https://github.com/fabel-smith/stundenplan-card/releases).
+
+------------------------------------------------------------------------
+
+## Lizenz
+
+Der eigene Code der Stundenplan Card steht unter der [MIT-Lizenz](LICENSE).
+Der eingebundene Lit-Code unterliegt weiterhin der BSD-3-Clause-Lizenz;
+der vollständige Hinweis steht in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)
+und in der ausgelieferten JavaScript-Datei.
 
 ------------------------------------------------------------------------
 

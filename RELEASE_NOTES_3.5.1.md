@@ -1,5 +1,6 @@
 ## Wartung
 
+- MIT-Lizenz fuer den eigenen Code und BSD-Lizenzhinweise fuer eingebundenen Lit-Code ergaenzt.
 - Automatische HACS-Validierung fuer die Vorbereitung der Aufnahme in den HACS-Standardkatalog hinzugefuegt.
 - Installationsanleitung fuer das benutzerdefinierte HACS-Repository und den Ressourcenpfad berichtigt.
 
