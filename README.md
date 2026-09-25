@@ -32,6 +32,7 @@ Stundenplan Suite an und kann den aktuellen Unterricht hervorheben.
 -   Tabellenansicht (Tage × Stunden)
 -   Ganze Woche oder **Ab heute (rolling)**, optional auf die Kalenderwoche begrenzt
 -   Normale und kompakte Darstellung
+-   Optionale Schriftgrößen und Mindesthöhe der Stundenzeilen unter **Schrift & Abstände**
 -   Titelzeile, Datum und Zeitspalte optional ausblendbar
 -   Ansicht umschalten oder Wochen-Popup per Tipp auf die Karte
 -   Gleiche Folgestunden verbinden und leere Endstunden ausblenden (optional)
@@ -278,6 +279,59 @@ Bestehende Farbwerte werden beim Öffnen nicht verändert. Individuelle CSS-Wert
 können weiterhin unter **Farbcode** eingetragen werden. Die Schalter für farbige
 Fach- und Zeittexte befinden sich unter **Highlights**.
 
+### Schrift & Abstände
+
+Im aufklappbaren Bereich **Schrift & Abstände** kannst du Fachtext, Stunden und
+Uhrzeiten, Wochentage sowie Raum-, Lehrer- und Hinweistext vergrößern.
+Die Einstellungen gelten für alle Datenquellen, für die normale und kompakte
+Ansicht sowie für das Wochen-Popup.
+
+**Leere Felder verwenden die bisherigen Standardgrößen.** Damit sehen bestehende
+Karten ohne neue Einstellungen weiterhin gleich aus. Die Mindesthöhe gilt je
+Stundenzeile, auch bei verbundenen Folgestunden. Längere Inhalte vergrößern die
+Zeile bei Bedarf; Pausenzeilen erhalten diese Mindesthöhe nicht.
+
+Titelgröße und Titel-Schriftfamilie stehen ebenfalls in diesem Bereich.
+Die bisherige Titelgröße gilt für die normale Ansicht und das Wochen-Popup;
+für die Kompaktansicht gibt es einen eigenen optionalen Wert (Standard: 16 px).
+**Größen zurücksetzen** entfernt die neuen Größenangaben und setzt die normale
+Titelgröße auf 20 px zurück. Farben und Titel-Schriftfamilie bleiben erhalten.
+
+<details>
+<summary>YAML und CSS-Variablen</summary>
+
+Optional zur bestehenden Kartenkonfiguration ergänzen (Zahlen in Pixeln):
+
+```yaml
+font_size_subject: 24
+font_size_time: 18
+font_size_header: 20
+font_size_details: 16
+row_height: 72
+font_size_title_compact: 24
+```
+
+Die neuen Schriftgrößen erlauben 8–64 px, die Mindesthöhe 24–240 px.
+Entferne einen Schlüssel oder leere sein Editorfeld, um den Standard zu verwenden.
+
+Alternativ können folgende CSS-Variablen an die Karte vererbt werden. CSS-Werte
+benötigen eine Einheit, beispielsweise `24px` oder `1.5rem`:
+
+| Einstellung | CSS-Variable |
+| --- | --- |
+| `font_size_subject` | `--stundenplan-font-size-subject` |
+| `font_size_time` | `--stundenplan-font-size-time` |
+| `font_size_header` | `--stundenplan-font-size-header` |
+| `font_size_details` | `--stundenplan-font-size-details` |
+| `row_height` | `--stundenplan-row-height` |
+| `font_size_title_compact` | `--stundenplan-font-size-title-compact` |
+
+Explizite Größen in der Kartenkonfiguration haben Vorrang vor geerbten
+CSS-Variablen. Nach dem Leeren eines Feldes greift eine vorhandene CSS-Variable
+wieder; sonst gilt der Standard der jeweiligen Ansicht.
+
+</details>
+
 Mehrere Fächer innerhalb einer Stunde sind möglich (z. B.
 Gruppenunterricht / AG / Teilung).\
 Durch eine Leerzeile kann eine Stunde mehrfach unterteilt werden.
@@ -345,6 +399,10 @@ Raumänderungen oder Unterrichtsausfall.
 ------------------------------------------------------------------------
 
 ## Update-Hinweise
+
+**v3.5.0** ergänzt den Bereich **Schrift & Abstände** mit optionalen Schriftgrößen,
+Mindesthöhe für Stundenzeilen und CSS-Variablen. Titelgröße und Titel-Schriftfamilie
+stehen jetzt ebenfalls dort. Ohne neue Größenangaben bleibt die bisherige Darstellung erhalten.
 
 **v3.4.1** korrigiert die Zellenauswahl per Klick in der manuellen Vorschau.
 Im Bearbeitungsdialog öffnet der Klick die passende Zelle statt die Tap-Aktion

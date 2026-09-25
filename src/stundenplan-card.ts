@@ -723,6 +723,24 @@ function Oe(r) {
   const t = wt(r);
   return ["mo", "montag", "mon", "monday"].includes(t) ? 1 : ["di", "dienstag", "tue", "tues", "tuesday"].includes(t) ? 2 : ["mi", "mittwoch", "wed", "wednesday"].includes(t) ? 3 : ["do", "donnerstag", "thu", "thurs", "thursday"].includes(t) ? 4 : ["fr", "freitag", "fri", "friday"].includes(t) ? 5 : ["sa", "samstag", "sat", "saturday"].includes(t) ? 6 : ["so", "sonntag", "sun", "sunday"].includes(t) ? 7 : null;
 }
+const typographyFields = [
+  { key: "font_size_subject", variable: "--stundenplan-font-size-subject", label: "Fächer (px)", min: 8, max: 64 },
+  { key: "font_size_time", variable: "--stundenplan-font-size-time", label: "Stunden & Uhrzeiten (px)", min: 8, max: 64 },
+  { key: "font_size_header", variable: "--stundenplan-font-size-header", label: "Wochentage / Tabellenkopf (px)", min: 8, max: 64 },
+  { key: "font_size_details", variable: "--stundenplan-font-size-details", label: "Raum, Lehrer & Hinweise (px)", min: 8, max: 64 },
+  { key: "row_height", variable: "--stundenplan-row-height", label: "Mindesthöhe der Stundenzeilen (px)", min: 24, max: 240 },
+  { key: "font_size_title_compact", variable: "--stundenplan-font-size-title-compact", label: "Titelgröße kompakt (px)", min: 8, max: 64 }
+];
+function normalizeTypography(config) {
+  const values = {};
+  for (const { key, min, max } of typographyFields) {
+    const raw = config[key];
+    if ((typeof raw !== "number" && typeof raw !== "string") || String(raw).trim() === "") continue;
+    const value = Number(raw);
+    if (Number.isFinite(value) && value > 0) values[key] = Math.max(min, Math.min(max, value));
+  }
+  return values;
+}
 var D;
 const v = (D = class extends U {
   constructor() {
@@ -1004,6 +1022,7 @@ const v = (D = class extends U {
       show_title: t.show_title ?? e.show_title,
       title_font_size: Number.isFinite(Number(t.title_font_size)) ? Math.max(0, Math.min(40, Number(t.title_font_size))) : e.title_font_size,
       title_font_family: (t.title_font_family ?? e.title_font_family ?? "").toString(),
+      ...normalizeTypography(t),
       show_header_date: t.show_header_date ?? e.show_header_date,
       show_time_column: t.show_time_column ?? e.show_time_column,
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
@@ -1209,6 +1228,11 @@ const v = (D = class extends U {
     const i = (t.title_font_family ?? "").toString().trim();
     i && e.push(`font-family:${i}`);
     return e.join(";");
+  }
+  getTypographyStyle(t) {
+    const values = normalizeTypography(t);
+    return typographyFields.filter(({ key }) => values[key] != null)
+      .map(({ key, variable }) => `${variable}:${values[key]}px`).join(";");
   }
   fmtYMD(t) {
     return `${t.getFullYear()}${String(t.getMonth() + 1).padStart(2, "0")}${String(t.getDate()).padStart(2, "0")}`;
@@ -1724,7 +1748,7 @@ const v = (D = class extends U {
           return y;
         })();
     return d`
-      <ha-card class=${cardClass} @click=${popup ? (y) => this.closeWeekPopup(y) : (y) => this.handleCardAction(t, y)}>
+      <ha-card class=${cardClass} style=${this.getTypographyStyle(t)} @click=${popup ? (y) => this.closeWeekPopup(y) : (y) => this.handleCardAction(t, y)}>
         ${showHeaderRow ? d`<div class="headerRow">
           ${showTitle ? d`<div class="title" style=${titleStyle}>${t.title ?? ""}</div>` : d`<div class="titleSpacer"></div>`}
 
@@ -1959,6 +1983,14 @@ const v = (D = class extends U {
     th {
       background: var(--secondary-background-color);
       font-weight: 700;
+      font-size: var(--stundenplan-font-size-header, inherit);
+    }
+    /* A table row's height is a minimum; wrapped content can still grow. */
+    tbody tr:not(.break):not(.nodata) {
+      height: var(--stundenplan-row-height, auto);
+    }
+    .break .time {
+      font-size: var(--stundenplan-font-size-time, inherit);
     }
 
     .thDate {
@@ -1987,11 +2019,11 @@ const v = (D = class extends U {
       line-height: 1.1;
     }
     .timeSt {
-      font-size: 13px;
+      font-size: var(--stundenplan-font-size-time, 13px);
       font-weight: 800;
     }
     .timeHm {
-      font-size: 11px;
+      font-size: var(--stundenplan-font-size-time, 11px);
       font-weight: 650;
       opacity: 0.85;
     }
@@ -2028,7 +2060,7 @@ const v = (D = class extends U {
     }
     .fach {
       font-weight: 800;
-      font-size: 14px;
+      font-size: var(--stundenplan-font-size-subject, 14px);
       letter-spacing: 0.2px;
       white-space: nowrap;
     }
@@ -2037,7 +2069,7 @@ const v = (D = class extends U {
     }
     .raum,
     .lehrer {
-      font-size: 12px;
+      font-size: var(--stundenplan-font-size-details, 12px);
       opacity: 0.9;
       white-space: nowrap;
     }
@@ -2053,7 +2085,7 @@ const v = (D = class extends U {
     .note {
       display: block;
       text-align: center;
-      font-size: 11px;
+      font-size: var(--stundenplan-font-size-details, 11px);
       line-height: 1.25;
       opacity: 0.92;
       padding: 3px 4px;
@@ -2083,6 +2115,7 @@ const v = (D = class extends U {
     .cellText {
       white-space: pre-line;
       display: inline-block;
+      font-size: var(--stundenplan-font-size-subject, inherit);
     }
   
 
@@ -2102,7 +2135,7 @@ const v = (D = class extends U {
       gap: 8px;
     }
     ha-card.compact .title {
-      font-size: 16px !important;
+      font-size: var(--stundenplan-font-size-title-compact, 16px) !important;
       line-height: 1.1;
     }
     ha-card.compact .headRight {
@@ -2136,28 +2169,28 @@ const v = (D = class extends U {
       margin-top: 0;
     }
     ha-card.compact .timeSt {
-      font-size: 12px;
+      font-size: var(--stundenplan-font-size-time, 12px);
     }
     ha-card.compact .timeHm {
-      font-size: 10px;
+      font-size: var(--stundenplan-font-size-time, 10px);
     }
     ha-card.compact .cellWrap {
       gap: 1px;
       line-height: 1.08;
     }
     ha-card.compact .fach {
-      font-size: 12px;
+      font-size: var(--stundenplan-font-size-subject, 12px);
     }
     ha-card.compact .raum,
     ha-card.compact .lehrer {
-      font-size: 11px;
+      font-size: var(--stundenplan-font-size-details, 11px);
     }
     ha-card.compact .notes {
       margin-top: 2px;
       gap: 2px;
     }
     ha-card.compact .note {
-      font-size: 10px;
+      font-size: var(--stundenplan-font-size-details, 10px);
       padding: 2px 4px;
       border-radius: 7px;
     }
@@ -2233,6 +2266,7 @@ const ut = class ut extends U {
     this._didSubEntities = !1;
     this._open = {
       general: !1,
+      typography: !1,
       highlights: !1,
       colors: !1,
       sources: !1,
@@ -2780,6 +2814,24 @@ const ut = class ut extends U {
       this.setValue(key, value || Xt.getStubConfig()[key]);
     }, fallback, alpha);
   }
+  renderTypographyInput(field) {
+    return d`<ha-input
+      label=${field.label} type="number" min=${field.min} max=${field.max} step="1"
+      placeholder="Standard" .value=${String(this._config[field.key] ?? "")}
+      @change=${(event) => {
+        const value = normalizeTypography({ [field.key]: event.target.value })[field.key];
+        const config = { ...this._config };
+        if (value == null) delete config[field.key];
+        else config[field.key] = value;
+        this.emit(config);
+      }}
+    ></ha-input>`;
+  }
+  resetTypography() {
+    const config = { ...this._config, title_font_size: 20 };
+    for (const { key } of typographyFields) delete config[key];
+    this.emit(config);
+  }
   render() {
     if (!this._config) return d``;
     const t = this._config;
@@ -2807,23 +2859,6 @@ const ut = class ut extends U {
               ${this.renderToggle("show_header_date", "Datum anzeigen", !0)}
               ${this.renderToggle("show_time_column", "Spalte „Stunde“ anzeigen", !0)}
             </div>
-            ${t.show_title !== !1 ? d`<div class="grid2">
-              <ha-input
-                label="Titelgröße (px)"
-                type="number"
-                .value=${String(t.title_font_size ?? 20)}
-                @input=${(e) => {
-                  const n = Number(e.target.value);
-                  this.setValue("title_font_size", Number.isFinite(n) ? Math.max(10, Math.min(40, Math.floor(n))) : 20);
-                }}
-              ></ha-input>
-              <ha-input
-                label="Titel-Schriftfamilie (optional)"
-                .value=${t.title_font_family ?? ""}
-                @input=${(e) => this.onText(e, "title_font_family")}
-              ></ha-input>
-            </div>` : f}
-
             <div class="generalDivider">Ansicht</div>
             <div class="grid2">
               <ha-form
@@ -3008,6 +3043,31 @@ const ut = class ut extends U {
             </div>
           `
     )}
+
+        ${this.renderSection("Schrift & Abstände", "typography", d`
+          <div class="hint">Alle Größen in Pixeln. Leere Felder verwenden die bisherigen Vorgaben der normalen oder kompakten Ansicht.</div>
+          <div class="grid2">
+            ${typographyFields.filter(({ key }) => key !== "font_size_title_compact").map(field => this.renderTypographyInput(field))}
+            <div class="hint gridFull">Die Mindesthöhe gilt pro Stundenzeile. Mehrzeilige Inhalte dürfen die Zeile vergrößern; Pausenzeilen bleiben kompakt.</div>
+          </div>
+          ${t.show_title !== !1 ? d`
+            <div class="generalDivider">Kartentitel</div>
+            <div class="grid2">
+              <ha-input label="Titelgröße normal (px)" type="number" min="10" max="40" step="1"
+                placeholder="Standard: 20" .value=${String(t.title_font_size ?? 20)}
+                @change=${(event) => {
+                  const raw = event.target.value;
+                  const size = raw === "" ? 20 : Number(raw);
+                  this.setValue("title_font_size", Number.isFinite(size) ? Math.max(10, Math.min(40, size)) : 20);
+                }}></ha-input>
+              ${this.renderTypographyInput(typographyFields.find(({ key }) => key === "font_size_title_compact"))}
+              <ha-input class="gridFull" label="Titel-Schriftfamilie (optional)"
+                .value=${t.title_font_family ?? ""}
+                @input=${(event) => this.onText(event, "title_font_family")}></ha-input>
+            </div>
+          ` : f}
+          <button type="button" class="spBtn" @click=${() => this.resetTypography()}>Größen zurücksetzen</button>
+        `)}
 
         ${this.renderSection(
       "Highlights",
@@ -3658,14 +3718,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.4.1";
+window.__STUNDENPLAN_CARD_VERSION = "v3.5.0";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.4.1 (marker: STUNDENPLAN_CARD_v3.4.1)",
+  description: "Stundenplan Card v3.5.0 (marker: STUNDENPLAN_CARD_v3.5.0)",
   preview: !0
 });
 export {

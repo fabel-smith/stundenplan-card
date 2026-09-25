@@ -27,7 +27,7 @@ class Switch extends HTMLElement {
 customElements.define('ha-input',Input);customElements.define('ha-form',Form);customElements.define('ha-switch',Switch);
 </script><script type="module" src="/bundle.js"></script></body></html>`;
 (async()=>{
- const previousBundle=execFileSync('git',['show','v3.3.3:dist/stundenplan-card.js'],{cwd:__dirname,maxBuffer:1024*1024});
+ const previousBundle=execFileSync('git',['show','v3.4.1:dist/stundenplan-card.js'],{cwd:__dirname,maxBuffer:1024*1024});
  const server=http.createServer((req,res)=>{
    res.setHeader('Content-Type',req.url.endsWith('.js')?'text/javascript':'text/html');
    res.end(req.url==='/bundle.js'?fs.readFileSync(path.join(__dirname,'dist/stundenplan-card.js')):
@@ -46,7 +46,7 @@ customElements.define('ha-input',Input);customElements.define('ha-form',Form);cu
    editor.setConfig({type:'custom:stundenplan-card',source_type:'manual',view_mode:'rolling',rolling_week_only:true,days_ahead:4,
     rows:[{time:'1.',start:'08:00',end:'08:45',cells:['D','E','M','Sp','D']}],rows_b:[{time:'1.',cells:['M']}],
     highlight_current_text:true,highlight_current_time_text:true});
-   editor._open={general:true,colors:true,highlights:true,sources:true,manual:true};
+   editor._open={general:true,typography:true,colors:true,highlights:true,sources:true,manual:true};
    editor._showCellStyles=true;
    document.querySelector('#editor').append(editor);await editor.updateComplete;
   });
@@ -70,7 +70,11 @@ customElements.define('ha-input',Input);customElements.define('ha-form',Form);cu
       .map(el=>el.className||el.tagName);
    });
    assert.deepEqual(overflow,[], 'Editor overflow at '+width+'px');
-   if(output)await page.locator('#editor').screenshot({path:path.join(output,'editor-'+width+'.png')});
+   if(output){
+    await page.locator('#editor').screenshot({path:path.join(output,'editor-'+width+'.png')});
+    await page.locator('.section').filter({has:page.getByText('Schrift & Abstände',{exact:true})})
+      .screenshot({path:path.join(output,'typography-'+width+'.png')});
+   }
   }
   await page.evaluate(async()=>{editor.setSourceType('manual');editor._rowOpen={0:true};await editor.updateComplete;});
   assert.equal(await page.getByText('Manueller Stundenplan',{exact:true}).count(),1);
@@ -107,9 +111,9 @@ customElements.define('ha-input',Input);customElements.define('ha-form',Form);cu
     rows:[{time:'1.',start:'08:30',end:'09:15',cells:['D','E','M','Sp','D'],cell_styles:[null,null,null,{bg:'#f44336',bg_alpha:0.2}]},
       {break:true,time:'09:15-09:30',label:'Pause'},{time:'2.',start:'09:30',end:'10:15',cells:['E','D','Sp','M','E']}],
     highlight_current_text:true,highlight_current_text_color:'#ffaa00'};
-  for(const view_mode of ['week','rolling']) for(const equal_column_widths of [false,true]) {
-    const config={...base,view_mode,days_ahead:0,equal_column_widths};
-    assert.deepEqual(await renderSnapshot(newPage,config),await renderSnapshot(oldPage,config),'Existing card changed: '+JSON.stringify({view_mode,equal_column_widths}));
+  for(const view_mode of ['week','rolling']) for(const equal_column_widths of [false,true]) for(const display_mode of ['default','compact']) {
+    const config={...base,view_mode,days_ahead:0,equal_column_widths,display_mode,title_font_size:24};
+    assert.deepEqual(await renderSnapshot(newPage,config),await renderSnapshot(oldPage,config),'Existing card changed: '+JSON.stringify({view_mode,equal_column_widths,display_mode}));
   }
   const setupPreview=async config=>newPage.evaluate(async config=>{
     document.querySelector('#editor').replaceChildren();
@@ -214,9 +218,101 @@ customElements.define('ha-input',Input);customElements.define('ha-form',Form);cu
   await rollingPreview.locator('tbody tr').first().locator('td').nth(1).click();
   assert.equal(await newPage.evaluate(()=>previewFixture.editor._open.manual),false);
   assert.equal(await newPage.evaluate(()=>previewFixture.card._uiViewMode),null);
+  // Typography: actual rendered sizes in both layouts, including merged and tall rows.
+  const typographyBase={...base,equal_column_widths:true,merge_double_lessons:true,
+    rows:[{time:'1.',start:'08:00',end:'08:45',cells:['Mathe\nMUL\n126','Deutsch']},
+      {time:'2.',start:'08:45',end:'09:30',cells:['Mathe\nMUL\n126','Deutsch']},
+      {break:true,time:'09:30-09:45',label:'Pause'},
+      {time:'3.',start:'09:45',end:'10:30',cells:['Mathe\nMUL\n126\n'+Array.from({length:12},(_,i)=>'Aufgaben '+i).join('\n')]}]};
+  const typographySnapshot=()=>newPage.evaluate(()=>{
+    const card=document.querySelector('#editor stundenplan-card');
+    const root=card.shadowRoot;
+    const size=selector=>{
+      const element=root.querySelector(selector);
+      if(!element)throw new Error('Missing typography element '+selector+': '+root.querySelector('tbody')?.innerText);
+      return getComputedStyle(element).fontSize;
+    };
+    return {subject:size('.fach'),plain:size('.cellText'),time:size('.timeSt'),clock:size('.timeHm'),
+      header:size('th'),details:size('.lehrer'),note:size('.note'),title:size('.title'),
+      rows:[...root.querySelectorAll('tbody tr')].map(row=>row.getBoundingClientRect().height),
+      span:root.querySelector('td[rowspan="2"]')?.rowSpan};
+  });
+  for(const display_mode of ['default','compact']) {
+    await renderSnapshot(newPage,{...typographyBase,display_mode,title_font_size:22,
+      font_size_subject:24,font_size_time:18,font_size_header:20,font_size_details:16,row_height:72,font_size_title_compact:26});
+    let sizes=await typographySnapshot();
+    assert.deepEqual({subject:sizes.subject,plain:sizes.plain,time:sizes.time,clock:sizes.clock,
+      header:sizes.header,details:sizes.details,note:sizes.note,title:sizes.title,span:sizes.span},
+      {subject:'24px',plain:'24px',time:'18px',clock:'18px',header:'20px',details:'16px',note:'16px',
+        title:display_mode==='compact'?'26px':'22px',span:2});
+    assert(sizes.rows[0]>=72 && sizes.rows[1]>=72,'Minimum row height with merged cells');
+    assert(sizes.rows[2]<72,'Pause should not receive lesson minimum height');
+    assert(sizes.rows[3]>72,'Long content should grow beyond the minimum');
+    await renderSnapshot(newPage,{...typographyBase,display_mode,tap_action:{action:'popup_week'}});
+    await newPage.evaluate(()=>{
+      const card=document.querySelector('#editor stundenplan-card');
+      for(const [name,value] of Object.entries({'subject':23,'time':17,'header':19,'details':15,'title-compact':25}))
+        card.style.setProperty('--stundenplan-font-size-'+name,value+'px');
+      card.style.setProperty('--stundenplan-row-height','80px');
+    });
+    sizes=await typographySnapshot();
+    assert.equal(sizes.subject,'23px');assert.equal(sizes.plain,'23px');assert.equal(sizes.time,'17px');
+    assert.equal(sizes.header,'19px');assert.equal(sizes.details,'15px');assert(sizes.rows[0]>=80);
+    if(display_mode==='compact')assert.equal(sizes.title,'25px');
+    // Explicit card settings override inherited CSS; clearing restores inheritance.
+    await newPage.evaluate(async()=>{
+      const card=document.querySelector('#editor stundenplan-card');
+      card.setConfig({...card.config,font_size_subject:30});await card.updateComplete;
+    });
+    assert.equal((await typographySnapshot()).subject,'30px');
+    await newPage.evaluate(async()=>{
+      const card=document.querySelector('#editor stundenplan-card');
+      card.setConfig({...card.config,font_size_subject:''});await card.updateComplete;
+    });
+    assert.equal((await typographySnapshot()).subject,'23px');
+    await newPage.locator('#editor stundenplan-card tbody .fach').first().click();
+    assert.equal(await newPage.locator('#editor stundenplan-card .popupCard .fach').first()
+      .evaluate(el=>getComputedStyle(el).fontSize),'23px');
+  }
+  await newPage.evaluate(()=>document.querySelector('hui-dialog-edit-card')?.remove());
+  await setupPreview({...base,view_mode:'week'});
+  await newPage.evaluate(async()=>{
+    previewFixture.editor._open={typography:true};previewFixture.editor.requestUpdate();
+    await previewFixture.editor.updateComplete;
+    previewFixture.editor.addEventListener('config-changed',event=>previewFixture.card.setConfig(event.detail.config));
+  });
+  const subjectInput=newPage.locator('hui-dialog-edit-card stundenplan-card-editor ha-input[label="Fächer (px)"]');
+  const changeSize=async value=>subjectInput.evaluate((input,value)=>{
+    input.value=value;input.dispatchEvent(new Event('change',{bubbles:true,composed:true}));
+  },value);
+  await changeSize('28');
+  assert.equal(await newPage.locator('hui-dialog-edit-card stundenplan-card .cellText').first()
+    .evaluate(el=>getComputedStyle(el).fontSize),'28px');
+  // Persist through editor reload and source changes.
+  await newPage.evaluate(async()=>{
+    const editor=previewFixture.editor;editor.setConfig(JSON.parse(JSON.stringify(editor._config)));
+    editor.setSourceType('sensor');editor.setSourceType('manual');await editor.updateComplete;
+  });
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._config.font_size_subject),28);
+  await changeSize('');
+  assert.equal(await newPage.evaluate(()=>Object.hasOwn(previewFixture.editor._config,'font_size_subject')),false);
+  await changeSize('32');
+  await newPage.getByRole('button',{name:'Größen zurücksetzen',exact:true}).click();
+  assert.equal(await newPage.evaluate(()=>Object.hasOwn(previewFixture.editor._config,'font_size_subject')),false);
+  assert.equal(await newPage.evaluate(()=>previewFixture.editor._config.title_font_size),20);
+  await newPage.evaluate(async()=>{
+    const card=previewFixture.card;
+    card.setConfig({...card.config,font_size_subject:'bad',font_size_time:null,font_size_header:false,
+      font_size_details:-5,row_height:9999,font_size_title_compact:'24'});await card.updateComplete;
+  });
+  assert.deepEqual(await newPage.evaluate(()=>({
+    invalid:['font_size_subject','font_size_time','font_size_header','font_size_details'].filter(key=>Object.hasOwn(previewFixture.card.config,key)),
+    height:previewFixture.card.config.row_height,title:previewFixture.card.config.font_size_title_compact
+  })),{invalid:[],height:240,title:24});
   assert.deepEqual(errors,[]);
   console.log('Preview clicks passed: tap actions, merged rows, empty cells, pauses, A/B rolling, source edits and dashboard isolation.');
   console.log('Browser checks passed: color/opacity persistence, source switching, retained A/B data, editor widths 320/440px.');
-  console.log('Existing card rendering matches v3.3.3 in four weekly/rolling/column-layout combinations.');
+  console.log('Typography passed: normal/compact sizes, CSS inheritance, row growth, merged cells, popup and editor persistence/reset.');
+  console.log('Existing card rendering matches v3.4.1 in eight weekly/rolling/column-layout/density combinations.');
  } finally { if(browser)await browser.close();await new Promise(resolve=>server.close(resolve)); }
 })().catch(error=>{console.error(error);process.exitCode=1;});
