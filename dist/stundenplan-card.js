@@ -3354,13 +3354,13 @@ z([
 ], Ye.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", qt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", Ye);
-window.__STUNDENPLAN_CARD_VERSION = "v3.5.0";
+window.__STUNDENPLAN_CARD_VERSION = "v3.5.1";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.5.0 (marker: STUNDENPLAN_CARD_v3.5.0)",
+  description: "Stundenplan Card v3.5.1 (marker: STUNDENPLAN_CARD_v3.5.1)",
   preview: !0
 });
 export {

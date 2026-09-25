@@ -94,9 +94,13 @@ kein YAML und keine JSON-Dateien notwendig.
 
 ### Installation über HACS (empfohlen)
 
-HACS öffnen → Frontend\
-Stundenplan Card installieren\
-Home Assistant neu laden (oder Browser-Cache aktualisieren)
+Die Karte ist derzeit als **benutzerdefiniertes Repository** verfügbar;
+eine Aufnahme in den HACS-Standardkatalog ist noch nicht erfolgt.
+
+1. HACS öffnen und im Drei-Punkte-Menü **Benutzerdefinierte Repositories** wählen.
+2. `https://github.com/fabel-smith/stundenplan-card` eintragen und als Typ **Dashboard** auswählen.
+3. **Stundenplan Card** in HACS suchen und herunterladen.
+4. Home Assistant im Browser neu laden (bei Bedarf den Browser-Cache aktualisieren).
 
 Die Lovelace-Resource wird in der Regel automatisch hinzugefügt.
 
@@ -106,7 +110,7 @@ Einstellungen → Dashboards → Ressourcen
 
 URL:
 
-    /local/stundenplan-card/stundenplan-card.js
+    /hacsfiles/stundenplan-card/stundenplan-card.js
 
 Typ:
 
