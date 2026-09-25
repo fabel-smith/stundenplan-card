@@ -660,6 +660,30 @@ function yt(r) {
   // Treat single dash variants as empty, but keep "---" (used by Indiware as a visible placeholder).
   return !t || t === "-" || t === "–" || t === "—";
 }
+function subjectKey(value) {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
+}
+function normalizeHiddenSubjects(value) {
+  const entries = Array.isArray(value) ? value : [];
+  const unique = new Map();
+  for (const entry of entries) {
+    if (typeof entry !== "string") continue;
+    const label = entry.trim().replace(/\s+/g, " ");
+    if (label) unique.set(subjectKey(label), label);
+  }
+  return [...unique.values()];
+}
+function cellSubject(block) {
+  return block.trim().split(/\r?\n/, 1)[0].trim();
+}
+function filterHiddenSubjects(text, subjects) {
+  if (!subjects?.length) return text;
+  const hidden = new Set(subjects.map(subjectKey));
+  // Blank lines separate independent lessons; never match teacher/room/note text.
+  return text.split(/\r?\n\s*\r?\n/)
+    .filter(block => !hidden.has(subjectKey(cellSubject(block))))
+    .join("\n\n").trim();
+}
 function trimTrailingEmptyRows(r, t, e = (s, i, n) => s?.cells?.[n] ?? "") {
   const rows = Array.isArray(r) ? r : [], days = Array.isArray(t) ? t : [];
   let lastUsed = -1;
@@ -943,6 +967,7 @@ const v = (D = class extends U {
       show_time_column: !0,
       show_week_navigation: !0,
       trim_empty_rows: !1,
+      hidden_subjects: [],
       merge_double_lessons: !1,
       equal_column_widths: !1,
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
@@ -1046,6 +1071,7 @@ const v = (D = class extends U {
       show_time_column: t.show_time_column ?? e.show_time_column,
       show_week_navigation: t.show_week_navigation ?? e.show_week_navigation,
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
+      hidden_subjects: normalizeHiddenSubjects(t.hidden_subjects),
       merge_double_lessons: t.merge_double_lessons ?? e.merge_double_lessons,
       equal_column_widths: t.equal_column_widths ?? e.equal_column_widths,
       days: s,
@@ -1239,7 +1265,7 @@ const v = (D = class extends U {
     return t.week_mode === "week_map" ? this.weekFromMap(t) ?? this.weekFromParity(t) : t.week_mode === "kw_parity" ? this.weekFromParity(t) : "A";
   }
   filterCellText(t, e) {
-    return (t ?? "").toString().trim();
+    return filterHiddenSubjects((t ?? "").toString().trim(), e.hidden_subjects);
   }
   getTitleStyle(t) {
     const e = [];
@@ -1277,8 +1303,25 @@ const v = (D = class extends U {
     }
     return s;
   }
-  getLastLessonEnd() {
+  getLastLessonEnd(config = this.config, date = new Date()) {
     const t = this._rowsCache ?? [];
+    if (config?.hidden_subjects?.length) {
+      const day = this.findConfiguredDayIndexForDate(date, config.days);
+      if (day < 0) return "";
+      let latest = "";
+      for (let index = 0; index < t.length; index++) {
+        const row = this.getManualRowForDate(config, t[index], index, date);
+        if (ct(row) || yt(this.filterCellText(row?.cells?.[day], config))) continue;
+        const end = row?.cell_times?.[day]?.end || row?.end;
+        // Unknown end times must not make the card advance before a remaining lesson.
+        if (!/^\d{1,2}:\d{2}$/.test(end ?? "")) return "";
+        const [hours, minutes] = end.split(":").map(Number);
+        if (hours > 23 || minutes > 59) return "";
+        const normalized = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+        if (normalized > latest) latest = normalized;
+      }
+      return latest;
+    }
     for (let e = t.length - 1; e >= 0; e--) {
       const s = t[e];
       if (!ct(s) && s?.end) return (s.end + "").toString().trim();
@@ -1289,7 +1332,7 @@ const v = (D = class extends U {
     if (!this.isConfiguredSchoolday(e, t.days ?? [])) return !0;
     const s = ((t.rolling_switch_mode ?? "midnight") + "").toString();
     if (s === "after_last_lesson") {
-      const i = this.getLastLessonEnd();
+      const i = this.getLastLessonEnd(t, e);
       if (!i) return !1;
       const [n, o] = i.split(":").map(Number);
       return Number.isFinite(n) && Number.isFinite(o) ? (e.getHours() > n || e.getHours() === n && e.getMinutes() >= o) : !1;
@@ -1759,7 +1802,7 @@ const v = (D = class extends U {
         focusDayIndex = idxs[focusVisibleIndex] ?? 0,
         focusDate = rollingDates?.[focusVisibleIndex] ?? null,
         focusIsToday = focusDate instanceof Date ? this.fmtYMD(focusDate) === this.fmtYMD(new Date()) : focusDayIndex === s,
-        visibleRows = t.trim_empty_rows ? trimTrailingEmptyRows(e, idxs, (row, rowIndex, dayIndex, visibleIndex) => {
+        visibleRows = t.trim_empty_rows || t.hidden_subjects?.length ? trimTrailingEmptyRows(e, idxs, (row, rowIndex, dayIndex, visibleIndex) => {
           const resolved = this.getManualRowForDate(t, row, rowIndex, rollingDates?.[visibleIndex]);
           return this.filterCellText((resolved?.cells ?? row?.cells ?? [])[dayIndex] ?? "", t);
         }) : e,
@@ -1821,7 +1864,7 @@ const v = (D = class extends U {
             </thead>
 
             <tbody>
-              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${daysVis.length + (showTimeColumn ? 1 : 0)}>${this._noDataMsg}</td></tr>` : visibleRows.map((y, rowIndex) => {
+              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${daysVis.length + (showTimeColumn ? 1 : 0)}>${this._noDataMsg}</td></tr>` : t.hidden_subjects?.length && e.length && !visibleRows.length ? d`<tr class="nodata"><td class="nodataCell" colspan=${daysVis.length + (showTimeColumn ? 1 : 0)}>Keine Einträge nach Filterung.</td></tr>` : visibleRows.map((y, rowIndex) => {
       if (ct(y)) {
         const z = mt(y.time), P = !!z.start && !!z.end && this.isNowBetween(z.start, z.end), F = !!t.highlight_breaks && P;
         let I = `--sp-hl:${o};`, G = "";
@@ -2305,6 +2348,7 @@ const ut = class ut extends U {
     this._open = {
       general: !1,
       rolling: !1,
+      filters: !1,
       typography: !1,
       appearance: !1,
       highlights: !1,
@@ -2491,15 +2535,81 @@ const ut = class ut extends U {
   }
   renderSection(t, e, s) {
     const i = !!this._open[e];
+    const sections = {
+      general: ["Titel, Schultage und die grundlegende Ansicht.", "M4 5h16M4 12h16M4 19h16M8 3v4M16 10v4M10 17v4"],
+      sources: ["Woher dein Stundenplan kommt.", "M4 4h16v5H4zM4 15h16v5H4zM8 9v6M16 9v6"],
+      manual: ["Fächer, Zeiten und Pausen selbst eintragen.", "M4 4h16v16H4zM4 9h16M9 4v16M9 14h11"],
+      filters: ["Fächer/Angebote gezielt ausblenden.", "M3 4h18l-7 8v7l-4 2v-9z"],
+      rolling: ["Welche kommenden Schultage angezeigt werden.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M9 15h6M13 13l2 2-2 2"],
+      typography: ["Textgrößen und Abstände deiner Karte.", "M3 5h12M9 5v15M6 20h6M15 12h6M18 12v8"],
+      highlights: ["Heute, aktuellen Unterricht und Pausen hervorheben.", "M12 3l3 6 6 1-4 5 1 6-6-3-6 3 1-6-4-5 6-1z"],
+      colors: ["Farben und Transparenz der Hervorhebungen.", "M12 3C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-12zM8 15a4 4 0 0 0 4 4"],
+      appearance: ["Kartenflächen, Tabellenlinien und Transparenz.", "M3 4h18v16H3zM3 9h18M3 14h18M9 9v11"]
+    };
+    const [description, icon] = sections[e] ?? ["", "M4 4h16v16H4z"];
     return d`
-      <div class="section">
-        <div class="sectionHead" @click=${() => this.toggleOpen(e)}>
-          <div class="sectionTitle">${t}</div>
-          <div class="chev">${i ? "▾" : "▸"}</div>
-        </div>
-        ${i ? d`<div class="sectionBody">${s}</div>` : d``}
+      <div class="section" data-section=${e}>
+        <button type="button" class="sectionHead" aria-expanded=${String(i)} aria-controls=${`section-${e}`} @click=${() => this.toggleOpen(e)}>
+          <svg class="sectionIcon" viewBox="0 0 24 24" aria-hidden="true"><path d=${icon}></path></svg>
+          <span class="sectionLabels"><span class="sectionTitle">${t}</span><span class="sectionDescription">${description}</span></span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d=${i ? "m6 15 6-6 6 6" : "m6 9 6 6 6-6"}></path></svg>
+        </button>
+        ${i ? d`<div class="sectionBody" id=${`section-${e}`}>${s}</div>` : d``}
       </div>
     `;
+  }
+  getFilterSubjects() {
+    const config = this._config;
+    let rows = [];
+    if ((config.source_type ?? "manual") === "manual") {
+      rows = [...(config.rows ?? []), ...(config.week_mode === "kw_parity" ? config.rows_b ?? [] : [])];
+    } else if (config.source_type !== "json") {
+      // Read existing HA state only; opening the editor must not trigger HTTP requests.
+      const reader = new Xt();
+      reader.hass = this.hass;
+      rows = reader.getRowsResolved(config);
+    }
+    const labels = [...(config.hidden_subjects ?? [])];
+    for (const row of rows ?? []) {
+      if (ct(row)) continue;
+      for (const cell of row.cells ?? []) {
+        for (const block of String(cell).split(/\r?\n\s*\r?\n/)) {
+          const subject = cellSubject(block);
+          if (subject && !/^[\s—–-]+$/.test(subject)) labels.push(subject);
+        }
+      }
+    }
+    return normalizeHiddenSubjects(labels).sort((a, b) => a.localeCompare(b, "de"));
+  }
+  renderFilterSettings() {
+    if (!this._open.filters) return this.renderSection("Inhalte filtern", "filters", f);
+    const selected = this._config.hidden_subjects ?? [];
+    const subjects = this.getFilterSubjects();
+    return this.renderSection("Inhalte filtern", "filters", d`
+      <div class="hint">Wähle die Fächer/Angebote aus, an denen dein Kind nicht teilnimmt. Nur diese Karte wird gefiltert; die Quelldaten bleiben unverändert.</div>
+      ${subjects.length ? d`<div class="subjectChoices" role="group" aria-label="Zum Ausblenden auswählen">
+        ${subjects.map(subject => d`<label class="subjectChoice">
+          <input type="checkbox" .checked=${selected.some(value => subjectKey(value) === subjectKey(subject))}
+            @change=${event => this.setValue("hidden_subjects", event.target.checked
+              ? normalizeHiddenSubjects([...selected, subject])
+              : selected.filter(value => subjectKey(value) !== subjectKey(subject)))}>
+          <span>${subject}</span>
+        </label>`)}
+      </div>` : d`<div class="hint">Keine Fächer/Angebote in der aktuellen Quelle gefunden. Du kannst sie unten selbst ergänzen.</div>`}
+      <form class="subjectAdd" @submit=${event => {
+        event.preventDefault();
+        const input = event.currentTarget.elements.namedItem("subject");
+        if (!input.value.trim()) return;
+        this.setValue("hidden_subjects", normalizeHiddenSubjects([...selected, input.value]));
+        input.value = "";
+      }}>
+        <label>Fächer/Angebote ergänzen<input name="subject" type="text" placeholder="z. B. Ess/Spi GT" autocomplete="off"></label>
+        <button type="submit" class="spBtn">Hinzufügen</button>
+      </form>
+      <div class="hint">Verglichen wird der vollständige Fachname in der ersten Zeile, nicht Raum, Lehrkraft oder Hinweise. Groß-/Kleinschreibung spielt keine Rolle. Neue Namen werden nicht automatisch ausgewählt.</div>
+      ${selected.length ? d`<div class="infoBox slim">${selected.length} Fächer/Angebote ausgeblendet. Vollständig leere Endzeilen werden gekürzt. „Nach der letzten Stunde“ berücksichtigt nur die verbleibenden Einträge des jeweiligen Tages.</div>
+        <button type="button" class="spBtn" @click=${() => this.setValue("hidden_subjects", [])}>Alle Einträge wieder anzeigen</button>` : f}
+    `);
   }
   onToggle(t, e) {
     const s = !!t?.target?.checked;
@@ -2883,6 +2993,192 @@ const ut = class ut extends U {
     for (const { key } of typographyFields) delete config[key];
     this.emit(config);
   }
+  renderSourceSettings() {
+    const t = this._config;
+    return this.renderSection(
+      "Datenquellen",
+      "sources",
+      d`
+            <div class="grid2">
+              <ha-form
+                .hass=${this.hass}
+                .data=${{
+        source_type: t.source_type ?? "manual"
+      }}
+                .schema=${[
+        {
+          name: "source_type",
+          selector: {
+            select: {
+              mode: "dropdown",
+              options: [
+                { value: "manual", label: "Manuell (rows)" },
+                { value: "entity", label: "Stundenplan Suite (Integration)" },
+                ...(((t.source_type ?? "manual") === "json")
+                  ? [{ value: "json", label: "JSON-Datei (deprecated)" }]
+                  : []),
+                { value: "sensor", label: "Beliebiger Sensor (JSON)" }
+              ]
+            }
+          }
+        }
+      ]}
+                .computeLabel=${(e) => e?.name === "source_type" ? "Quelle" : e?.name}
+                @value-changed=${(e) => {
+        try {
+          e?.stopPropagation?.();
+          const i = (e?.detail?.value ?? {}).source_type ?? t.source_type ?? "manual";
+          i !== (t.source_type ?? "manual") && this.setSourceType(i);
+        } catch (s) {
+          console.error("stundenplan-card editor: ha-form value-changed failed", s);
+        }
+      }}
+              ></ha-form>
+            </div>
+
+            ${(t.source_type ?? "manual") === "entity" ? d`
+                  <div class="hint">Stundenplan Suite: Wochensensor für Stundenplan24 oder Schulmanager auswählen.</div>
+
+                  ${this.isHaEntityPickerAvailable() ? d`
+                    ${(() => {
+                      const all = Object.keys(this.hass?.states ?? {});
+                      const matches = all.filter((id) => /^sensor\./.test(id) && (/_woche$/i.test(id) || this.hass?.states?.[id]?.attributes?.rows_table != null));
+                      // Better loading hint: show only if we have very few states OR none of the *_woche sensors exist yet
+                      return (all.length < 5 || matches.length === 0)
+                        ? d`<div class="hint">Keine <code>*_woche</code>-Sensoren gefunden – Integration noch nicht geladen?</div>`
+                        : d``;
+                    })()}
+
+                    <ha-entity-picker
+                      .hass=${this.hass}
+                      .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
+                      .includeDomains=${["sensor"]}
+                      .entityFilter=${(entityId) => {
+                        const id = (typeof entityId === "string")
+                          ? entityId
+                          : (entityId && typeof entityId === "object" && "entity_id" in entityId ? entityId.entity_id : "");
+                        const sid = (id ?? "").toString();
+                        return !sid || /_woche$/i.test(sid) || this.hass?.states?.[sid]?.attributes?.rows_table != null;
+                      }}
+                      .label=${"Stundenplan Suite Sensor"}
+                      @value-changed=${(e) => {
+                        try {
+                          const v = e.detail?.value ?? e.target?.value;
+                          const id = (typeof v === "string") ? v : (v && typeof v === "object" ? v.entity_id : undefined);
+                          this.setSourceEntity(id);
+                        } catch (s) {
+                          console.error("stundenplan-card editor: setSourceEntity failed", s);
+                        }
+                      }}
+                    ></ha-entity-picker>
+                  ` : d``}
+
+                  ${!this.isHaEntityPickerAvailable() ? d`<ha-input
+                    label="Stundenplan Suite Entity-ID"
+                    .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
+                    @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
+placeholder="sensor.05b_woche"
+                  ></ha-input>` : f}
+                ` : d``}
+
+            ${(t.source_type ?? "manual") === "sensor" ? d`
+                  <div class="hint">Beliebiger Sensor (JSON): beliebiger <code>sensor.*</code> (z.B. REST-Sensor). Attribut/Time-Key nach Datenformat.</div>
+
+                  ${this.isHaEntityPickerAvailable() ? d`
+                    <ha-entity-picker
+                      .hass=${this.hass}
+                      .value=${(t.source_entity ?? "")}
+                      .includeDomains=${["sensor"]}
+                      .entityFilter=${(entityId) => {
+                        // allow all sensors
+                        const id = (typeof entityId === "string")
+                          ? entityId
+                          : (entityId && typeof entityId === "object" && "entity_id" in entityId ? entityId.entity_id : "");
+                        const sid = (id ?? "").toString();
+                        return !sid || /^sensor\./.test(sid);
+                      }}
+                      .label=${"Sensor (JSON)"}
+                      @value-changed=${(e) => {
+                        try {
+                          const v = e.detail?.value ?? e.target?.value;
+                          const id = (typeof v === "string") ? v : (v && typeof v === "object" ? v.entity_id : undefined);
+                          this.setSourceEntity(id);
+                        } catch (s) {
+                          console.error("stundenplan-card editor: setSourceEntity failed", s);
+                        }
+                      }}
+                    ></ha-entity-picker>
+                  ` : d``}
+
+                  ${!this.isHaEntityPickerAvailable() ? d`<ha-input
+                    label="Sensor Entity-ID (manuell)"
+                    .value=${(t.source_entity ?? "")}
+                    @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
+placeholder="sensor.stundenplan"
+                  ></ha-input>` : f}
+
+                  <div class="grid2">
+                    <ha-input label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} @change=${(e) => this.onText(e, "source_attribute")} @value-changed=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-input>
+                    <ha-input label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} @change=${(e) => this.onText(e, "source_time_key")} @value-changed=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-input>
+                  </div>
+                  <div class="hint">Sensor (JSON): REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
+
+                  <div class="hint" style="margin-top:10px;">
+                    Wechselwochen (A/B) gehört zu „Single-Source (Legacy / einfach)“.
+                  </div>
+
+                  <div class="grid2">
+                    <ha-form
+                      .hass=${this.hass}
+                      .data=${{
+                        week_mode: t.week_mode ?? "off",
+                        week_a_is_even_kw: E(t.week_a_is_even_kw, !0)
+                      }}
+                      .schema=${[
+                        {
+                          name: "week_mode",
+                          selector: {
+                            select: {
+                              mode: "list",
+                              options: [
+                                { value: "off", label: "off (deaktiviert)" },
+                                { value: "kw_parity", label: "A/B nach Kalenderwoche" }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          name: "week_a_is_even_kw",
+                          selector: {
+                            select: {
+                              mode: "list",
+                              options: [
+                                { value: !0, label: "Woche A = gerade KW" },
+                                { value: !1, label: "Woche A = ungerade KW" }
+                              ]
+                            }
+                          }
+                        }
+                      ]}
+                      .computeLabel=${(e) => e?.name === "week_mode" ? "Wechselwochen (A/B)" : e?.name === "week_a_is_even_kw" ? "Woche A" : e?.name}
+                      @value-changed=${(e) => {
+                        try {
+                          e?.stopPropagation?.();
+                          const s = e?.detail?.value ?? {}, i = s.week_mode ?? t.week_mode ?? "off";
+                          i !== (t.week_mode ?? "off") && this.setValue("week_mode", i);
+                          const n = s.week_a_is_even_kw;
+                          typeof n == "boolean" && n !== E(t.week_a_is_even_kw, !0) && this.setValue("week_a_is_even_kw", n);
+                        } catch (s) {
+                          console.error("stundenplan-card editor: week settings change failed", s);
+                        }
+                      }}
+                    ></ha-form>
+                  </div>
+` : d``}
+
+          `
+    );
+  }
   renderRollingSettings() {
     const t = this._config;
     return this.renderSection("Rolling", "rolling", d`
@@ -3090,16 +3386,15 @@ const ut = class ut extends U {
           `
     )}
 
+        ${this.renderSourceSettings()}
+        ${(t.source_type ?? "manual") === "manual" ? this.renderSection("Manueller Stundenplan", "manual", this.renderManualRows()) : f}
+        ${this.renderFilterSettings()}
         ${(t.view_mode ?? "week") === "rolling" ? this.renderRollingSettings() : f}
 
         ${this.renderSection("Schrift & Abstände", "typography", d`
           <div class="hint">Alle Größen in Pixeln. Leere Felder verwenden die bisherigen Vorgaben der normalen oder kompakten Ansicht.</div>
-          <div class="grid2">
-            ${typographyFields.filter(({ key }) => key !== "font_size_title_compact").map(field => this.renderTypographyInput(field))}
-            <div class="hint gridFull">Die Mindesthöhe gilt pro Stundenzeile. Mehrzeilige Inhalte dürfen die Zeile vergrößern; Pausenzeilen bleiben kompakt. Der Kopfzeilenabstand gilt unterhalb von Titel und Navigation: leer = bisheriger Abstand, 0 = kein zusätzlicher Abstand.</div>
-          </div>
           ${t.show_title !== !1 ? d`
-            <div class="generalDivider">Kartentitel</div>
+            <div class="generalDivider first">Kartentitel</div>
             <div class="grid2">
               <ha-input label="Titelgröße normal (px)" type="number" min="10" max="40" step="1"
                 placeholder="Standard: 20" .value=${String(t.title_font_size ?? 20)}
@@ -3114,6 +3409,16 @@ const ut = class ut extends U {
                 @input=${(event) => this.onText(event, "title_font_family")}></ha-input>
             </div>
           ` : f}
+          <div class=${t.show_title !== !1 ? "generalDivider" : "generalDivider first"}>Kopfzeile & Tabelle</div>
+          <div class="grid2">
+            ${["header_table_gap", "font_size_header"].map(key => this.renderTypographyInput(typographyFields.find(field => field.key === key)))}
+            <div class="hint gridFull">Der Abstand gilt unterhalb von Titel und Navigation: leer = bisheriger Abstand, 0 = kein zusätzlicher Abstand.</div>
+          </div>
+          <div class="generalDivider">Stunden & Inhalte</div>
+          <div class="grid2">
+            ${["font_size_time", "font_size_subject", "font_size_details", "row_height"].map(key => this.renderTypographyInput(typographyFields.find(field => field.key === key)))}
+            <div class="hint gridFull">Die Mindesthöhe gilt pro Stundenzeile. Mehrzeilige Inhalte dürfen die Zeile vergrößern; Pausenzeilen bleiben kompakt.</div>
+          </div>
           <button type="button" class="spBtn" @click=${() => this.resetTypography()}>Größen zurücksetzen</button>
         `)}
 
@@ -3154,191 +3459,6 @@ const ut = class ut extends U {
         </div>
       `
     )}
-        ${this.renderSection(
-      "Datenquellen",
-      "sources",
-      d`
-            <div class="grid2">
-              <ha-form
-                .hass=${this.hass}
-                .data=${{
-        source_type: t.source_type ?? "manual"
-      }}
-                .schema=${[
-        {
-          name: "source_type",
-          selector: {
-            select: {
-              mode: "dropdown",
-              options: [
-                { value: "manual", label: "Manuell (rows)" },
-                { value: "entity", label: "Stundenplan Suite (Integration)" },
-                ...(((t.source_type ?? "manual") === "json")
-                  ? [{ value: "json", label: "JSON-Datei (deprecated)" }]
-                  : []),
-                { value: "sensor", label: "Beliebiger Sensor (JSON)" }
-              ]
-            }
-          }
-        }
-      ]}
-                .computeLabel=${(e) => e?.name === "source_type" ? "Quelle" : e?.name}
-                @value-changed=${(e) => {
-        try {
-          e?.stopPropagation?.();
-          const i = (e?.detail?.value ?? {}).source_type ?? t.source_type ?? "manual";
-          i !== (t.source_type ?? "manual") && this.setSourceType(i);
-        } catch (s) {
-          console.error("stundenplan-card editor: ha-form value-changed failed", s);
-        }
-      }}
-              ></ha-form>
-            </div>
-
-            ${(t.source_type ?? "manual") === "entity" ? d`
-                  <div class="hint">Stundenplan Suite: Wochensensor für Stundenplan24 oder Schulmanager auswählen.</div>
-
-                  ${this.isHaEntityPickerAvailable() ? d`
-                    ${(() => {
-                      const all = Object.keys(this.hass?.states ?? {});
-                      const matches = all.filter((id) => /^sensor\./.test(id) && (/_woche$/i.test(id) || this.hass?.states?.[id]?.attributes?.rows_table != null));
-                      // Better loading hint: show only if we have very few states OR none of the *_woche sensors exist yet
-                      return (all.length < 5 || matches.length === 0)
-                        ? d`<div class="hint">Keine <code>*_woche</code>-Sensoren gefunden – Integration noch nicht geladen?</div>`
-                        : d``;
-                    })()}
-
-                    <ha-entity-picker
-                      .hass=${this.hass}
-                      .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
-                      .includeDomains=${["sensor"]}
-                      .entityFilter=${(entityId) => {
-                        const id = (typeof entityId === "string")
-                          ? entityId
-                          : (entityId && typeof entityId === "object" && "entity_id" in entityId ? entityId.entity_id : "");
-                        const sid = (id ?? "").toString();
-                        return !sid || /_woche$/i.test(sid) || this.hass?.states?.[sid]?.attributes?.rows_table != null;
-                      }}
-                      .label=${"Stundenplan Suite Sensor"}
-                      @value-changed=${(e) => {
-                        try {
-                          const v = e.detail?.value ?? e.target?.value;
-                          const id = (typeof v === "string") ? v : (v && typeof v === "object" ? v.entity_id : undefined);
-                          this.setSourceEntity(id);
-                        } catch (s) {
-                          console.error("stundenplan-card editor: setSourceEntity failed", s);
-                        }
-                      }}
-                    ></ha-entity-picker>
-                  ` : d``}
-
-                  ${!this.isHaEntityPickerAvailable() ? d`<ha-input
-                    label="Stundenplan Suite Entity-ID"
-                    .value=${(t.source_entity_integration ?? t.source_entity ?? "")}
-                    @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
-placeholder="sensor.05b_woche"
-                  ></ha-input>` : f}
-                ` : d``}
-
-            ${(t.source_type ?? "manual") === "sensor" ? d`
-                  <div class="hint">Beliebiger Sensor (JSON): beliebiger <code>sensor.*</code> (z.B. REST-Sensor). Attribut/Time-Key nach Datenformat.</div>
-
-                  ${this.isHaEntityPickerAvailable() ? d`
-                    <ha-entity-picker
-                      .hass=${this.hass}
-                      .value=${(t.source_entity ?? "")}
-                      .includeDomains=${["sensor"]}
-                      .entityFilter=${(entityId) => {
-                        // allow all sensors
-                        const id = (typeof entityId === "string")
-                          ? entityId
-                          : (entityId && typeof entityId === "object" && "entity_id" in entityId ? entityId.entity_id : "");
-                        const sid = (id ?? "").toString();
-                        return !sid || /^sensor\./.test(sid);
-                      }}
-                      .label=${"Sensor (JSON)"}
-                      @value-changed=${(e) => {
-                        try {
-                          const v = e.detail?.value ?? e.target?.value;
-                          const id = (typeof v === "string") ? v : (v && typeof v === "object" ? v.entity_id : undefined);
-                          this.setSourceEntity(id);
-                        } catch (s) {
-                          console.error("stundenplan-card editor: setSourceEntity failed", s);
-                        }
-                      }}
-                    ></ha-entity-picker>
-                  ` : d``}
-
-                  ${!this.isHaEntityPickerAvailable() ? d`<ha-input
-                    label="Sensor Entity-ID (manuell)"
-                    .value=${(t.source_entity ?? "")}
-                    @input=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @change=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)} @value-changed=${(e) => this.setSourceEntity(e?.detail?.value ?? e?.target?.value ?? e?.currentTarget?.value)}
-placeholder="sensor.stundenplan"
-                  ></ha-input>` : f}
-
-                  <div class="grid2">
-                    <ha-input label="Attribut" .value=${t.source_attribute ?? ""} @input=${(e) => this.onText(e, "source_attribute")} @change=${(e) => this.onText(e, "source_attribute")} @value-changed=${(e) => this.onText(e, "source_attribute")} placeholder="plan"></ha-input>
-                    <ha-input label="Time-Key" .value=${t.source_time_key ?? ""} @input=${(e) => this.onText(e, "source_time_key")} @change=${(e) => this.onText(e, "source_time_key")} @value-changed=${(e) => this.onText(e, "source_time_key")} placeholder="Stunde"></ha-input>
-                  </div>
-                  <div class="hint">Sensor (JSON): REST-Sensor + JSON-Attribut (z.B. <code>plan</code>) und Zeit-Key (z.B. <code>Stunde</code>).</div>
-
-                  <div class="hint" style="margin-top:10px;">
-                    Wechselwochen (A/B) gehört zu „Single-Source (Legacy / einfach)“.
-                  </div>
-
-                  <div class="grid2">
-                    <ha-form
-                      .hass=${this.hass}
-                      .data=${{
-                        week_mode: t.week_mode ?? "off",
-                        week_a_is_even_kw: E(t.week_a_is_even_kw, !0)
-                      }}
-                      .schema=${[
-                        {
-                          name: "week_mode",
-                          selector: {
-                            select: {
-                              mode: "list",
-                              options: [
-                                { value: "off", label: "off (deaktiviert)" },
-                                { value: "kw_parity", label: "A/B nach Kalenderwoche" }
-                              ]
-                            }
-                          }
-                        },
-                        {
-                          name: "week_a_is_even_kw",
-                          selector: {
-                            select: {
-                              mode: "list",
-                              options: [
-                                { value: !0, label: "Woche A = gerade KW" },
-                                { value: !1, label: "Woche A = ungerade KW" }
-                              ]
-                            }
-                          }
-                        }
-                      ]}
-                      .computeLabel=${(e) => e?.name === "week_mode" ? "Wechselwochen (A/B)" : e?.name === "week_a_is_even_kw" ? "Woche A" : e?.name}
-                      @value-changed=${(e) => {
-                        try {
-                          e?.stopPropagation?.();
-                          const s = e?.detail?.value ?? {}, i = s.week_mode ?? t.week_mode ?? "off";
-                          i !== (t.week_mode ?? "off") && this.setValue("week_mode", i);
-                          const n = s.week_a_is_even_kw;
-                          typeof n == "boolean" && n !== E(t.week_a_is_even_kw, !0) && this.setValue("week_a_is_even_kw", n);
-                        } catch (s) {
-                          console.error("stundenplan-card editor: week settings change failed", s);
-                        }
-                      }}
-                    ></ha-form>
-                  </div>
-` : d``}
-
-          `
-    )}
-
-        ${(t.source_type ?? "manual") === "manual" ? this.renderSection("Manueller Stundenplan", "manual", this.renderManualRows()) : f}
       </div>
     `;
   }
@@ -3359,35 +3479,59 @@ ut.properties = {
     .wrap {
       padding: 8px;
       display: grid;
-      gap: 12px;
+      gap: 10px;
     }
     .section {
       border: 1px solid var(--divider-color);
-      border-radius: 14px;
+      border-radius: 12px;
       overflow: hidden;
       background: var(--card-background-color);
     }
     .sectionHead {
-      padding: 12px 12px;
+      width: 100%;
+      padding: 10px;
+      border: 0;
+      color: inherit;
+      font: inherit;
+      text-align: left;
       cursor: pointer;
       display: flex;
-      align-items: start;
-      justify-content: space-between;
-      background: var(--secondary-background-color);
+      gap: 10px;
+      align-items: center;
+      background: transparent;
       user-select: none;
     }
+    .sectionHead:hover { background: var(--secondary-background-color); }
+    .sectionHead:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -3px; }
+    .sectionLabels { flex: 1; min-width: 0; }
     .sectionTitle {
+      display: block;
+      font-size: 13px;
+      line-height: 1.4;
       font-weight: 700;
     }
-    .chev {
-      opacity: 0.8;
+    .sectionDescription {
+      display: block;
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--secondary-text-color, var(--primary-text-color));
+      overflow-wrap: anywhere;
     }
+    .sectionIcon, .chev { width: 22px; height: 22px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .chev { width: 18px; height: 18px; opacity: 0.8; }
     .sectionBody {
       padding: 12px;
       display: grid;
       gap: 10px;
     }
     .sectionBody > *, .grid2 > *, .optRow > div { min-width: 0; }
+    .subjectChoices { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 4px; }
+    .subjectChoice { display: flex; align-items: center; gap: 8px; padding: 6px; cursor: pointer; min-width: 0; }
+    .subjectChoice span { overflow-wrap: anywhere; }
+    .subjectChoice input { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--primary-color); }
+    .subjectAdd { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+    .subjectAdd label { flex: 1 1 170px; min-width: 0; font-size: 12px; }
+    .subjectAdd input { display: block; width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--divider-color); border-radius: 6px; background: var(--secondary-background-color); color: inherit; font: inherit; }
     .stack, .toggleGroup { display: grid; gap: 10px; min-width: 0; }
     .toggleGroup { gap: 0; }
     .toggleRow {
@@ -3776,14 +3920,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.7.0";
+window.__STUNDENPLAN_CARD_VERSION = "v3.8.0";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.7.0 (marker: STUNDENPLAN_CARD_v3.7.0)",
+  description: "Stundenplan Card v3.8.0 (marker: STUNDENPLAN_CARD_v3.8.0)",
   preview: !0
 });
 export {

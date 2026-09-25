@@ -56,6 +56,13 @@ customElements.define('ha-card',HaCard);
    document.querySelector('#editor').append(editor);await editor.updateComplete;
   });
   assert.equal(await page.getByText('Auf Kalenderwoche begrenzen',{exact:true}).count(),1);
+  const typographyOrder=['Titelgröße normal (px)','Titelgröße kompakt (px)','Titel-Schriftfamilie (optional)',
+    'Abstand Kopfzeile / Tabelle (px)','Wochentage / Tabellenkopf (px)','Stunden & Uhrzeiten (px)',
+    'Fächer (px)','Raum, Lehrer & Hinweise (px)','Mindesthöhe der Stundenzeilen (px)'];
+  assert.deepEqual(await page.locator('[data-section="typography"] ha-input').evaluateAll(inputs=>inputs.map(input=>input.getAttribute('label'))),typographyOrder);
+  await page.evaluate(async()=>{editor.setConfig({...editor._config,show_title:false});await editor.updateComplete;});
+  assert.deepEqual(await page.locator('[data-section="typography"] ha-input').evaluateAll(inputs=>inputs.map(input=>input.getAttribute('label'))),typographyOrder.slice(3));
+  await page.evaluate(async()=>{editor.setConfig({...editor._config,show_title:true});await editor.updateComplete;});
   const rollingSection=page.locator('.section').filter({has:page.locator('.sectionTitle').getByText('Rolling',{exact:true})});
   const generalSection=page.locator('.section').filter({has:page.locator('.sectionTitle').getByText('Allgemein',{exact:true})});
   assert.equal(await generalSection.getByText('Auf Kalenderwoche begrenzen',{exact:true}).count(),0);
@@ -82,6 +89,28 @@ customElements.define('ha-card',HaCard);
   assert.deepEqual(await page.evaluate(()=>[editor._config.days_ahead,editor._config.rolling_switch_mode,editor._config.rolling_switch_time,editor._config.rolling_week_only]),[6,'fixed_time','16:00',true]);
   assert.equal(await page.evaluate(()=>document.createElement('stundenplan-card-editor')._open.rolling),false);
   await page.evaluate(async()=>{editor.setConfig(window.originalRollingConfig);await editor.updateComplete;});
+  assert.deepEqual(await page.locator('.sectionTitle').allTextContents(),
+    ['Allgemein','Datenquellen','Manueller Stundenplan','Inhalte filtern','Rolling','Schrift & Abstände','Highlights','Farben','Hintergründe & Linien']);
+  assert.equal(await page.locator('.sectionDescription').count(),9);
+  assert.equal(await page.locator('.sectionIcon path').count(),9);
+  const filterHeader=page.locator('[data-section="filters"] .sectionHead');
+  assert.equal(await filterHeader.getAttribute('aria-expanded'),'false');
+  await filterHeader.focus();await page.keyboard.press('Enter');
+  assert.equal(await filterHeader.getAttribute('aria-expanded'),'true');
+  await page.getByRole('checkbox',{name:'Sp',exact:true}).check();
+  assert.deepEqual(await page.evaluate(()=>editor._config.hidden_subjects),['Sp']);
+  await page.getByLabel('Fächer/Angebote ergänzen',{exact:true}).fill('Ess/Spi GT');
+  await page.getByRole('button',{name:'Hinzufügen',exact:true}).click();
+  assert.deepEqual(await page.evaluate(()=>editor._config.hidden_subjects),['Sp','Ess/Spi GT']);
+  await page.evaluate(async()=>{editor.setConfig(JSON.parse(JSON.stringify(editor._config)));await editor.updateComplete;});
+  assert.equal(await page.getByRole('checkbox',{name:'Ess/Spi GT',exact:true}).isChecked(),true);
+  await page.evaluate(async()=>{editor.setSourceType('entity');await editor.updateComplete;});
+  assert.equal(await page.locator('[data-section="manual"]').count(),0);
+  assert.equal(await page.getByRole('checkbox',{name:'Ess/Spi GT',exact:true}).isChecked(),true,'Unavailable selected subjects remain editable');
+  await page.getByRole('button',{name:'Alle Einträge wieder anzeigen',exact:true}).click();
+  assert.deepEqual(await page.evaluate(()=>editor._config.hidden_subjects),[]);
+  await page.evaluate(async()=>{editor.setConfig(window.originalRollingConfig);await editor.updateComplete;});
+  console.log('Editor sections passed: logical order, icons/descriptions, keyboard accordion, filter selection/add/reset and source-switch persistence.');
   console.log('Rolling accordion passed: independent section, no settings in General, collapsed by default, edits and values preserved across view switches.');
   await page.getByRole('button',{name:'Heute-Spalte: Rot',exact:true}).click();
   assert.equal(await page.evaluate(()=>editor._config.highlight_today_color),'rgba(244, 67, 54, 0.12)');
@@ -570,6 +599,123 @@ customElements.define('ha-card',HaCard);
       assert.equal(result.futureSpan,merge_double_lessons?2:1);
     }
   }
+  for(const source_type of ['manual','sensor','entity','json']) for(const merge_double_lessons of [false,true]) {
+    const result=await repeatedDayPage.evaluate(async({source_type,merge_double_lessons})=>{
+      window.testNow='2026-09-25T11:50:00';
+      const lesson=(time,start,end,cells)=>({time,start,end,cells});
+      const rows=[
+        lesson('1.','07:45','08:30',['D','D','D','D','D']),
+        lesson('2.','08:35','09:20',['SU','SU','SU','SU','SU']),
+        {break:true,time:'09:20-09:40',label:'Pause'},
+        lesson('3.','09:40','10:25',['M','M','M','M','M']),
+        lesson('4.','10:30','11:15',['M','M','M','M','M']),
+        {break:true,time:'11:15-11:40',label:'Pause'},
+        lesson('5.','11:40','12:25',['E','E','E','E','E']),
+        lesson('6.','12:30','13:15',['Ess/Spi GT\nMensa','Ess/Spi GT','Ess/Spi GT','Ess/Spi GT','evR\nRaum 1']),
+        lesson('MP','13:20','14:05',Array(5).fill('Ess/Spi GT\nMensa')),
+        lesson('8.','14:10','14:55',Array(5).fill('LZ_GS\nRaum 2')),
+        lesson('9.','15:00','15:45',['AG GS 1','','','',''])
+      ];
+      const original=JSON.stringify(rows);
+      const config={type:'custom:stundenplan-card',source_type,rows,days:['Mo','Di','Mi','Do','Fr'],
+        source_entity:'sensor.demo',source_entity_integration:'sensor.demo',source_entity_legacy:'sensor.demo',
+        source_attribute:'plan',json_url:'/fixture',view_mode:'week',display_mode:'compact',
+        merge_double_lessons,hidden_subjects:['Ess/Spi GT','LZ_GS','AG GS 1'],
+        trim_empty_rows:false,rolling_switch_mode:'after_last_lesson',days_ahead:0};
+      document.querySelector('#editor').replaceChildren();
+      const card=document.createElement('stundenplan-card');
+      if(source_type==='json') {card._jsonRows=rows;card._jsonStatus='loaded';card._jsonUrlLast=config.json_url;}
+      card.setConfig(config);
+      card.hass={states:{'sensor.demo':{state:'ok',attributes:{plan:rows}}}};
+      document.querySelector('#editor').append(card);await card.updateComplete;await card.updateComplete;
+      const weeklyText=card.shadowRoot.querySelector('tbody').textContent;
+      const weeklyCount=card.shadowRoot.querySelectorAll('tbody tr').length;
+      const lastCells=[...card.shadowRoot.querySelector('tbody tr:last-child').querySelectorAll('td')].map(el=>el.textContent.trim());
+      const beforeThu=card.shouldAdvanceRollingDay(card.config,new Date(2026,8,24,12,24));
+      const afterThu=card.shouldAdvanceRollingDay(card.config,new Date(2026,8,24,12,25));
+      const beforeFri=card.shouldAdvanceRollingDay(card.config,new Date(2026,8,25,13,14));
+      const afterFri=card.shouldAdvanceRollingDay(card.config,new Date(2026,8,25,13,15));
+      window.testNow='2026-09-24T11:50:00';card.setConfig({...card.config,view_mode:'rolling'});await card.updateComplete;
+      const thursdayCount=card.shadowRoot.querySelectorAll('tbody tr').length;
+      card._uiPopupOpen=true;card.requestUpdate();await card.updateComplete;
+      const popup=card.shadowRoot.querySelector('.popupCard');
+      const popupCount=popup?.querySelectorAll('tbody tr').length;
+      const popupText=popup?.querySelector('tbody').textContent;
+      card._uiPopupOpen=false;card.setConfig({...card.config,hidden_subjects:[],view_mode:'week'});await card.updateComplete;
+      const restored=card.shadowRoot.querySelectorAll('tbody tr').length;
+      return {weeklyText,weeklyCount,lastCells,beforeThu,afterThu,beforeFri,afterFri,thursdayCount,popupCount,popupText,restored,
+        sourceUnchanged:JSON.stringify(rows)===original};
+    },{source_type,merge_double_lessons});
+    assert.equal(result.weeklyCount,8);
+    assert(result.weeklyText.includes('evR'));
+    for(const value of ['Ess/Spi','LZ_GS','AG GS 1']) assert(!result.weeklyText.includes(value));
+    assert.deepEqual(result.lastCells.slice(1,5),['','','','']);
+    assert(result.lastCells[5].includes('evR'));
+    assert.deepEqual([result.beforeThu,result.afterThu,result.beforeFri,result.afterFri],[false,true,false,true]);
+    assert.equal(result.thursdayCount,7);
+    assert.equal(result.popupCount,8);
+    assert(result.popupText.includes('evR'));assert(!result.popupText.includes('Ess/Spi'));
+    assert.equal(result.restored,11);
+    assert.equal(result.sourceUnchanged,true);
+  }
+  // A/B rows must be filtered and timed for the displayed date, not the current week.
+  const abFilter=await repeatedDayPage.evaluate(async()=>{
+    const card=document.querySelector('stundenplan-card');window.testNow='2026-09-25T11:50:00';
+    const rows=[{time:'1.',start:'08:00',end:'08:45',cells:['D','D','D','D','D']},
+      {time:'2.',start:'08:50',end:'09:35',cells:Array(5).fill('Ess/Spi GT')}];
+    card.setConfig({type:'custom:stundenplan-card',source_type:'manual',week_mode:'kw_parity',week_a_is_even_kw:true,
+      rows,rows_b:[rows[0],{...rows[1],cells:Array(5).fill('evR')}],view_mode:'rolling',days_ahead:1,
+      hidden_subjects:['Ess/Spi GT'],rolling_switch_mode:'midnight'});await card.updateComplete;
+    return {text:card.shadowRoot.querySelector('tbody tr:last-child').textContent,
+      fri:card.getLastLessonEnd(card.config,new Date(2026,8,25)),mon:card.getLastLessonEnd(card.config,new Date(2026,8,28))};
+  });
+  assert(abFilter.text.includes('evR'));
+  assert.equal(abFilter.fri,'09:35');assert.equal(abFilter.mon,'08:45');
+  const filterEdges=await repeatedDayPage.evaluate(async()=>{
+    const card=document.querySelector('stundenplan-card');
+    const rows=[{time:'1.',start:'08:00',end:'08:45',cells:Array(5).fill('D')},
+      {break:true,time:'08:45-09:00',label:'Pause'},
+      {time:'2.',start:'09:00',end:'09:45',cells:Array(5).fill('LZ_GS')},
+      {time:'3.',start:'09:50',end:'10:35',cells:Array(5).fill('evR\nRaum\n\nEss/Spi GT\nMensa')}];
+    card.setConfig({type:'custom:stundenplan-card',source_type:'manual',rows,hidden_subjects:['LZ_GS','Ess/Spi GT'],
+      view_mode:'week',show_time_column:false,merge_double_lessons:true});await card.updateComplete;
+    const gapCount=card.shadowRoot.querySelectorAll('tbody tr').length;
+    const gapText=card.shadowRoot.querySelectorAll('tbody tr')[2].textContent.trim();
+    const mixedText=card.shadowRoot.querySelector('tbody tr:last-child').textContent;
+    card.setConfig({...card.config,hidden_subjects:['LZ_GS','Ess/Spi GT','D','evR']});await card.updateComplete;
+    const emptyMessage=card.shadowRoot.querySelector('tbody').textContent.trim();
+    const span=card.shadowRoot.querySelector('.nodataCell').colSpan;
+    // Refreshing the source must apply the saved filters, but not hide unknown new names.
+    const next=[{time:'1.',start:'08:00',end:'08:45',cells:['LZ_GS','Neues Fach','D','','']}];
+    card.setConfig({...card.config,source_type:'sensor',source_entity:'sensor.updated',source_entity_legacy:'sensor.updated',source_attribute:'plan'});
+    card.hass={states:{'sensor.updated':{state:'ok',last_updated:'new',attributes:{plan:next}}}};
+    await card.updateComplete;await card.updateComplete;
+    const refreshed=card.shadowRoot.querySelector('tbody').textContent;
+    const editor=document.createElement('stundenplan-card-editor');editor.hass=card.hass;
+    editor.setConfig(card.config);editor._open={filters:true};document.querySelector('#editor').append(editor);
+    await editor.updateComplete;
+    const suggestions=editor.getFilterSubjects();
+    const safeText='<img src=x onerror=alert(1)>';
+    editor.setValue('hidden_subjects',[...editor._config.hidden_subjects,safeText]);await editor.updateComplete;
+    const noInjection=editor.shadowRoot.querySelectorAll('img').length===0;
+    return {gapCount,gapText,mixedText,emptyMessage,span,refreshed,suggestions,noInjection};
+  });
+  assert.equal(filterEdges.gapCount,4,'Internal gaps and pauses must remain, not collapse the timetable');
+  assert.equal(filterEdges.gapText,'');
+  assert(filterEdges.mixedText.includes('evR'));assert(!filterEdges.mixedText.includes('Ess/Spi'));
+  assert.equal(filterEdges.emptyMessage,'Keine Einträge nach Filterung.');assert.equal(filterEdges.span,5);
+  assert(filterEdges.refreshed.includes('Neues Fach'));assert(!filterEdges.refreshed.includes('LZ_GS'));
+  assert(filterEdges.suggestions.includes('Neues Fach'));assert(filterEdges.suggestions.includes('Ess/Spi GT'));
+  assert.equal(filterEdges.noInjection,true);
+  for(const width of [320,440]) {
+    await repeatedDayPage.evaluate(width=>document.querySelector('#editor').style.width=width+'px',width);
+    assert.equal(await repeatedDayPage.locator('stundenplan-card-editor').evaluate(editor=>{
+      const bounds=editor.getBoundingClientRect();
+      return [...editor.shadowRoot.querySelectorAll('.sectionHead,.subjectChoice,.subjectAdd,input')]
+        .every(el=>el.getBoundingClientRect().right<=bounds.right+1);
+    }),true,'Filter controls must fit narrow editors');
+  }
+  console.log('Afternoon filters passed: manual, JSON sensor/URL, Suite, merged lessons, pauses, week/popup/rolling, Friday sixth lesson, A/B and safe reset.');
   await repeatedDayPage.close();
   assert.deepEqual(errors,[]);
   console.log('Repeated rolling weekdays passed: only the actual Friday is highlighted, for manual/JSON/Suite and both halves of merged lessons.');

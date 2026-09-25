@@ -90,3 +90,36 @@ assert.equal(parseColor('rgba(0,0,0,0)').alpha,0);
 assert.equal(parseColor('transparent').alpha,0);
 assert.deepEqual(parseColor('var(--custom)', '#ffffff',0.18), {hex:'#ffffff',alpha:0.18});
 console.log('Rolling boundaries and color conversion: 12 behavior assertions passed.');
+
+const subjectKey = standalone('subjectKey', 'normalizeHiddenSubjects');
+const normalizeHiddenSubjects = standalone('normalizeHiddenSubjects', 'cellSubject', {subjectKey});
+const cellSubject = standalone('cellSubject', 'filterHiddenSubjects');
+const filterHiddenSubjects = standalone('filterHiddenSubjects', 'trimTrailingEmptyRows', {subjectKey,cellSubject});
+assert.deepEqual(normalizeHiddenSubjects([' Ess/Spi  GT ', 'ess/spi gt', null, 12, '', 'LZ_GS']), ['ess/spi gt','LZ_GS']);
+assert.deepEqual(normalizeHiddenSubjects('M'), [], 'Malformed config must not silently hide subjects');
+const hidden = ['Ess/Spi GT','LZ_GS','AG GS 1'];
+assert.equal(filterHiddenSubjects('Ess/Spi GT\nMensa 1\n-Seil', hidden), '');
+assert.equal(filterHiddenSubjects('ess/spi  gt\r\nMensa 1', hidden), '');
+assert.equal(filterHiddenSubjects('evR\nRaum 1\n+Kay', hidden), 'evR\nRaum 1\n+Kay');
+assert.equal(filterHiddenSubjects('D\nLZ_GS\nHinweis: Ess/Spi GT', hidden), 'D\nLZ_GS\nHinweis: Ess/Spi GT');
+assert.equal(filterHiddenSubjects('LZ_GS 2\nRaum 1', hidden), 'LZ_GS 2\nRaum 1');
+assert.equal(filterHiddenSubjects('Ess/Spi GT\r\nMensa\r\n\r\nevR\r\nRaum 1', hidden), 'evR\r\nRaum 1');
+assert.equal(filterHiddenSubjects('evR\nRaum\n\nLZ_GS\nRaum 2', hidden), 'evR\nRaum');
+assert.equal(filterHiddenSubjects('---\nVertretung fuer LZ_GS', hidden), '---\nVertretung fuer LZ_GS');
+assert.equal(filterHiddenSubjects('M\n\nE', []), 'M\n\nE');
+const lastEnd = method('getLastLessonEnd', 'shouldAdvanceRollingDay', {ct:isBreak,yt:isEmpty});
+const endContext = {
+  _rowsCache:[{end:'12:25',cells:['M','M']},{end:'13:15',cells:['Ess/Spi GT','evR']},
+    {end:'15:45',cells:['AG GS 1','LZ_GS']}],
+  findConfiguredDayIndexForDate:date=>date.getDay()===5?1:0,
+  getManualRowForDate:(_,row)=>row,
+  filterCellText:(text,config)=>filterHiddenSubjects(text??'',config.hidden_subjects),
+};
+assert.equal(lastEnd.call(endContext,{hidden_subjects:hidden},new Date(2026,8,24)), '12:25');
+assert.equal(lastEnd.call(endContext,{hidden_subjects:hidden},new Date(2026,8,25)), '13:15');
+assert.equal(lastEnd.call(endContext,{hidden_subjects:[]},new Date(2026,8,24)), '15:45');
+endContext._rowsCache[1].cell_times=[null,{end:'13:30'}];
+assert.equal(lastEnd.call(endContext,{hidden_subjects:hidden},new Date(2026,8,25)), '13:30');
+endContext._rowsCache.push({cells:['Sp','Sp']});
+assert.equal(lastEnd.call(endContext,{hidden_subjects:hidden},new Date(2026,8,25)), '', 'Unknown remaining end time prevents early advance');
+console.log('Subject filtering passed: exact subjects, split cells, details preserved and day-specific remaining end times.');

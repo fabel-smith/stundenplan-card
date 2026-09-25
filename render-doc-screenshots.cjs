@@ -83,6 +83,7 @@ customElements.define('ha-switch',Switch);customElements.define('ha-card',HaCard
    document.querySelector('#editor').append(editor);
    const preview=document.createElement('stundenplan-card');preview.setConfig(rolling);
    document.querySelector('#preview').append(preview);
+   window.docFixture={base,rows,editor,preview};
    await Promise.all([week.updateComplete,editor.updateComplete,preview.updateComplete]);
   });
   const output=path.join(__dirname,'docs/screenshots');fs.mkdirSync(output,{recursive:true});
@@ -90,8 +91,27 @@ customElements.define('ha-switch',Switch);customElements.define('ha-card',HaCard
   await page.evaluate(() => {document.querySelector('#capture').style.display='none';document.querySelector('#editor-view').style.display='block';});
   await page.locator('#editor-view').screenshot({path:path.join(output,'editor.png')});
   await page.locator('#editor-view').screenshot({path:path.join(__dirname,'screenshot.png')});
+  await page.evaluate(async()=>{
+    const {editor}=docFixture;editor._open={};editor.requestUpdate();await editor.updateComplete;
+  });
+  await page.locator('#editor').screenshot({path:path.join(output,'editor-overview.png')});
+  await page.evaluate(async()=>{
+    const {base,rows,editor,preview}=docFixture;
+    const filteredRows=[...rows.slice(0,-1),
+      {...rows.at(-1),cells:['Ess/Spi GT','Ess/Spi GT','Ess/Spi GT','Ess/Spi GT','evR']},
+      {time:'MP',start:'13:25',end:'14:10',cells:Array(5).fill('Ess/Spi GT')},
+      {time:'8.',start:'14:15',end:'15:00',cells:Array(5).fill('LZ_GS')},
+      {time:'9.',start:'15:05',end:'15:50',cells:['AG GS 1','','','','']}];
+    const config={...base,source_type:'entity',source_entity:'sensor.beispiel_woche',source_entity_integration:'sensor.beispiel_woche',
+      source_attribute:'rows_table',view_mode:'week',show_week_navigation:false,hidden_subjects:['Ess/Spi GT','LZ_GS','AG GS 1']};
+    const hass={states:{'sensor.beispiel_woche':{state:'ok',attributes:{rows_table:filteredRows}}}};
+    editor.hass=hass;editor.setConfig(config);editor._open={filters:true};
+    preview.hass=hass;preview.setConfig(config);
+    await editor.updateComplete;await preview.updateComplete;
+  });
+  await page.locator('#editor-view').screenshot({path:path.join(output,'filtered-offers.png')});
   if(errors.length) throw new Error(errors.join('\n'));
-  console.log('Generated three documentation screenshots with fictional data only.');
+  console.log('Generated documentation screenshots, editor overview and filtered afternoon example with fictional data only.');
  } finally {
   if(browser) await browser.close();
   await new Promise(resolve => server.close(resolve));

@@ -36,6 +36,7 @@ Stundenplan Suite an und kann den aktuellen Unterricht hervorheben.
 -   Titelzeile, Datum und Zeitspalte optional ausblendbar
 -   Ansicht umschalten oder Wochen-Popup per Tipp auf die Karte
 -   Gleiche Folgestunden verbinden und leere Endstunden ausblenden (optional)
+-   Fächer/Angebote pro Karte gezielt ausblenden, etwa Essen, Betreuung oder AGs (optional)
 -   Gleichmäßige Tages-Spalten für mehrere gleich breite Karten (optional)
 -   **Kompletter visueller Editor (kein YAML notwendig)**
 -   Manueller Stundenplan direkt im Dialog bearbeitbar
@@ -296,10 +297,64 @@ sowie Hinweisfarben bleiben unabhängig davon erhalten und können weiterhin
 über ihre bisherigen Einstellungen angepasst werden. Der abgedunkelte Bereich
 hinter dem Wochen-Popup bleibt unverändert.
 
+### Editor und Fächer/Angebote filtern
+
+Die aufklappbaren Editorbereiche haben Icons und kurze Erklärungen. Nach
+**Allgemein** folgt **Datenquellen**, danach bei manueller Quelle der
+**Manuelle Stundenplan**. Unter **Inhalte filtern** wählst du anschließend
+die Fächer/Angebote aus, die auf dieser Karte nicht angezeigt werden sollen.
+Danach folgen Rolling, Schrift & Abstände, Highlights, Farben sowie
+Hintergründe & Linien. Die Bereiche sind auch per Tastatur bedienbar.
+
+[Editorübersicht](docs/screenshots/editor-overview.png) und
+[Beispiel mit ausgeblendeten Fächern/Angeboten](docs/screenshots/filtered-offers.png)
+zeigen die neuen Bereiche mit fiktiven Daten.
+
+**Inhalte filtern** schlägt Fachnamen aus der aktuell verfügbaren Quelle vor.
+Angehakte Namen werden ausgeblendet. Fehlende Namen kannst du einzeln über
+**Fächer/Angebote ergänzen** hinzufügen. Bei einer direkten JSON-URL werden
+keine zusätzlichen Daten im Editor abgerufen; ergänze dort die Namen selbst.
+Bereits gewählte Namen bleiben auch dann editierbar, wenn sie gerade nicht
+in der Quelle stehen. Ein Quellwechsel löscht die Filter nicht.
+
+Beispiel für ein Kind ohne Nachmittagsbetreuung:
+
+```yaml
+hidden_subjects:
+  - Ess/Spi GT
+  - LZ_GS
+  - AG GS 1
+```
+
+Verglichen wird der **vollständige Fachname in der ersten Zeile** eines
+Eintrags. Groß-/Kleinschreibung und mehrfache Leerzeichen spielen keine Rolle;
+Teiltreffer, Lehrer, Räume und Hinweise werden nicht durchsucht. Bei mehreren
+durch Leerzeilen getrennten Einträgen in einer Zelle wird jeder einzeln
+geprüft. Neue oder geänderte Fachnamen werden nicht automatisch ausgeblendet.
+
+Bei aktivem Filter werden vollständig leere **Endzeilen** automatisch gekürzt,
+auch ohne zusätzliche Einstellung „Leere Endstunden ausblenden“. Pausen und
+Lücken zwischen verbleibenden Stunden bleiben erhalten. In der Wochenansicht
+bleibt beispielsweise die 6. Zeile sichtbar, wenn am Freitag noch regulärer
+Unterricht stattfindet; die ausgeblendeten Einträge anderer Tage sind leer.
+Ist alles ausgeblendet, erscheint „Keine Einträge nach Filterung“.
+
+Rolling mit **Nach der letzten Stunde** verwendet bei aktivem Filter die
+letzte verbleibende Endzeit **des jeweiligen Tages**, inklusive A/B-Woche und
+zellbezogener Zeiten. Bei fehlender Endzeit oder einem vollständig leeren Tag
+wird nicht vorzeitig weitergeschaltet. Ohne Filter bleibt das bisherige
+Verhalten erhalten. Es gibt keine feste Grenze bei einer bestimmten Stunde.
+
+Der Filter gilt für alle Datenquellen und das Wochen-Popup, nur innerhalb
+dieser Karte. Die Quelldaten und andere Karten bleiben unverändert. Mit
+**Alle Einträge wieder anzeigen** lässt er sich vollständig zurücksetzen.
+Standardmäßig ist nichts ausgeblendet. Bitte wähle nur Fächer/Angebote aus,
+die für das Kind tatsächlich nicht relevant sind.
+
 ### Rolling auf eine Kalenderwoche begrenzen
 
 Die Auswahl **Ab heute (rolling)** bleibt unter **Allgemein → Ansichtsmodus**.
-Danach erscheint direkt unter „Allgemein“ das eigene, zunächst geschlossene
+Danach erscheint das eigene, zunächst geschlossene
 Akkordeon **Rolling**. Dort findest du die zusätzlichen Tage, den Tageswechsel,
 die feste Umschaltzeit und optional **Auf Kalenderwoche begrenzen**.
 Beim Wechsel zur Wochenansicht wird der Abschnitt ausgeblendet; gespeicherte
