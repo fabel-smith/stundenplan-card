@@ -2642,10 +2642,23 @@ const ut = class ut extends U {
     const key = this.getManualRowsKey();
     this.emit({ ...this._config, [key]: rows });
   }
+  async scrollToManualRow(index, rowsKey) {
+    await this.updateComplete;
+    if (!this.isConnected || this._config?.source_type !== "manual" ||
+        this.getManualRowsKey() !== rowsKey || !this._open.manual) return;
+    const panel = this.shadowRoot?.querySelectorAll(".rowPanel")[index];
+    if (!panel?.open) return;
+    const heading = panel.querySelector("summary");
+    heading?.scrollIntoView({ block: "start", inline: "nearest", behavior: "instant" });
+    // Focus the heading, not a text field: keep keyboard access without opening a mobile keyboard.
+    heading?.focus({ preventScroll: !0 });
+  }
   addManualRow() {
     if (!this._config) return;
     const t = this._config.days ?? ["Mo", "Di", "Mi", "Do", "Fr"], e = this.getManualRows(), s = { time: `${e.length + 1}.`, cells: Array.from({ length: t.length }, () => "") };
+    this._rowOpen = { ...this._rowOpen, [e.length]: !0 };
     e.push(s), this.emitManualRows(e);
+    void this.scrollToManualRow(e.length - 1, this.getManualRowsKey());
   }
   insertManualRowBelow(t) {
     if (!this._config) return;
@@ -2686,8 +2699,10 @@ const ut = class ut extends U {
   addBreakRow() {
     if (!this._config) return;
     const e = this.getManualRows();
+    this._rowOpen = { ...this._rowOpen, [e.length]: !0 };
     e.push({ break: !0, time: "", label: "Pause" });
     this.emitManualRows(e);
+    void this.scrollToManualRow(e.length - 1, this.getManualRowsKey());
   }
   toggleManualBreak(t, e) {
     if (!this._config) return;
@@ -2784,12 +2799,12 @@ const ut = class ut extends U {
         ` : d``}
       </div>
 
-      <div class="rowsTop">
+      ${rows.length ? d`<div class="rowsTop">
         <div class="rowsTitle">Stundenplan${alternating ? ` · Woche ${activeWeek}` : ""}</div>
 
         <div class="btnBar">
           <div class="toggleInline">
-            <div class="toggleText">Cell-Styles</div>
+            <div class="toggleText">Zellfarben</div>
             <ha-switch
               .checked=${!!this._showCellStyles}
               @change=${(e) => {
@@ -2799,14 +2814,22 @@ const ut = class ut extends U {
             ></ha-switch>
           </div>
 
-          <mwc-button outlined @click=${this.addLessonRow}>+ Stunde</mwc-button>
-          <mwc-button outlined @click=${this.addBreakRow}>+ Pause</mwc-button>
+          <button type="button" class="spBtn manualAdd" @click=${this.addLessonRow}>+ Stunde</button>
+          <button type="button" class="spBtn manualAdd" @click=${this.addBreakRow}>+ Pause</button>
         </div>
       </div>
 
       <div class="sub" style="margin-bottom:10px;">
         Pro Zeile: Zeit sowie optional Start und Ende. Ein Klick in der Vorschau öffnet direkt die passende Zelle.
       </div>
+      ` : d`<div class="manualEmpty">
+        <div class="rowsTitle">${alternating ? `Woche ${activeWeek}: Noch keine Einträge` : "Noch keine Stunden angelegt"}</div>
+        <div class="hint">Lege zuerst eine Stunde an, um Zeiten und Fächer einzutragen. Die Eingabefelder öffnen sich automatisch.</div>
+        <div class="btnBar">
+          <button type="button" class="spBtn manualAdd manualAddPrimary" @click=${this.addLessonRow}>Erste Stunde hinzufügen</button>
+          <button type="button" class="spBtn manualAdd" @click=${this.addBreakRow}>+ Pause</button>
+        </div>
+      </div>`}
 
       ${rows.map((r, idx) => {
         const isBreak = ct(r);
@@ -3012,7 +3035,7 @@ const ut = class ut extends U {
             select: {
               mode: "dropdown",
               options: [
-                { value: "manual", label: "Manuell (rows)" },
+                { value: "manual", label: "Manuell" },
                 { value: "entity", label: "Stundenplan Suite (Integration)" },
                 ...(((t.source_type ?? "manual") === "json")
                   ? [{ value: "json", label: "JSON-Datei (deprecated)" }]
@@ -3740,6 +3763,7 @@ ut.properties = {
       overflow: hidden;
     }
     details.rowPanel > summary {
+      scroll-margin-block: 12px;
       list-style: none;
       cursor: pointer;
       padding: 12px 14px;
@@ -3913,6 +3937,40 @@ ut.properties = {
       border-color: rgba(219,68,55,0.8);
       background: rgba(219,68,55,0.18);
     }
+    .manualEmpty {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--divider-color);
+      border-radius: 12px;
+      background: var(--secondary-background-color);
+    }
+    .spBtn.manualAdd {
+      min-height: 44px;
+      max-width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--primary-color);
+      border-radius: 8px;
+      background: var(--card-background-color);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+    .spBtn.manualAdd:hover {
+      background: color-mix(in srgb, var(--primary-color) 12%, var(--card-background-color));
+    }
+    .spBtn.manualAddPrimary {
+      background: var(--primary-color);
+      color: var(--text-primary-color, #fff);
+    }
+    .spBtn.manualAddPrimary:hover {
+      background: color-mix(in srgb, var(--primary-color) 90%, #000);
+    }
+    .spBtn.manualAdd:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 3px;
+    }
   `;
 let ht = ut;
 $([
@@ -3920,14 +3978,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.8.0";
+window.__STUNDENPLAN_CARD_VERSION = "v3.8.1";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.8.0 (marker: STUNDENPLAN_CARD_v3.8.0)",
+  description: "Stundenplan Card v3.8.1 (marker: STUNDENPLAN_CARD_v3.8.1)",
   preview: !0
 });
 export {

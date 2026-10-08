@@ -143,10 +143,12 @@ Vorgehen:
 
 1.  Card zum Dashboard hinzufügen
 2.  Bearbeiten öffnen
-3.  Unter **Datenquellen** die Quelle **Manuell (rows)** auswählen
+3.  Unter **Datenquellen** die Quelle **Manuell** auswählen
 4.  Den nun sichtbaren Abschnitt **Manueller Stundenplan** aufklappen
-5.  **+ Stunde** oder **+ Pause** hinzufügen
-6.  Stunde anklicken → Details bearbeiten
+5.  Bei einem leeren Plan **Erste Stunde hinzufügen** anklicken. Die Zeile öffnet sich direkt für Zeiten und Fächer.
+6.  Weitere Zeilen über **+ Stunde** oder **+ Pause** ergänzen. Neue Zeilen öffnen sich automatisch und werden ins Sichtfeld gescrollt; bestehende Stunden lassen sich weiterhin einzeln aufklappen.
+
+Über **Zellfarben** lassen sich die Farbeinstellungen der einzelnen Fächer einblenden.
 
 Ein Klick auf eine Fachzelle in der Vorschau öffnet die passende Zeile und
 fokussiert das Fach im manuellen Editor. Bei verbundenen Folgestunden entscheidet

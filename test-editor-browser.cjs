@@ -55,6 +55,98 @@ customElements.define('ha-card',HaCard);
    editor._showCellStyles=true;
    document.querySelector('#editor').append(editor);await editor.updateComplete;
   });
+  const setupConfig=await page.evaluate(()=>JSON.parse(JSON.stringify(editor._config)));
+  const manualSection=page.locator('[data-section="manual"]');
+  const emptyOutput=process.env.EDITOR_SCREENSHOT_DIR;
+  if(emptyOutput) fs.mkdirSync(emptyOutput,{recursive:true});
+  for(const width of [320,440]) for(const light of [false,true]) {
+    await page.evaluate(async({width,light})=>{
+      document.querySelector('#editor').style.width=width+'px';
+      editor.style.setProperty('--primary-text-color',light?'#202020':'#eeeeee');
+      editor.style.setProperty('--card-background-color',light?'#ffffff':'#1c1c1c');
+      editor.style.setProperty('--secondary-background-color',light?'#eeeeee':'#292929');
+      editor.style.setProperty('--primary-color',light?'#0072a3':'#0072a3');
+      editor.style.setProperty('--divider-color',light?'#cccccc':'#444444');
+      editor.setConfig({type:'custom:stundenplan-card',source_type:'manual',rows:[],days:['Mo','Di','Mi','Do','Fr']});
+      editor._rowOpen={};editor._open={manual:true};await editor.updateComplete;
+    },{width,light});
+    assert.equal(await manualSection.locator('mwc-button').count(),0);
+    assert.equal(await manualSection.locator('.rowPanel').count(),0);
+    const first=manualSection.getByRole('button',{name:'Erste Stunde hinzufügen',exact:true});
+    assert.equal(await first.getAttribute('type'),'button');
+    assert.equal(await manualSection.getByText('Zellfarben',{exact:true}).count(),0);
+    assert.equal(await manualSection.evaluate(el=>{
+      const bounds=el.getBoundingClientRect();
+      return [...el.querySelectorAll('.manualEmpty,.manualAdd')].every(item=>{
+        const box=item.getBoundingClientRect();return box.right<=bounds.right+1 && box.left>=bounds.left;
+      });
+    }),true,'Empty state must fit '+width+'px');
+    assert((await first.boundingBox()).height>=44);
+    if(emptyOutput) await manualSection.screenshot({path:path.join(emptyOutput,`manual-empty-${width}-${light?'light':'dark'}.png`)});
+    await first.focus();await page.keyboard.press('Enter');
+    assert.equal(await manualSection.locator('.rowPanel[open]').count(),1);
+    assert.equal(await manualSection.locator('.rowPanel[open] .lessonArea').count(),5);
+    assert.equal(await manualSection.locator('.rowPanel summary').first().evaluate(el=>el.getRootNode().activeElement===el),true);
+    assert.equal(await manualSection.getByText('Zellfarben',{exact:true}).count(),1);
+    assert.equal(await first.count(),0);
+    assert.deepEqual(await page.evaluate(()=>editor._config.rows),[{time:'1.',cells:['','','','','']}]);
+    const lesson=manualSection.locator('.lessonArea').first();
+    await page.evaluate(()=>editor.addEventListener('config-changed',event=>{
+      window.savedManualConfig=JSON.parse(JSON.stringify(event.detail.config));
+    }));
+    await lesson.fill('Mathe');
+    for(const [label,value] of [['Zeit / Stunde','1.'],['Start (HH:MM)','08:00'],['Ende (HH:MM)','08:45']]) {
+      await manualSection.locator('ha-input').evaluateAll((inputs,{label,value})=>{
+        const input=inputs.find(el=>el.getAttribute('label')===label);
+        input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));
+      },{label,value});
+    }
+    assert.equal(await page.evaluate(()=>editor._config.rows[0].cells[0]),'Mathe');
+    await manualSection.getByRole('button',{name:'+ Stunde',exact:true}).click();
+    assert.equal(await manualSection.locator('.rowPanel').nth(1).getAttribute('open'),'');
+    await manualSection.getByRole('button',{name:'+ Pause',exact:true}).focus();await page.keyboard.press('Space');
+    assert.equal(await manualSection.locator('.rowPanel').nth(2).getAttribute('open'),'');
+    assert.equal(await manualSection.locator('.rowPanel').nth(2).locator('ha-input[label="Pausentext"]').count(),1);
+    const pausePosition=await manualSection.locator('.rowPanel').nth(2).locator('summary').evaluate(el=>{
+      const bounds=el.getBoundingClientRect();
+      return {focused:el.getRootNode().activeElement===el,top:bounds.top,bottom:bounds.bottom,height:innerHeight};
+    });
+    assert(pausePosition.focused && pausePosition.top>=-1 && pausePosition.bottom<=pausePosition.height+1,
+      'The newly appended pause heading should be visible and focused: '+JSON.stringify(pausePosition));
+    await manualSection.locator('.rowPanel').nth(2).locator('ha-input[label="Pausentext"]').evaluate(input=>{
+      input.value='Hofpause';input.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    assert.equal(await page.evaluate(()=>editor._config.rows.length),3);
+    assert.equal(await page.evaluate(()=>editor._config.rows[0].cells[0]),'Mathe');
+    await page.evaluate(async()=>{
+      const oldEditor=editor;
+      window.editor=document.createElement('stundenplan-card-editor');
+      editor.setConfig(window.savedManualConfig);editor._open={manual:true};editor._rowOpen={0:true,1:true,2:true};
+      oldEditor.replaceWith(editor);await editor.updateComplete;
+    });
+    assert.equal(await page.evaluate(()=>editor._config.rows[0].cells[0]),'Mathe');
+    assert.deepEqual(await page.evaluate(()=>[editor._config.rows[0].start,editor._config.rows[0].end,editor._config.rows[2].label]),['08:00','08:45','Hofpause']);
+    for(let i=0;i<3;i++) await manualSection.getByRole('button',{name:'Löschen',exact:true}).last().click();
+    assert.equal(await first.count(),1,'Removing all rows must restore the empty state');
+    await manualSection.getByRole('button',{name:'+ Pause',exact:true}).click();
+    assert.equal(await manualSection.locator('.rowPanel[open] ha-input[label="Pausentext"]').count(),1,'Pause can also be the first entry');
+  }
+  await page.evaluate(async()=>{
+    editor.setConfig({type:'custom:stundenplan-card',source_type:'manual',week_mode:'kw_parity',
+      rows:[{time:'1.',cells:['D']}],rows_b:[]});editor._manualWeek='B';editor._rowOpen={};await editor.updateComplete;
+  });
+  await manualSection.getByRole('button',{name:'Erste Stunde hinzufügen',exact:true}).click();
+  assert.equal(await page.evaluate(()=>editor._config.rows[0].cells[0]),'D');
+  assert.equal(await page.evaluate(()=>editor._config.rows_b.length),1);
+  assert.equal(await manualSection.locator('.rowPanel[open]').count(),1);
+  await page.evaluate(async(config)=>{
+    editor.removeAttribute('style');document.querySelector('#editor').style.width='440px';
+    editor.setConfig(config);editor._manualWeek='A';editor._rowOpen={};editor._showCellStyles=true;
+    editor._open={general:true,rolling:true,typography:true,appearance:true,colors:true,highlights:true,sources:true,manual:true};
+    await editor.updateComplete;
+  },setupConfig);
+  assert.equal(await page.locator('option[value="manual"]').textContent(),'Manuell');
+  console.log('Manual onboarding passed: native visible buttons, empty/first-pause states, immediate row opening, keyboard, A/B isolation, data persistence and light/dark 320/440px layouts.');
   assert.equal(await page.getByText('Auf Kalenderwoche begrenzen',{exact:true}).count(),1);
   const typographyOrder=['Titelgröße normal (px)','Titelgröße kompakt (px)','Titel-Schriftfamilie (optional)',
     'Abstand Kopfzeile / Tabelle (px)','Wochentage / Tabellenkopf (px)','Stunden & Uhrzeiten (px)',
