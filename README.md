@@ -487,6 +487,12 @@ berücksichtigt dabei ebenfalls die jeweilige Zellzeit.
 
 ## 🔌 Nutzung mit der stundenplan-suite
 
+Bei Quellen mit `week_offset_entity` richtet sich die A/B-Kennzeichnung nach der
+ausgewählten Woche, auch bei ausgeblendeter Wochennavigation. Das gilt sowohl
+für gerade/ungerade ISO-Kalenderwochen als auch für `week_map`. Ohne Wochenversatz
+wird weiterhin die aktuelle Woche verwendet. Ein Sensor, der selbst die gewählte
+Woche liefert (z. B. `rows_table`), benötigt keine getrennten A/B-Quellsensoren.
+
 Die Card dient sowohl als Anzeige für automatisch importierte Daten
 (*stundenplan-suite*) als auch als vollständig eigenständig gepflegter
 Stundenplan.
@@ -495,9 +501,13 @@ Die Suite unterstützt zwei Datenquellen:
 
 - **Stundenplan24** wird direkt von der Suite abgerufen.
 - **Schulmanager Online** wird über die bereits installierte
-  [Schulmanager-Integration](https://github.com/rwunsch/schulmanager-online-hass)
+  [Schulmanager-Integration von MrIcemanLE](https://github.com/MrIcemanLE/Schulmanager-homeassistant)
   angebunden. Die Suite liest deren Kalender- und Stundenplan-Entitäten und
   erzeugt daraus den einheitlichen Wochensensor für die Karte.
+
+Die Suite-Einrichtung erwartet die Domain `schulmanager`. Das ähnlich benannte
+Projekt von rwunsch (`schulmanager_online`) ist dort derzeit nicht direkt
+auswählbar; siehe die Installationshinweise der Suite.
 
 In der Kartenkonfiguration unter **Datenquellen → Stundenplan Suite
 (Integration)** einfach den passenden `*_woche`-Sensor auswählen. Die Karte

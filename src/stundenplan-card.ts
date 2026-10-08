@@ -646,7 +646,8 @@ function Re(r) {
 function Bt(r) {
   const t = new Date(Date.UTC(r.getFullYear(), r.getMonth(), r.getDate())), e = t.getUTCDay() === 0 ? 7 : t.getUTCDay();
   t.setUTCDate(t.getUTCDate() + 4 - e);
-  const s = t.getUTCFullYear(), i = new Date(Date.UTC(s, 0, 1)), n = i.getUTCDay() === 0 ? 7 : i.getUTCDay(), o = new Date(i);
+  const s = t.getUTCFullYear(), i = new Date(Date.UTC(s, 0, 4)), n = i.getUTCDay() === 0 ? 7 : i.getUTCDay(), o = new Date(i);
+  // ISO week 1 contains January 4, not necessarily January 1.
   o.setUTCDate(i.getUTCDate() + (4 - n));
   const l = t.getTime() - o.getTime();
   return { isoWeek: 1 + Math.round(l / (10080 * 60 * 1e3)), isoYear: s };
@@ -1242,7 +1243,7 @@ const v = (D = class extends U {
     e === this._jsonUrlLast && this._jsonStatus !== "error" || (e !== this._jsonUrlLast && (this._jsonUrlLast = e, this._jsonRows = null, this._jsonStatus = "idle", this._jsonError = ""), this._jsonStatus === "idle" && e && this.loadJsonRows(t, e));
   }
   weekFromParity(t) {
-    return this.weekFromParityAtDate(t, /* @__PURE__ */ new Date());
+    return this.weekFromParityAtDate(t, this.getBaseDate(t));
   }
   weekFromParityAtDate(t, e) {
     const { isoWeek: s } = Bt(e), i = s % 2 === 0, n = !!t.week_a_is_even_kw;
@@ -1253,7 +1254,7 @@ const v = (D = class extends U {
     if (!e) return null;
     const s = (t.week_map_attribute ?? "").toString().trim(), i = this.readEntityJson(e, s);
     if (!i || typeof i != "object") return null;
-    const { isoWeek: n, isoYear: o } = Bt(/* @__PURE__ */ new Date()), l = String(n), a = String(o);
+    const { isoWeek: n, isoYear: o } = Bt(this.getBaseDate(t)), l = String(n), a = String(o);
     if (i?.[a] && typeof i[a] == "object") {
       const _ = zt(i[a][l]);
       if (_) return _;
@@ -1446,9 +1447,9 @@ const v = (D = class extends U {
   getHeaderDaysFromEntity(t) {
     const e = (
       (t.source_type ?? "manual") === "entity"
-        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        ? ((t.source_entity_integration || t.source_entity) ?? "")
         : (t.source_type ?? "manual") === "sensor"
-          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
+          ? ((t.source_entity_legacy || t.source_entity) ?? "")
           : (t.source_entity ?? "")
     ).toString().trim();
     if (!e || !this.hass?.states?.[e]) return null;
@@ -1472,9 +1473,9 @@ const v = (D = class extends U {
     if (sourceType !== "entity" && sourceType !== "sensor") return null;
     const e = (
       sourceType === "entity"
-        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        ? ((t.source_entity_integration || t.source_entity) ?? "")
         : sourceType === "sensor"
-          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
+          ? ((t.source_entity_legacy || t.source_entity) ?? "")
           : (t.source_entity ?? "")
     ).toString().trim();
     if (!e || !this.hass?.states?.[e]) return null;
@@ -1509,9 +1510,9 @@ const v = (D = class extends U {
     const e = t.source_type ?? "manual";
     const effEntity = (
       e === "entity"
-        ? ((t.source_entity_integration ?? t.source_entity) ?? "")
+        ? ((t.source_entity_integration || t.source_entity) ?? "")
         : e === "sensor"
-          ? ((t.source_entity_legacy ?? t.source_entity) ?? "")
+          ? ((t.source_entity_legacy || t.source_entity) ?? "")
           : (t.source_entity ?? "")
     ).toString().trim();
 
@@ -1577,10 +1578,18 @@ const v = (D = class extends U {
         || /^für\b/i.test(x);
     }, l = (u) => {
       const x = (u ?? "").toString().trim();
-      // Räume: reine Nummern (222), alphanumerisch kurz (SH2-B, SH2-A), oder "044 Aula"
+
+      // Räume:
+      // 134, 131       -> reine Nummer
+      // U04, E18, SH2  -> Buchstaben direkt gefolgt von Zahlen
+      // IT 4, Ph 1     -> Buchstaben, Leerzeichen, Zahlen
+      // KuWe 25        -> längeres Fachraum-Kürzel mit Leerzeichen
+      // SH2-A, SH2/B   -> zusammengesetzte Raumbezeichnungen
+      // 044 Aula       -> Nummer plus Bezeichnung
       return /^\d{1,4}$/.test(x)
+        || /^[A-Za-zÄÖÜäöüß]{1,8}\s*\d{1,4}$/i.test(x)
         || /^[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}$/i.test(x)
-        || /^\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12}$/.test(x);
+        || /^\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12}$/i.test(x);
     }, a = s.slice(1);
     let c = -1;
     for (let u = 0; u < a.length; u++)
@@ -1651,8 +1660,6 @@ const v = (D = class extends U {
 
     const partsByBlank = filtered.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
 
-    const parsed = this.parseCellTriplet(filtered);
-
     // Helfer: Note-Klasse bestimmen (Emoji oder Keywords)
     const noteClass = (line) => {
       if (line.startsWith("🔴")) return "note noteRed";
@@ -1673,28 +1680,6 @@ const v = (D = class extends U {
         // manchmal bleibt ein Replacement-Char übrig
         .replace(/^[�]+\s*/, "")
         .trim();
-
-    if (partsByBlank.length === 1 && parsed?.fach && parsed?.raum && parsed?.lehrer) {
-      return d`
-        <div class="cellWrap">
-          <div class="fach">${parsed.fach}</div>
-          <div class="lehrer">${parsed.lehrer}</div>
-          <div class="raum">${parsed.raum}</div>
-
-          ${parsed.notes?.length
-            ? d`
-                <div class="notes">
-                  ${parsed.notes.map((line) => {
-                    const cls = noteClass(line);
-                    const txt = noteText(line) || line;
-                    return d`<div class=${cls}><span class="txt">${txt}</span></div>`;
-                  })}
-                </div>
-              `
-            : d``}
-        </div>
-      `;
-    }
 
     // Multi-Block (z.B. geteilte Gruppen nebeneinander): entweder durch Leerzeile getrennt
     // oder als 3er-Gruppen (Fach / Raum / Lehrer) hintereinander.
@@ -1755,12 +1740,13 @@ const v = (D = class extends U {
 
     // Heuristik: 6/9/12… Zeilen ohne Notes => als 2+ Spalten rendern (typisch: Fach/Raum/Lehrer je Block)
     const flatLines = (filtered ?? "").split(`\n`).map((c) => c.trim()).filter(Boolean);
-    const roomRe = /^\d{1,4}$/;
-    const teacherRe = /^[A-ZÄÖÜ]{2,6}$/;
+    const roomRe = /^(?:\d{1,4}|[A-Za-zÄÖÜäöüß]{1,8}\s*\d{1,4}|[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}|\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12})$/i;
+    const teacherRe = /^[A-Za-zÄÖÜäöüß]{2,12}$/i;
     const looksLikeSubject = (s: string) => {
       const x = (s ?? "").trim();
       if (!x) return false;
-      if (roomRe.test(x) || teacherRe.test(x)) return false;
+      // Subject and teacher abbreviations overlap; validate teachers by position.
+      if (roomRe.test(x)) return false;
       const lx = x.toLowerCase();
       if (lx.startsWith("statt ") || lx.includes("fällt aus") || lx.includes("verlegt") || lx.includes("gehalten")) return false;
       // Icons/Marker eher Notes
@@ -3978,14 +3964,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.8.1";
+window.__STUNDENPLAN_CARD_VERSION = "v3.8.2";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.8.1 (marker: STUNDENPLAN_CARD_v3.8.1)",
+  description: "Stundenplan Card v3.8.2 (marker: STUNDENPLAN_CARD_v3.8.2)",
   preview: !0
 });
 export {

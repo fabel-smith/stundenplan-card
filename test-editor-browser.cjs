@@ -808,6 +808,67 @@ customElements.define('ha-card',HaCard);
     }),true,'Filter controls must fit narrow editors');
   }
   console.log('Afternoon filters passed: manual, JSON sensor/URL, Suite, merged lessons, pauses, week/popup/rolling, Friday sixth lesson, A/B and safe reset.');
+  const weekResults=await repeatedDayPage.evaluate(async()=>{
+    window.testNow='2026-10-08T09:00:00';
+    const card=document.createElement('stundenplan-card');
+    const cfg={type:'custom:stundenplan-card',source_type:'sensor',source_entity:'sensor.test',
+      source_attribute:'rows_table',source_time_key:'time',week_offset_entity:'number.offset',
+      week_mode:'kw_parity',week_a_is_even_kw:true,view_mode:'week',show_header_date:true};
+    card.setConfig(cfg);document.querySelector('#editor').replaceChildren(card);
+    const values=[];
+    for(const offset of [0,1,-1,2]) {
+      const text='Plan '+offset;
+      card.hass={states:{'number.offset':{state:String(offset),attributes:{}},
+        'sensor.test':{state:'ok',attributes:{rows_table:[{time:'1.',Mo:text,Di:text,Mi:text,Do:text,Fr:text}]}}}};
+      await card.updateComplete;
+      await card.updateComplete;
+      values.push({badge:card.shadowRoot.querySelector('.weekBadgeInline').textContent.trim(),
+        text:card.shadowRoot.querySelector('tbody').textContent.includes(text)});
+    }
+    card.setConfig({...cfg,week_offset_attribute:'offset',show_week_navigation:false});
+    card.hass={states:{...card.hass.states,'number.offset':{state:'ignored',attributes:{offset:1}}}};
+    await card.updateComplete;
+    values.push({badge:card.shadowRoot.querySelector('.weekBadgeInline').textContent.trim()});
+    card.setConfig({...cfg,week_mode:'week_map',week_map_entity:'sensor.map'});
+    card.hass={states:{...card.hass.states,'number.offset':{state:'1',attributes:{}},
+      'sensor.map':{state:JSON.stringify({'2026':{'42':'B'}}),attributes:{}}}};
+    await card.updateComplete;
+    values.push({badge:card.shadowRoot.querySelector('.weekBadgeInline').textContent.trim()});
+    // Missing offset falls back to the current week, without changing the source data.
+    card.setConfig(cfg);card.hass={states:{'sensor.test':card.hass.states['sensor.test']}};
+    await card.updateComplete;
+    values.push({badge:card.shadowRoot.querySelector('.weekBadgeInline').textContent.trim()});
+    return values;
+  });
+  assert.deepEqual(weekResults,[{badge:'Woche B',text:true},{badge:'Woche A',text:true},
+    {badge:'Woche A',text:true},{badge:'Woche B',text:true},{badge:'Woche A'},
+    {badge:'Woche B'},{badge:'Woche B'}]);
+  const roomResults=await repeatedDayPage.evaluate(async()=>{
+    const card=document.createElement('stundenplan-card');
+    document.querySelector('#editor').replaceChildren(card);
+    const values=[];
+    for(const cell of ['Mathe\nU04\nMue','Mathe\nIT 4\nMue\nDeutsch\nKuWe 25\nSchmidt',
+      'Mathe\n134\nMUE\nDeutsch\n131\nABC','Mathe\nU04\nMue\n\nDeutsch\nSH2/B\nMueller',
+      'Mathe\nU04\nMue\nVertretung']) {
+      card.setConfig({type:'custom:stundenplan-card',source_type:'manual',days:['Mo'],
+        rows:[{time:'1.',cells:[cell]}]});
+      await card.updateComplete;
+      const root=card.shadowRoot;
+      values.push({subjects:[...root.querySelectorAll('.fach')].map(el=>el.textContent.trim()),
+        rooms:[...root.querySelectorAll('.raum')].map(el=>el.textContent.trim()),
+        teachers:[...root.querySelectorAll('.lehrer')].map(el=>el.textContent.trim()),
+        notes:[...root.querySelectorAll('.note .txt')].map(el=>el.textContent.trim())});
+    }
+    return values;
+  });
+  assert.deepEqual(roomResults,[
+    {subjects:['Mathe'],rooms:['U04'],teachers:['Mue'],notes:[]},
+    {subjects:['Mathe','Deutsch'],rooms:['IT 4','KuWe 25'],teachers:['Mue','Schmidt'],notes:[]},
+    {subjects:['Mathe','Deutsch'],rooms:['134','131'],teachers:['MUE','ABC'],notes:[]},
+    {subjects:['Mathe','Deutsch'],rooms:['U04','SH2/B'],teachers:['Mue','Mueller'],notes:[]},
+    {subjects:['Mathe'],rooms:['U04'],teachers:['Mue'],notes:['Vertretung']},
+  ]);
+  console.log('Issue #13 and PR #14 passed: live offset updates, attribute offsets, hidden pager, map and missing offset; room/teacher parsing and parallel lesson blocks.');
   await repeatedDayPage.close();
   assert.deepEqual(errors,[]);
   console.log('Repeated rolling weekdays passed: only the actual Friday is highlighted, for manual/JSON/Suite and both halves of merged lessons.');

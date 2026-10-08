@@ -123,3 +123,42 @@ assert.equal(lastEnd.call(endContext,{hidden_subjects:hidden},new Date(2026,8,25
 endContext._rowsCache.push({cells:['Sp','Sp']});
 assert.equal(lastEnd.call(endContext,{hidden_subjects:hidden},new Date(2026,8,25)), '', 'Unknown remaining end time prevents early advance');
 console.log('Subject filtering passed: exact subjects, split cells, details preserved and day-specific remaining end times.');
+
+const isoWeek = standalone('Bt', 'zt');
+for (const [day, week, year] of [
+  ['2026-10-08',41,2026], ['2026-10-15',42,2026], ['2026-12-31',53,2026],
+  ['2027-01-01',53,2026], ['2027-01-04',1,2027], ['2027-01-11',2,2027],
+  ['2021-01-04',1,2021], ['2022-01-03',1,2022], ['2023-01-02',1,2023],
+  ['2024-12-30',1,2025],
+]) assert.deepEqual(isoWeek(new Date(day+'T12:00:00')), {isoWeek:week,isoYear:year}, day);
+const parity = method('weekFromParityAtDate', 'weekFromMap', {Bt:isoWeek});
+const weekContext = {
+  date:new Date('2026-10-08T12:00:00'),
+  getBaseDate(){return this.date;},
+  weekFromParityAtDate:parity,
+  weekFromParity:method('weekFromParity','weekFromParityAtDate'),
+  weekFromMap:method('weekFromMap','getActiveWeek',{Bt:isoWeek,zt:value=>['A','B'].includes(value)?value:null}),
+  getActiveWeek:method('getActiveWeek','filterCellText'),
+  readEntityJson(){return this.map;},
+  map:{'2026':{'41':'A','42':'B'},'2027':{'1':'B'}},
+};
+const weekConfig={week_mode:'kw_parity',week_a_is_even_kw:true,week_map_entity:'sensor.weeks'};
+assert.equal(weekContext.getActiveWeek(weekConfig),'B');
+weekContext.date=new Date('2026-10-15T12:00:00');
+assert.equal(weekContext.getActiveWeek(weekConfig),'A');
+assert.equal(weekContext.getActiveWeek({...weekConfig,week_mode:'week_map'}),'B');
+weekContext.date=new Date('2027-01-04T12:00:00');
+assert.equal(weekContext.getActiveWeek({...weekConfig,week_mode:'week_map'}),'B');
+weekContext.map={};
+assert.equal(weekContext.getActiveWeek({...weekConfig,week_mode:'week_map'}),'B');
+assert.equal(weekContext.getActiveWeek({...weekConfig,week_mode:'off'}),'A');
+
+const triplet = method('parseCellTriplet','renderCell');
+for(const room of ['134','131','U04','E18','SH2','IT 4','Ph 1','KuWe 25','SH2-A','SH2/B','044 Aula']) {
+  assert.deepEqual(triplet('Mathe\n'+room+'\nMue'), {fach:'Mathe',raum:room,lehrer:'Mue',notes:undefined});
+}
+assert.equal(triplet('Mathe\nMue'),null);
+assert.equal(triplet('---'),null);
+assert.deepEqual(triplet('Mathe\nU04\nMue\nVertretung'),
+  {fach:'Mathe',raum:'U04',lehrer:'Mue',notes:['Vertretung']});
+console.log('Week labels and room formats passed: ISO year boundaries, week maps, parity and new/legacy room names.');
