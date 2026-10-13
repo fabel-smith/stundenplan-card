@@ -1,5 +1,9 @@
 ## Termine und Hinweise
 
+![Diktat, Klassenarbeit und Fachwechsel im Beispiel-Stundenplan](https://raw.githubusercontent.com/fabel-smith/stundenplan-card/main/docs/screenshots/release-3.9.0.png)
+
+*Fiktive Beispieldaten: farbige Hinweise in den Unterrichtsstunden und Schwimmen als datumsbezogener Fachwechsel.*
+
 - Klassenarbeiten, Diktate und Erinnerungen direkt in der Karte eintragen: mit **+ Termin hinzufügen** oder per Klick auf eine Unterrichtsstunde in der Editor-Vorschau.
 - Neue Termine werden nach **Datum und Stunde** zugeordnet, unabhängig vom Fachnamen. Auch spätere Termine ohne bereits geladenen Stundenplan sind möglich.
 - Die zusätzliche Liste **Anstehende Termine** unter der Tabelle ist optional und standardmäßig ausgeschaltet. Der Schalter im Termine-Bereich blendet nur diese Liste ein oder aus; Termine und Hinweise in den Unterrichtszellen bleiben erhalten.
