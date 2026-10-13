@@ -1,3 +1,4 @@
+import { collectEntries, applyDatedEntries, validateEntry, isPastEntry, dateKey, validDate, periodKey, isPeriodNote, entrySummary, pendingNotes } from "./dated-entries.js";
 // Bundled Lit runtime: see THIRD_PARTY_NOTICES for its BSD-3-Clause license.
 const Q = globalThis, $t = Q.ShadowRoot && (Q.ShadyCSS === void 0 || Q.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, vt = /* @__PURE__ */ Symbol(), Dt = /* @__PURE__ */ new WeakMap();
 let Ft = class {
@@ -729,7 +730,7 @@ function mergedCellInfo(r, t, e) {
     const info = e(rows[index], index) ?? {};
     const text = mergedCellTextKey(info.text);
     if (yt(text)) return null;
-    return JSON.stringify([text, mergedCellStyleKey(info.style)]);
+    return JSON.stringify([text, mergedCellStyleKey(info.style), info.notes ?? []]);
   };
   const current = signature(t);
   if (!current) return { covered: !1, span: 1 };
@@ -756,11 +757,19 @@ const appearanceFields = [
   { key: "row_background", variable: "--stundenplan-row-background", label: "Zeilenhintergrund", theme: "--card-background-color", fallback: "#ffffff" },
   { key: "divider_color", variable: "--stundenplan-divider-color", label: "Trennlinien", theme: "--divider-color", fallback: "#e0e0e0" }
 ];
+function normalizeCssColor(value) {
+  const color = typeof value === "string" ? value.trim() : "";
+  return color && !/[;{}]/.test(color) && CSS.supports("color", color) ? color : "";
+}
+function datedNoteStyle(note) {
+  const color = normalizeCssColor(note.color), background = normalizeCssColor(note.background);
+  return `${color ? `color:${color};` : ""}${background ? `background-color:${background};` : ""}`;
+}
 function normalizeAppearance(config) {
   const values = {};
   for (const { key } of appearanceFields) {
-    const value = typeof config[key] === "string" ? config[key].trim() : "";
-    if (value && !/[;{}]/.test(value) && CSS.supports("color", value)) values[key] = value;
+    const value = normalizeCssColor(config[key]);
+    if (value) values[key] = value;
   }
   return values;
 }
@@ -906,7 +915,7 @@ const v = (D = class extends U {
       const n = (i ?? "").toString().trim();
       n && e.add(n);
     };
-    return s(t.week_offset_entity), s(t.source_entity), s(t.source_entity_integration), s(t.source_entity_legacy), s(t.source_entity_a), s(t.source_entity_b), s(t.week_map_entity), Array.from(e);
+    return s(t.dated_entries_entity), s(t.week_offset_entity), s(t.source_entity), s(t.source_entity_integration), s(t.source_entity_legacy), s(t.source_entity_a), s(t.source_entity_b), s(t.week_map_entity), Array.from(e);
   }
   getEntitySig(t) {
     const e = this.hass?.states?.[t];
@@ -1073,6 +1082,9 @@ const v = (D = class extends U {
       show_week_navigation: t.show_week_navigation ?? e.show_week_navigation,
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
       hidden_subjects: normalizeHiddenSubjects(t.hidden_subjects),
+      dated_entries: Array.isArray(t.dated_entries) ? t.dated_entries : [],
+      dated_entries_entity: typeof t.dated_entries_entity === "string" ? t.dated_entries_entity.trim() : "",
+      dated_entries_attribute: typeof t.dated_entries_attribute === "string" ? t.dated_entries_attribute.trim() || "entries" : "entries",
       merge_double_lessons: t.merge_double_lessons ?? e.merge_double_lessons,
       equal_column_widths: t.equal_column_widths ?? e.equal_column_widths,
       days: s,
@@ -1268,6 +1280,18 @@ const v = (D = class extends U {
   filterCellText(t, e) {
     return filterHiddenSubjects((t ?? "").toString().trim(), e.hidden_subjects);
   }
+  getDatedCell(config, row, day, date, entries) {
+    const original = this.filterCellText(row?.cells?.[day], config);
+    if (!entries?.length || ct(row)) return { text: original, notes: [] };
+    const notes = new Map(), blocks = [];
+    applyDatedEntries("", row, day, date, entries).notes.forEach(note => notes.set(JSON.stringify(note), note));
+    for (const block of original.split(/\r?\n\s*\r?\n/)) {
+      const result = applyDatedEntries(block, row, day, date, entries);
+      const text = this.filterCellText(result.text, config);
+      if (text) { blocks.push(text); result.notes.forEach(note => notes.set(JSON.stringify(note), note)); }
+    }
+    return { text: blocks.join("\n\n"), notes: [...notes.values()] };
+  }
   getTitleStyle(t) {
     const e = [];
     const s = Number(t.title_font_size);
@@ -1307,12 +1331,13 @@ const v = (D = class extends U {
   getLastLessonEnd(config = this.config, date = new Date()) {
     const t = this._rowsCache ?? [];
     if (config?.hidden_subjects?.length) {
+      const entries = collectEntries(config, this.hass).entries;
       const day = this.findConfiguredDayIndexForDate(date, config.days);
       if (day < 0) return "";
       let latest = "";
       for (let index = 0; index < t.length; index++) {
         const row = this.getManualRowForDate(config, t[index], index, date);
-        if (ct(row) || yt(this.filterCellText(row?.cells?.[day], config))) continue;
+        if (ct(row) || yt(this.getDatedCell(config, row, day, date, entries).text)) continue;
         const end = row?.cell_times?.[day]?.end || row?.end;
         // Unknown end times must not make the card advance before a remaining lesson.
         if (!/^\d{1,2}:\d{2}$/.test(end ?? "")) return "";
@@ -1411,10 +1436,23 @@ const v = (D = class extends U {
     this._uiPopupOpen = !1;
     this.requestUpdate();
   }
+  handlePreviewNote(t, event, row, dayIndex, date, note) {
+    if (!cardEditDialog(this)) return;
+    event.stopPropagation();
+    this.dispatchEvent(new CustomEvent("stundenplan-add-note", { bubbles: true, composed: true, cancelable: true,
+      detail: { config: this.config, date: dateKey(date), period: periodKey(row?.cell_times?.[dayIndex]?.time || row?.time),
+        note, sourceText: row?.cells?.[dayIndex] ?? "" } }));
+  }
+  updatePreviewTooltip(t, event) {
+    if (!cardEditDialog(this)) return;
+    const detail = { config: this.config, text: t.source_type === "manual" ? "Fach bearbeiten" : "Termin oder Hinweis hinzufügen" };
+    // Ask the editor on hover: opening an accordion does not rerender the preview.
+    this.dispatchEvent(new CustomEvent("stundenplan-preview-tooltip", { bubbles: true, composed: true, detail }));
+    event.currentTarget.title = detail.text;
+  }
   handlePreviewCell(t, event, rowIndex, dayIndex, date, span = 1) {
     if (!cardEditDialog(this)) return;
     event.stopPropagation();
-    if (t.source_type !== "manual") return;
     // A merged cell still represents multiple editable source rows.
     let tr = event.currentTarget.parentElement;
     for (let offset = 1; offset < span; offset++) {
@@ -1422,6 +1460,14 @@ const v = (D = class extends U {
       if (tr && event.clientY >= tr.getBoundingClientRect().top) rowIndex++;
       else break;
     }
+    const targetRow = this.getManualRowForDate(t, this._rowsCache[rowIndex], rowIndex, date);
+    const period = periodKey(targetRow?.cell_times?.[dayIndex]?.time || targetRow?.time);
+    if (dayIndex >= 0 && targetRow && !ct(targetRow) && period && dateKey(date)) {
+      const noteEvent = new CustomEvent("stundenplan-add-note", { bubbles: true, composed: true, cancelable: true,
+        detail: { config: this.config, date: dateKey(date), period } });
+      if (!this.dispatchEvent(noteEvent)) return;
+    }
+    if (t.source_type !== "manual") return;
     let week = t.week_mode === "kw_parity"
       ? (date instanceof Date ? this.weekFromParityAtDate(t, date) : this.getActiveWeek(t)) : "A";
     if (week === "B" && !t.rows_b?.length) week = "A";
@@ -1784,14 +1830,34 @@ const v = (D = class extends U {
         idxs = rollingSlots.length ? rollingSlots.map((y) => y.orig) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m),
         daysVis = idxs.map((y) => t.days[y]),
         rollingDates = rollingSlots.length ? rollingSlots.map((y) => y.date) : null,
+        dated = collectEntries(t, this.hass),
+        dateForColumn = (visibleIndex) => {
+          if (rollingDates) return rollingDates[visibleIndex];
+          const day = Oe(t.days[idxs[visibleIndex]]);
+          if (!day) return null;
+          if (g) return g.find(date => (date.getDay() || 7) === day) ?? null;
+          const date = new Date(B); date.setDate(date.getDate() + day - 1); return date;
+        },
         focusVisibleIndex = rollingSlots.length ? 0 : Math.max(0, idxs.indexOf(s)),
         focusDayIndex = idxs[focusVisibleIndex] ?? 0,
         focusDate = rollingDates?.[focusVisibleIndex] ?? null,
         focusIsToday = focusDate instanceof Date ? this.fmtYMD(focusDate) === this.fmtYMD(new Date()) : focusDayIndex === s,
         visibleRows = t.trim_empty_rows || t.hidden_subjects?.length ? trimTrailingEmptyRows(e, idxs, (row, rowIndex, dayIndex, visibleIndex) => {
           const resolved = this.getManualRowForDate(t, row, rowIndex, rollingDates?.[visibleIndex]);
-          return this.filterCellText((resolved?.cells ?? row?.cells ?? [])[dayIndex] ?? "", t);
+          const cell = this.getDatedCell(t, resolved ?? row, dayIndex, dateForColumn(visibleIndex), dated.entries);
+          return cell.text + cell.notes.map(note => note.text).join(" ");
         }) : e,
+        represented = new Set(),
+        upcoming = (() => {
+          if (!this._noData) visibleRows.forEach((row, rowIndex) => {
+            if (ct(row)) return;
+            idxs.forEach((dayIndex, visibleIndex) => {
+              const resolved = this.getManualRowForDate(t, row, rowIndex, dateForColumn(visibleIndex)) ?? row;
+              represented.add(`${dateKey(dateForColumn(visibleIndex))}/${periodKey(resolved.cell_times?.[dayIndex]?.time || resolved.time)}`);
+            });
+          });
+          return pendingNotes(dated.entries, represented);
+        })(),
         updMap = (() => {
           const y = /* @__PURE__ */ new Map();
           if (!g || !upd) return y;
@@ -1861,7 +1927,7 @@ const v = (D = class extends U {
                     </tr>
                   `;
       }
-      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], focusedRow = this.getManualRowForDate(t, m, rowIndex, focusDate), cellTime = (focusedRow?.cell_times ?? m.cell_times)?.[focusDayIndex] ?? null, displayTime = cellTime?.time || focusedRow?.time || m.time, displayStart = cellTime?.start || focusedRow?.start || m.start, displayEnd = cellTime?.end || focusedRow?.end || m.end, w = focusIsToday && !!displayStart && !!displayEnd && this.isNowBetween(displayStart, displayEnd), x = s >= 0 ? W[s] ?? "" : "", te = s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), __rng = mt(displayTime),
+      const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], focusedRow = this.getManualRowForDate(t, m, rowIndex, focusDate), cellTime = (focusedRow?.cell_times ?? m.cell_times)?.[focusDayIndex] ?? null, displayTime = cellTime?.time || focusedRow?.time || m.time, displayStart = cellTime?.start || focusedRow?.start || m.start, displayEnd = cellTime?.end || focusedRow?.end || m.end, w = focusIsToday && !!displayStart && !!displayEnd && this.isNowBetween(displayStart, displayEnd), x = s >= 0 ? W[s] ?? "" : "", te = dated.entries.length ? this.getDatedCell(t, focusedRow ?? m, focusDayIndex, dateForColumn(focusVisibleIndex), dated.entries).text : s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), __rng = mt(displayTime),
       __timeHasRange = !!(__rng.start && __rng.end),
       Et = (!__timeHasRange && displayStart && displayEnd) ? `${displayStart}–${displayEnd}` : "";
       let gt = `--sp-hl:${o};`;
@@ -1877,9 +1943,10 @@ const v = (D = class extends U {
                     ${daysVis.map((z, P) => { const orig = idxs[P], rowForDay = this.getManualRowForDate(t, m, rowIndex, rollingDates?.[P]), rowCells = rowForDay?.cells ?? W, rowStyles = rowForDay?.cell_styles ?? b;
         // Rolling can contain the same weekday twice; only the actual date is today.
         const isToday = rollingDates ? this.fmtYMD(rollingDates[P]) === this.fmtYMD(new Date()) : orig === s;
-        const F = this.filterCellText(rowCells[orig] ?? "", t), I = rowStyles[orig] ?? null, G = t.highlight_today && isToday ? "today" : "", merge = t.merge_double_lessons ? mergedCellInfo(visibleRows, rowIndex, (candidate, candidateIndex) => {
+        const datedCell = this.getDatedCell(t, rowForDay ?? m, orig, dateForColumn(P), dated.entries), F = datedCell.text, I = rowStyles[orig] ?? null, G = t.highlight_today && isToday ? "today" : "", merge = t.merge_double_lessons ? mergedCellInfo(visibleRows, rowIndex, (candidate, candidateIndex) => {
           const resolved = this.getManualRowForDate(t, candidate, candidateIndex, rollingDates?.[P]);
-          return { text: this.filterCellText((resolved?.cells ?? candidate?.cells ?? [])[orig] ?? "", t), style: (resolved?.cell_styles ?? candidate?.cell_styles ?? [])[orig] ?? null };
+          const cell = this.getDatedCell(t, resolved ?? candidate, orig, dateForColumn(P), dated.entries);
+          return { text: cell.text, notes: cell.notes, style: (resolved?.cell_styles ?? candidate?.cell_styles ?? [])[orig] ?? null };
         }) : { covered: !1, span: 1 };
         if (merge.covered) return f;
         let Ct = `--sp-hl:${n};` + Te(I, i);
@@ -1890,13 +1957,26 @@ const v = (D = class extends U {
           const start = firstTime?.start || rowForDay?.start || m.start, end = lastTime?.end || lastRow?.end || lastBase?.end;
           return !!start && !!end && this.isNowBetween(start, end);
         })(), cellCurrent = isToday && (w || mergedCurrent);
-        return pt && se && cellCurrent && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct} rowspan=${merge.span} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, orig, rollingDates?.[P], merge.span)}>${this.renderCell(F, t)}</td>`;
+        return pt && se && cellCurrent && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct} rowspan=${merge.span} @mouseenter=${event => this.updatePreviewTooltip(t, event)} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, orig, dateForColumn(P), merge.span)}>${this.renderCell(F, t)}${datedCell.notes.map(note => d`<div class="datedNote" style=${datedNoteStyle(note)}
+          title=${cardEditDialog(this) ? "Hinweis bearbeiten" : f}
+          role=${cardEditDialog(this) ? "button" : f} tabindex=${cardEditDialog(this) ? "0" : f}
+          @click=${event => this.handlePreviewNote(t, event, rowForDay ?? m, orig, dateForColumn(P), note)}
+          @keydown=${event => { if (cardEditDialog(this) && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); this.handlePreviewNote(t, event, rowForDay ?? m, orig, dateForColumn(P), note); } }}>${note.text}</div>`)}</td>`;
       })}
                   </tr>
                 `;
     })}
             </tbody>
           </table>
+          ${upcoming.length ? d`<div class="upcomingNotes"><strong>Anstehende Termine</strong>
+            <div class="datedWarning">Termine außerhalb der angezeigten Stunden. Noch nicht geladener Unterricht wird dadurch nicht bestätigt.</div>
+            ${upcoming.map(note => d`<div class="datedNote" style=${datedNoteStyle(note)}
+              title=${cardEditDialog(this) ? "Hinweis bearbeiten" : f}
+              role=${cardEditDialog(this) ? "button" : f} tabindex=${cardEditDialog(this) ? "0" : f}
+              @click=${event => this.handlePreviewNote(t, event, { time: note.periods[0] }, 0, new Date(`${note.date}T12:00:00`), note)}
+              @keydown=${event => { if (cardEditDialog(this) && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); this.handlePreviewNote(t, event, { time: note.periods[0] }, 0, new Date(`${note.date}T12:00:00`), note); } }}><strong>${note.text}</strong><br>${entrySummary(note).detail}</div>`)}
+          </div>` : f}
+          ${dated.warnings.map(warning => d`<div class="datedWarning" role="status">${warning}</div>`)}
         </div>
       </ha-card>
     `;
@@ -2135,6 +2215,9 @@ const v = (D = class extends U {
       white-space: nowrap;
     }
 
+    .datedNote { margin-top: 6px; padding: 3px 5px; border: 1px solid var(--divider-color); border-radius: 4px; font-size: var(--stundenplan-font-size-details, 12px); font-weight: 500; overflow-wrap: anywhere; }
+    .datedWarning { margin-top: 8px; font-size: 12px; overflow-wrap: anywhere; }
+    .upcomingNotes { margin-top: 14px; text-align: left; }
     .notes {
       margin-top: 4px;
       display: grid;
@@ -2351,24 +2434,83 @@ const ut = class ut extends U {
     this._showCellStyles = !1;
     this._manualWeek = "A";
     this._onPreviewCell = (event) => this.openPreviewCell(event);
+    this._onPreviewNote = (event) => this.openPreviewNote(event);
+    this._onPreviewTooltip = (event) => {
+      if (JSON.stringify(event.detail.config) !== JSON.stringify(this._config)) return;
+      if (this._open.dates) event.detail.text = "Termin oder Hinweis hinzufügen";
+      event.stopPropagation();
+    };
+    this._datedToday = dateKey(new Date());
   }
   connectedCallback() {
     super.connectedCallback();
     this._previewDialog = cardEditDialog(this);
     this._previewDialog?.addEventListener("stundenplan-edit-cell", this._onPreviewCell);
+    this._previewDialog?.addEventListener("stundenplan-add-note", this._onPreviewNote);
+    this._previewDialog?.addEventListener("stundenplan-preview-tooltip", this._onPreviewTooltip);
     this.ensureUiLoaded();
     this.ensureEntitySubscription();
+    this.refreshDatedDay();
+    this._datedDayTimer = window.setInterval(() => this.refreshDatedDay(), 60000);
   }
   disconnectedCallback() {
     super.disconnectedCallback();
     this._previewDialog?.removeEventListener("stundenplan-edit-cell", this._onPreviewCell);
+    this._previewDialog?.removeEventListener("stundenplan-add-note", this._onPreviewNote);
+    this._previewDialog?.removeEventListener("stundenplan-preview-tooltip", this._onPreviewTooltip);
     this._previewDialog = null;
+    this._datedDraftEntry = null;
+    this._datedReplacementDraft = null;
+    window.clearInterval(this._datedDayTimer);
+    this._datedDayTimer = undefined;
     try {
       this._unsubEntities?.();
     } catch {
     }
     this._unsubEntities = null;
     this._didSubEntities = !1;
+  }
+  refreshDatedDay() {
+    const today = dateKey(new Date());
+    if (today !== this._datedToday) {
+      this._datedToday = today;
+      this.requestUpdate();
+    }
+  }
+  async openPreviewNote(event) {
+    const { config, date, period, note, sourceText } = event.detail ?? {};
+    if (!this._config || JSON.stringify(config) !== JSON.stringify(this._config) || !validDate(date) || !period) return;
+    if (!note && this._config.source_type === "manual" && !this._open.dates) return;
+    event.preventDefault();
+    event.stopPropagation();
+    this._open = { ...this._open, dates: true };
+    this._datedReadOnly = false;
+    if (note) {
+      const when = new Date(`${date}T12:00:00`);
+      const index = (this._config.dated_entries ?? []).findIndex(entry => {
+        const entries = collectEntries({ dated_entries: [entry] }).entries;
+        return applyDatedEntries(sourceText, { time: period }, 0, when, entries).notes.some(candidate =>
+          candidate.text === note.text && (candidate.color || "") === (note.color || "") && (candidate.background || "") === (note.background || ""));
+      });
+      if (index < 0) { this._datedReadOnly = true; this.requestUpdate(); return; }
+      this._datedOpen = index;
+      this.requestUpdate(); await this.updateComplete;
+      const panel = this.shadowRoot.querySelector(`[data-entry-index="${index}"]`);
+      const archive = panel?.closest(".pastDatedEntries"); if (archive) archive.open = true;
+      const input = panel?.querySelector("input[data-note-text]");
+      input?.scrollIntoView({ block: "nearest" }); input?.focus({ preventScroll: true });
+      return;
+    }
+    await this.addDatedNote(date, period);
+  }
+  async addDatedNote(date, period) {
+    // A draft is editor-only; clicking the preview must not dirty the card config.
+    this._datedDraftEntry ??= { action: "note", match: "period", text: "", dates: [], periods: [] };
+    this._datedOpen = -1;
+    this.updateDatedEntry(-1, { ...(date ? { dates: [date] } : {}), ...(period ? { periods: [period] } : {}) });
+    await this.updateComplete;
+    const input = this.shadowRoot.querySelector(`[data-entry-index="${this._datedOpen}"] input[data-note-text]`);
+    input?.scrollIntoView({ block: "nearest" }); input?.focus({ preventScroll: true });
   }
   async openPreviewCell(event) {
     const { config, rowIndex, dayIndex, week } = event.detail ?? {};
@@ -2526,7 +2668,9 @@ const ut = class ut extends U {
       sources: ["Woher dein Stundenplan kommt.", "M4 4h16v5H4zM4 15h16v5H4zM8 9v6M16 9v6"],
       manual: ["Fächer, Zeiten und Pausen selbst eintragen.", "M4 4h16v16H4zM4 9h16M9 4v16M9 14h11"],
       filters: ["Fächer/Angebote gezielt ausblenden.", "M3 4h18l-7 8v7l-4 2v-9z"],
-      rolling: ["Welche kommenden Schultage angezeigt werden.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M9 15h6M13 13l2 2-2 2"],
+      dates: ["Klassenarbeiten und Erinnerungen nach Datum und Stunde.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M8 15h8M12 12v6"],
+      replacements: ["Fächer an ausgewählten Tagen ersetzen, z. B. Schwimmen durch Sport.", "M4 7h14l-3-3M20 17H6l3 3M18 7l-3 3M6 17l3-3"],
+      rolling: ["Ganze Woche oder ab heute: Ansicht und Zeitraum wählen.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M9 15h6M13 13l2 2-2 2"],
       typography: ["Textgrößen und Abstände deiner Karte.", "M3 5h12M9 5v15M6 20h6M15 12h6M18 12v8"],
       highlights: ["Heute, aktuellen Unterricht und Pausen hervorheben.", "M12 3l3 6 6 1-4 5 1 6-6-3-6 3 1-6-4-5 6-1z"],
       colors: ["Farben und Transparenz der Hervorhebungen.", "M12 3C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-12zM8 15a4 4 0 0 0 4 4"],
@@ -2595,6 +2739,110 @@ const ut = class ut extends U {
       <div class="hint">Verglichen wird der vollständige Fachname in der ersten Zeile, nicht Raum, Lehrkraft oder Hinweise. Groß-/Kleinschreibung spielt keine Rolle. Neue Namen werden nicht automatisch ausgewählt.</div>
       ${selected.length ? d`<div class="infoBox slim">${selected.length} Fächer/Angebote ausgeblendet. Vollständig leere Endzeilen werden gekürzt. „Nach der letzten Stunde“ berücksichtigt nur die verbleibenden Einträge des jeweiligen Tages.</div>
         <button type="button" class="spBtn" @click=${() => this.setValue("hidden_subjects", [])}>Alle Einträge wieder anzeigen</button>` : f}
+    `);
+  }
+  updateDatedEntry(index, patch) {
+    if (index === -1 || index === -2) {
+      const draftKey = index === -1 ? "_datedDraftEntry" : "_datedReplacementDraft";
+      if (!this[draftKey]) return;
+      this[draftKey] = { ...this[draftKey], ...patch };
+      if (validateEntry({ ...this[draftKey], enabled: true })) { this.requestUpdate(); return; }
+      const entries = this._config.dated_entries ?? [];
+      const completed = this[draftKey];
+      this[draftKey] = null;
+      this._datedOpen = entries.length;
+      this.setValue("dated_entries", [...entries, completed]);
+      return;
+    }
+    const entries = [...(this._config.dated_entries ?? [])];
+    entries[index] = { ...entries[index], ...patch };
+    this.setValue("dated_entries", entries);
+  }
+  renderDatedSettings(action = "note") {
+    const replacement = action === "replace", section = replacement ? "replacements" : "dates",
+      title = replacement ? "Fachabweichungen an bestimmten Tagen" : "Termine und Hinweise eintragen";
+    if (!this._open[section]) return this.renderSection(title, section, f);
+    const config = this._config, entries = config.dated_entries ?? [];
+    const visibleEntries = entries.map((raw, index) => ({ raw, index })).filter(({ raw }) => (raw?.action === "replace") === replacement);
+    const currentEntries = visibleEntries.filter(({ raw }) => !isPastEntry(raw, this._datedToday));
+    if (!replacement && this._datedDraftEntry) currentEntries.push({ raw: this._datedDraftEntry, index: -1 });
+    if (replacement && this._datedReplacementDraft) currentEntries.push({ raw: this._datedReplacementDraft, index: -2 });
+    const pastEntries = visibleEntries.filter(({ raw }) => isPastEntry(raw, this._datedToday));
+    const formatList = value => Array.isArray(value) ? value.join(", ") : typeof value === "string" ? value : "";
+    const renderEntry = ({ raw, index }) => {
+        const entry = raw && typeof raw === "object" ? raw : {}, error = validateEntry(raw), byPeriod = isPeriodNote(entry), summary = entrySummary(entry, this._datedToday);
+        return d`<details class="datedEntry" data-entry-index=${index} .open=${this._datedOpen === index}>
+          <summary><span class="datedTitle">${replacement ? `${entry.subject || "Fach"} → ${entry.text || "Neuer Fachname"}` : summary.title}</span><span class="datedMeta">${index < 0 ? "Entwurf · " : ""}${summary.detail}</span>
+            <button type="button" class="datedRemove" aria-label=${index < 0 ? "Entwurf verwerfen" : "Eintrag entfernen"}
+              title=${index < 0 ? "Entwurf verwerfen" : `${summary.title} entfernen`} @click=${event => {
+                event.preventDefault(); event.stopPropagation();
+                this._datedOpen = -1;
+                if (index < 0) { this[index === -1 ? "_datedDraftEntry" : "_datedReplacementDraft"] = null; this.requestUpdate(); return; }
+                this.setValue("dated_entries", entries.filter((_, i) => i !== index));
+              }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+          </summary>
+          <div class="datedFields">
+            ${index < 0 ? d`<div class="hint">${replacement ? "Noch nicht übernommen. Erst mit ursprünglichem Fach, neuem Fachnamen und Datum wird daraus eine Abweichung." : "Noch nicht übernommen. Erst mit Text, Datum und Stunde wird daraus ein Termin. Weitere Fachklicks ändern nur diesen Entwurf."}</div>` : f}
+            <label class="subjectChoice"><input type="checkbox" .checked=${entry.enabled !== false}
+              @change=${event => this.updateDatedEntry(index, { enabled: event.target.checked })}><span>Aktiv</span></label>
+            ${replacement ? d`<label>Ursprüngliches Fach<input type="text" .value=${entry.subject ?? ""} placeholder="z. B. Sport oder Mathe"
+              @change=${event => this.updateDatedEntry(index, { subject: event.target.value })}></label>` : !byPeriod ? d`<details class="legacyAssignment"><summary>Bisherige Fachzuordnung: ${entry.subject || "nicht angegeben"}</summary>
+              <div class="datedFields"><div class="hint">Dieser ältere Eintrag gilt weiterhin nur beim gewählten Fach. Für die Umstellung Unterrichtsstunden angeben; danach gilt er dort unabhängig vom Fachnamen.</div>
+              <label>Fach für bisherigen Eintrag<input type="text" .value=${entry.subject ?? ""} @change=${event => this.updateDatedEntry(index, { subject: event.target.value })}></label>
+              <button type="button" class="spBtn" ?disabled=${!formatList(entry.periods).trim()} @click=${() => {
+                const converted = { ...entry, match: "period" }; delete converted.subject;
+                const next = [...entries]; next[index] = converted; this.setValue("dated_entries", next);
+              }}>Auf Datum und Stunde umstellen</button></div>
+            </details>` : f}
+            <label>${entry.action === "replace" ? "Neuer Fachname" : "Termin / Hinweis"}<input type="text" data-note-text .value=${entry.text ?? ""}
+              placeholder=${entry.action === "replace" ? "z. B. Schwimmen" : "z. B. Schulaufgabe"}
+              @change=${event => this.updateDatedEntry(index, { text: event.target.value })}></label>
+            <label>${byPeriod ? "Unterrichtsstunden" : "Stunden (optional)"}<input type="text" .value=${formatList(entry.periods)} placeholder="z. B. 1, 2"
+              @change=${event => this.updateDatedEntry(index, { periods: event.target.value })}></label>
+            <div class="hint">${byPeriod ? "Nummern der Unterrichtsstunden, z. B. 1 oder 1, 2. Der Termin gilt dort unabhängig vom Fachnamen." : "Leer lassen = alle Stunden des gewählten Fachs. Für einzelne Unterrichtsstunden z. B. 1, 2 eintragen."}</div>
+            <div class="dateAdd"><label>Datum auswählen<input type="date" aria-label="Datum auswählen"></label>
+              <button type="button" class="spBtn" @click=${event => {
+                const input = event.currentTarget.parentElement.querySelector('input');
+                if (!input.value || !input.checkValidity()) { input.reportValidity(); return; }
+                const dates = formatList(entry.dates ?? entry.date).split(/[,;\n]/).map(value => value.trim()).filter(Boolean);
+                this.updateDatedEntry(index, { dates: [...new Set([...dates, input.value])] });
+              }}>Datum hinzufügen</button>
+            </div>
+            <label>Termine (JJJJ-MM-TT, mit Komma getrennt)<textarea rows="2" .value=${formatList(entry.dates ?? entry.date)}
+              @change=${event => this.updateDatedEntry(index, { dates: event.target.value })}></textarea></label>
+            ${entry.action !== "replace" ? d`<details class="datedColors"><summary>Hinweisfarben (optional)</summary>
+              <div class="datedFields">
+                <div class="hint">Färbt nur den Hinweis, nicht die Fachzelle. Ohne Auswahl bleibt die bisherige Darstellung erhalten.</div>
+                ${this.renderColorPicker("Hinweis: Text", normalizeCssColor(entry.color), value => this.updateDatedEntry(index, { color: normalizeCssColor(value) }), "#ffffff")}
+                ${this.renderColorPicker("Hinweis: Hintergrund", normalizeCssColor(entry.background), value => this.updateDatedEntry(index, { background: normalizeCssColor(value) }), "#ffeb3b", 0.25)}
+              </div>
+            </details>` : f}
+            ${error ? d`<div class="hint" role="status">${error} Dieser Eintrag wird noch nicht angewendet.</div>` : f}
+          </div>
+        </details>`;
+    };
+    return this.renderSection(title, section, d`
+      <div class="hint">${replacement ? "Gib das ursprüngliche Fach und den neuen Fachnamen ein, z. B. Schwimmen → Sport. Wähle die Tage, an denen die Änderung gelten soll. Die Quelldaten bleiben unverändert; kein automatischer Zweiwochenwechsel." : "Klicke auf „+ Termin hinzufügen“ oder auf ein Fach in der Vorschau, um einen Termin oder Hinweis anzulegen. Zukünftige Termine sind auch ohne geladenen Stundenplan über die Datumseingabe möglich. Vorhandene Hinweise kannst du zum Bearbeiten anklicken."}</div>
+      ${!replacement && this._datedReadOnly ? d`<div class="hint" role="status">Dieser Hinweis gehört zu keinem lokalen Termin. Hinweise aus einer Sensorquelle bitte dort bearbeiten.</div>` : f}
+      ${!replacement && config.source_type === "manual" ? d`<div class="hint">Solange dieser Bereich geöffnet ist, legt ein Vorschauklick einen Termin an. Zum Bearbeiten der Fächer diesen Bereich schließen.</div>` : f}
+      ${!currentEntries.length ? d`<div class="infoBox slim">${replacement ? "Keine aktuellen oder zukünftigen Abweichungen." : "Keine aktuellen oder zukünftigen Hinweise."}</div>` : f}
+      ${currentEntries.map(renderEntry)}
+      <button type="button" class="spBtn" @click=${async () => {
+        if (!replacement) { await this.addDatedNote(); return; }
+        this._datedReplacementDraft ??= { action, subject: "", text: "", dates: [] };
+        this._datedOpen = -2;
+        this.requestUpdate();
+        await this.updateComplete;
+        const input = this.shadowRoot.querySelector('[data-entry-index="-2"] input[type="text"]');
+        input?.focus(); input?.scrollIntoView({ block: "nearest" });
+      }}>${replacement ? "+ Abweichung hinzufügen" : "+ Termin hinzufügen"}</button>
+      ${pastEntries.length ? d`<details class="pastDatedEntries">
+        <summary>Vergangene Termine (${pastEntries.length})</summary>
+        <div class="hint">Alle Termine dieser Einträge liegen vor heute. Sie bleiben bearbeitbar und im früheren Stundenplan sichtbar. Ein neuer zukünftiger Termin macht einen Eintrag wieder aktuell.</div>
+        ${pastEntries.map(renderEntry)}
+      </details>` : f}
+      ${replacement ? d`<div class="hint">Erkennbare Ausfall- und Vertretungshinweise werden nicht ersetzt. Bei widersprüchlichen Abweichungen bleibt das Original stehen.</div>` : f}
+      ${collectEntries(config, this.hass).warnings.map(warning => d`<div class="hint" role="status">${warning}</div>`)}
     `);
   }
   onToggle(t, e) {
@@ -3190,7 +3438,21 @@ placeholder="sensor.stundenplan"
   }
   renderRollingSettings() {
     const t = this._config;
-    return this.renderSection("Rolling", "rolling", d`
+    return this.renderSection("Ansicht & Rolling", "rolling", d`
+      <ha-form
+        .hass=${this.hass}
+        .data=${{ view_mode: t.view_mode ?? "week" }}
+        .schema=${[{ name: "view_mode", selector: { select: { mode: "dropdown", options: [
+          { value: "week", label: "Ganze Woche" },
+          { value: "rolling", label: "Ab heute (rolling)" }
+        ] } } }]}
+        .computeLabel=${() => "Ansichtsmodus"}
+        @value-changed=${event => {
+          event.stopPropagation();
+          this.setValue("view_mode", event.detail?.value?.view_mode ?? "week");
+        }}
+      ></ha-form>
+      ${(t.view_mode ?? "week") === "rolling" ? d`
       <div class="grid2">
         <div class="gridFull">${this.renderToggle("rolling_week_only", "Auf Kalenderwoche begrenzen")}</div>
         ${t.rolling_week_only ? d`<div class="hint gridFull">Endet am Sonntag der Startwoche. Am Wochenende beginnt die Ansicht beim nächsten Schultag; auch „Nach der letzten Stunde“ bleibt wirksam.</div>` : f}
@@ -3238,6 +3500,7 @@ placeholder="sensor.stundenplan"
           : "Der Sprung auf den nächsten Schultag folgt direkt ab Mitternacht."}</div>`}
       </div>
       <div class="hint">Ab dem Starttag werden die nächsten passenden Schultage angezeigt. Beim Blättern in andere Wochen beginnt die Ansicht am Montag.</div>
+      ` : f}
     `);
   }
   render() {
@@ -3270,35 +3533,6 @@ placeholder="sensor.stundenplan"
             </div>
             <div class="generalDivider">Ansicht</div>
             <div class="grid2">
-              <ha-form
-                .hass=${this.hass}
-                .data=${{ view_mode: (t.view_mode ?? "week") }}
-                .schema=${[
-                  {
-                    name: "view_mode",
-                    selector: {
-                      select: {
-                        mode: "dropdown",
-                        options: [
-                          { value: "week", label: "Ganze Woche" },
-                          { value: "rolling", label: "Ab heute (rolling)" }
-                        ]
-                      }
-                    }
-                  }
-                ]}
-                .computeLabel=${(e) => e?.name === "view_mode" ? "Ansichtsmodus" : e?.name}
-                @value-changed=${(e) => {
-                  try {
-                    e?.stopPropagation?.();
-                    const v = (e?.detail?.value ?? {}).view_mode ?? "week";
-                    this.setValue("view_mode", v);
-                  } catch (s) {
-                    console.error("stundenplan-card editor: view_mode change failed", s);
-                  }
-                }}
-              ></ha-form>
-
               <ha-form
                 .hass=${this.hass}
                 .data=${{ display_mode: (t.display_mode ?? "default") }}
@@ -3396,9 +3630,11 @@ placeholder="sensor.stundenplan"
     )}
 
         ${this.renderSourceSettings()}
+        ${this.renderRollingSettings()}
         ${(t.source_type ?? "manual") === "manual" ? this.renderSection("Manueller Stundenplan", "manual", this.renderManualRows()) : f}
         ${this.renderFilterSettings()}
-        ${(t.view_mode ?? "week") === "rolling" ? this.renderRollingSettings() : f}
+        ${this.renderDatedSettings()}
+        ${this.renderDatedSettings("replace")}
 
         ${this.renderSection("Schrift & Abstände", "typography", d`
           <div class="hint">Alle Größen in Pixeln. Leere Felder verwenden die bisherigen Vorgaben der normalen oder kompakten Ansicht.</div>
@@ -3541,6 +3777,25 @@ ut.properties = {
     .subjectAdd { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
     .subjectAdd label { flex: 1 1 170px; min-width: 0; font-size: 12px; }
     .subjectAdd input { display: block; width: 100%; padding: 10px; margin-top: 4px; border: 1px solid var(--divider-color); border-radius: 6px; background: var(--secondary-background-color); color: inherit; font: inherit; }
+    .datedEntry, .datedSource, .pastDatedEntries { min-width: 0; border: 1px solid var(--divider-color); border-radius: 8px; }
+    .datedEntry summary, .datedSource summary, .pastDatedEntries > summary { padding: 12px; cursor: pointer; overflow-wrap: anywhere; }
+    .datedEntry > summary { position: relative; padding-right: 56px; }
+    .datedRemove { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--secondary-text-color); cursor: pointer; }
+    .datedRemove:hover { background: var(--secondary-background-color); color: var(--primary-text-color); }
+    .datedRemove:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
+    .datedRemove svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+    .datedTitle { font-weight: 600; }
+    .datedMeta { display: block; margin-top: 4px; color: var(--secondary-text-color); font-size: 12px; font-weight: 400; }
+    .legacyAssignment { border: 1px solid var(--divider-color); border-radius: 6px; }
+    .pastDatedEntries > .hint, .pastDatedEntries > .datedEntry { margin: 0 10px 10px; }
+    .datedFields { display: grid; gap: 10px; padding: 12px; min-width: 0; }
+    .datedFields label:not(.opacityControl) { display: block; min-width: 0; font-size: 12px; }
+    .datedFields input:not([type="checkbox"]):not([type="color"]):not([type="range"]), .datedFields textarea, .datedFields select { display: block; box-sizing: border-box; width: 100%; min-width: 0; padding: 10px; margin-top: 4px; border: 1px solid var(--divider-color); border-radius: 6px; background: var(--secondary-background-color); color: var(--primary-text-color); font: inherit; }
+    .datedFields textarea { resize: vertical; }
+    .datedFields .subjectChoice { display: flex; }
+    .dateAdd { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+    .dateAdd label { flex: 1 1 150px; }
+    [data-section="dates"] .spBtn, [data-section="replacements"] .spBtn { min-height: 40px; border: 1px solid var(--divider-color); background: var(--secondary-background-color); color: var(--primary-text-color); }
     .stack, .toggleGroup { display: grid; gap: 10px; min-width: 0; }
     .toggleGroup { gap: 0; }
     .toggleRow {
@@ -3964,14 +4219,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.8.2";
+window.__STUNDENPLAN_CARD_VERSION = "v3.9.0";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.8.2 (marker: STUNDENPLAN_CARD_v3.8.2)",
+  description: "Stundenplan Card v3.9.0 (marker: STUNDENPLAN_CARD_v3.9.0)",
   preview: !0
 });
 export {

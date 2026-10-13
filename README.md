@@ -29,6 +29,9 @@ Stundenplan Suite an und kann den aktuellen Unterricht hervorheben.
 
 ## ✨ Features
 
+> **Neu ab v3.9.0:** [Termine & Abweichungen](docs/DATED_ENTRIES.md)
+> ergänzt Klassenarbeiten, Erinnerungen und Fachwechsel an bestimmten Tagen.
+
 -   Tabellenansicht (Tage × Stunden)
 -   Ganze Woche oder **Ab heute (rolling)**, optional auf die Kalenderwoche begrenzt
 -   Normale und kompakte Darstellung
@@ -302,10 +305,10 @@ hinter dem Wochen-Popup bleibt unverändert.
 ### Editor und Fächer/Angebote filtern
 
 Die aufklappbaren Editorbereiche haben Icons und kurze Erklärungen. Nach
-**Allgemein** folgt **Datenquellen**, danach bei manueller Quelle der
+**Allgemein** folgen **Datenquellen** und **Ansicht & Rolling**, danach bei manueller Quelle der
 **Manuelle Stundenplan**. Unter **Inhalte filtern** wählst du anschließend
 die Fächer/Angebote aus, die auf dieser Karte nicht angezeigt werden sollen.
-Danach folgen Rolling, Schrift & Abstände, Highlights, Farben sowie
+Danach folgen Termine und Hinweise, Fachabweichungen, Schrift & Abstände, Highlights, Farben sowie
 Hintergründe & Linien. Die Bereiche sind auch per Tastatur bedienbar.
 
 [Editorübersicht](docs/screenshots/editor-overview.png) und
@@ -355,12 +358,12 @@ die für das Kind tatsächlich nicht relevant sind.
 
 ### Rolling auf eine Kalenderwoche begrenzen
 
-Die Auswahl **Ab heute (rolling)** bleibt unter **Allgemein → Ansichtsmodus**.
-Danach erscheint das eigene, zunächst geschlossene
-Akkordeon **Rolling**. Dort findest du die zusätzlichen Tage, den Tageswechsel,
-die feste Umschaltzeit und optional **Auf Kalenderwoche begrenzen**.
-Beim Wechsel zur Wochenansicht wird der Abschnitt ausgeblendet; gespeicherte
-Rolling-Einstellungen bleiben erhalten.
+Das Akkordeon **Ansicht & Rolling** steht immer direkt hinter **Datenquellen**.
+Unter **Ansichtsmodus** wählst du **Ganze Woche** oder **Ab heute (rolling)**.
+Bei Rolling erscheinen die zusätzlichen Tage, der Tageswechsel, die feste
+Umschaltzeit und **Auf Kalenderwoche begrenzen** direkt darunter.
+Beim Wechsel zur Wochenansicht werden nur diese Zusatzfelder ausgeblendet;
+gespeicherte Rolling-Einstellungen bleiben erhalten.
 
 ```yaml
 view_mode: rolling

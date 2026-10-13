@@ -1,6 +1,7 @@
 // Test the actual card readers against both old and new provider payloads.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import { collectEntries, applyDatedEntries } from './src/dated-entries.js';
 
 const code = fs.readFileSync(new URL('./src/stundenplan-card.ts', import.meta.url), 'utf8');
 function method(name, next, deps = {}) {
@@ -107,13 +108,14 @@ assert.equal(filterHiddenSubjects('Ess/Spi GT\r\nMensa\r\n\r\nevR\r\nRaum 1', hi
 assert.equal(filterHiddenSubjects('evR\nRaum\n\nLZ_GS\nRaum 2', hidden), 'evR\nRaum');
 assert.equal(filterHiddenSubjects('---\nVertretung fuer LZ_GS', hidden), '---\nVertretung fuer LZ_GS');
 assert.equal(filterHiddenSubjects('M\n\nE', []), 'M\n\nE');
-const lastEnd = method('getLastLessonEnd', 'shouldAdvanceRollingDay', {ct:isBreak,yt:isEmpty});
+const lastEnd = method('getLastLessonEnd', 'shouldAdvanceRollingDay', {ct:isBreak,yt:isEmpty,collectEntries});
 const endContext = {
   _rowsCache:[{end:'12:25',cells:['M','M']},{end:'13:15',cells:['Ess/Spi GT','evR']},
     {end:'15:45',cells:['AG GS 1','LZ_GS']}],
   findConfiguredDayIndexForDate:date=>date.getDay()===5?1:0,
   getManualRowForDate:(_,row)=>row,
   filterCellText:(text,config)=>filterHiddenSubjects(text??'',config.hidden_subjects),
+  getDatedCell:method('getDatedCell','getTitleStyle',{ct:isBreak,applyDatedEntries}),
 };
 assert.equal(lastEnd.call(endContext,{hidden_subjects:hidden},new Date(2026,8,24)), '12:25');
 assert.equal(lastEnd.call(endContext,{hidden_subjects:hidden},new Date(2026,8,25)), '13:15');
