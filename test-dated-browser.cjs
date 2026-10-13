@@ -176,14 +176,24 @@ module.exports = async function testDatedEntries(browser, url) {
           {date:'2026-10-23',match:'period',periods:[2],text:'Zukünftige Arbeit'},
           {date:'2026-10-15',match:'period',periods:[2],text:'Vergangene Arbeit'}]};
         const card=await makeCard(source,cfg);
+        const originalEntries=JSON.stringify(card.config.dated_entries);
+        const hiddenByDefault=!card.shadowRoot.querySelector('.upcomingNotes');
+        card.setConfig({...card.config,show_upcoming_notes:true});await card.updateComplete;
         const result={cell:card.shadowRoot.querySelector('tbody').textContent,
+          hiddenByDefault,
           pending:card.shadowRoot.querySelector('.upcomingNotes')?.textContent};
-        card.setConfig({...card.config,view_mode:'rolling'});await card.updateComplete;
+        card.setConfig({...card.config,show_upcoming_notes:false});await card.updateComplete;
+        result.hiddenWhenOff=!card.shadowRoot.querySelector('.upcomingNotes');
+        result.cellWhenOff=card.shadowRoot.querySelector('tbody').textContent;
+        result.entriesUnchanged=originalEntries===JSON.stringify(card.config.dated_entries);
+        card.setConfig({...card.config,view_mode:'rolling',show_upcoming_notes:true});await card.updateComplete;
         result.rolling=card.shadowRoot.querySelector('tbody').textContent;
         result.pendingRolling=card.shadowRoot.querySelector('.upcomingNotes')?.textContent||'';
         return result;
       },source);
       assert(slots.cell.includes('Arbeit ohne Fach'),source);
+      assert(slots.hiddenByDefault&&slots.hiddenWhenOff&&slots.entriesUnchanged,source);
+      assert(slots.cellWhenOff.includes('Arbeit ohne Fach'),source);
       assert(slots.pending.includes('Zukünftige Arbeit')&&slots.pending.includes('23.10.2026'),source);
       assert(!slots.pending.includes('Vergangene Arbeit'),source);
       assert(slots.rolling.includes('Zukünftige Arbeit'),source);
@@ -199,6 +209,14 @@ module.exports = async function testDatedEntries(browser, url) {
     });
     const section=page.locator('[data-section="dates"]');
     const replacements=page.locator('[data-section="replacements"]');
+    const toggleState=await section.getByText('Anstehende Termine unter der Tabelle anzeigen',{exact:true}).evaluate(el=>el.parentElement.querySelector('ha-switch').checked);
+    assert.equal(toggleState,false);
+    await section.getByText('Anstehende Termine unter der Tabelle anzeigen',{exact:true}).evaluate(el=>{
+      const toggle=el.parentElement.querySelector('ha-switch');toggle.checked=true;toggle.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+    assert.equal(await page.evaluate(()=>editor._config.show_upcoming_notes),true);
+    await page.evaluate(async()=>{editor.setConfig(JSON.parse(JSON.stringify(editor._config)));await editor.updateComplete;});
+    assert.equal(await section.getByText('Anstehende Termine unter der Tabelle anzeigen',{exact:true}).evaluate(el=>el.parentElement.querySelector('ha-switch').checked),true);
     assert((await section.textContent()).includes('Klicke auf „+ Termin hinzufügen“ oder auf ein Fach in der Vorschau'));
     assert((await replacements.textContent()).includes('Wähle die Tage'));
     await section.getByRole('button',{name:'+ Termin hinzufügen',exact:true}).click();
@@ -479,7 +497,7 @@ module.exports = async function testDatedEntries(browser, url) {
       assert.equal(await page.evaluate(()=>clickFixture.editor._datedDraftEntry.match),'period');
       await page.evaluate(async()=>{
         const {card,editor}=clickFixture;
-        const config={...editor._config,view_mode:'week',dated_entries:[
+        const config={...editor._config,view_mode:'week',show_upcoming_notes:true,dated_entries:[
           {date:'2026-10-16',subject:'BSC',text:'Alter Hinweis'},
           {date:'2026-10-23',match:'period',periods:[2],text:'Spätere Arbeit'},
           {date:'2026-10-12',match:'period',periods:[3],text:'Alter Termin'}],dated_entries_entity:'sensor.events'};

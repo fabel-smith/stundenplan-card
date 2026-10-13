@@ -41,7 +41,11 @@ einen neuen Termin anzulegen. Das gilt auch fuer vergangene und anstehende
 Termine; Enter oder Leertaste funktionieren ebenfalls. Externe Sensorhinweise
 bleiben schreibgeschuetzt und muessen an ihrer Quelle bearbeitet werden.
 
-Termine ausserhalb der angezeigten Stunden erscheinen unter **Anstehende Termine**.
+Die zusaetzliche Liste **Anstehende Termine** ist standardmaessig ausgeblendet.
+Mit **Anstehende Termine unter der Tabelle anzeigen** im Termine-Bereich
+(`show_upcoming_notes: true` in YAML) werden Termine ausserhalb der angezeigten
+Stunden eingeblendet. Ausschalten versteckt nur diese Liste, nicht die Hinweise
+in den Unterrichtszellen, und loescht keine Termine.
 Damit lassen sich Klassenarbeiten schon vor dem Laden der entsprechenden
 Stundenplanwoche erfassen. Ein Termin bestaetigt keinen noch unbekannten Unterricht.
 In der passenden Zelle wird der Hinweis auch bei leerem oder ausgeblendetem Fach

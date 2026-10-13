@@ -1,7 +1,8 @@
 ## Termine und Hinweise
 
 - Klassenarbeiten, Diktate und Erinnerungen direkt in der Karte eintragen: mit **+ Termin hinzufügen** oder per Klick auf eine Unterrichtsstunde in der Editor-Vorschau.
-- Neue Termine werden nach **Datum und Stunde** zugeordnet, unabhängig vom Fachnamen. Auch spätere Termine ohne bereits geladenen Stundenplan sind möglich; sie erscheinen zunächst unter **Anstehende Termine**.
+- Neue Termine werden nach **Datum und Stunde** zugeordnet, unabhängig vom Fachnamen. Auch spätere Termine ohne bereits geladenen Stundenplan sind möglich.
+- Die zusätzliche Liste **Anstehende Termine** unter der Tabelle ist optional und standardmäßig ausgeschaltet. Der Schalter im Termine-Bereich blendet nur diese Liste ein oder aus; Termine und Hinweise in den Unterrichtszellen bleiben erhalten.
 - Vorhandene Hinweise lassen sich per Klick bearbeiten. Text- und Hintergrundfarben sind mit Farbpalette und Transparenzregler einstellbar.
 - Vergangene Einträge werden automatisch in einem eingeklappten Bereich gesammelt und bleiben bearbeitbar.
 - Unvollständige neue Einträge bleiben ungespeicherte Entwürfe. Mehrere Vorschauklicks erzeugen keine leeren Termine. Ein X in der Überschrift entfernt den Eintrag; Tooltips erklären die Vorschauaktionen.

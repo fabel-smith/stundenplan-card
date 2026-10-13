@@ -1083,6 +1083,7 @@ const v = (D = class extends U {
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
       hidden_subjects: normalizeHiddenSubjects(t.hidden_subjects),
       dated_entries: Array.isArray(t.dated_entries) ? t.dated_entries : [],
+      show_upcoming_notes: E(t.show_upcoming_notes, !1),
       dated_entries_entity: typeof t.dated_entries_entity === "string" ? t.dated_entries_entity.trim() : "",
       dated_entries_attribute: typeof t.dated_entries_attribute === "string" ? t.dated_entries_attribute.trim() || "entries" : "entries",
       merge_double_lessons: t.merge_double_lessons ?? e.merge_double_lessons,
@@ -1849,6 +1850,7 @@ const v = (D = class extends U {
         }) : e,
         represented = new Set(),
         upcoming = (() => {
+          if (!t.show_upcoming_notes) return [];
           if (!this._noData) visibleRows.forEach((row, rowIndex) => {
             if (ct(row)) return;
             idxs.forEach((dayIndex, visibleIndex) => {
@@ -2822,6 +2824,8 @@ const ut = class ut extends U {
         </details>`;
     };
     return this.renderSection(title, section, d`
+      ${!replacement ? d`${this.renderToggle("show_upcoming_notes", "Anstehende Termine unter der Tabelle anzeigen")}
+        <div class="hint">Standardmäßig aus. Hinweise in den Unterrichtsstunden bleiben sichtbar; gespeicherte Termine werden nicht gelöscht.</div>` : f}
       <div class="hint">${replacement ? "Gib das ursprüngliche Fach und den neuen Fachnamen ein, z. B. Schwimmen → Sport. Wähle die Tage, an denen die Änderung gelten soll. Die Quelldaten bleiben unverändert; kein automatischer Zweiwochenwechsel." : "Klicke auf „+ Termin hinzufügen“ oder auf ein Fach in der Vorschau, um einen Termin oder Hinweis anzulegen. Zukünftige Termine sind auch ohne geladenen Stundenplan über die Datumseingabe möglich. Vorhandene Hinweise kannst du zum Bearbeiten anklicken."}</div>
       ${!replacement && this._datedReadOnly ? d`<div class="hint" role="status">Dieser Hinweis gehört zu keinem lokalen Termin. Hinweise aus einer Sensorquelle bitte dort bearbeiten.</div>` : f}
       ${!replacement && config.source_type === "manual" ? d`<div class="hint">Solange dieser Bereich geöffnet ist, legt ein Vorschauklick einen Termin an. Zum Bearbeiten der Fächer diesen Bereich schließen.</div>` : f}

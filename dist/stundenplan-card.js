@@ -69,12 +69,12 @@ function Ot(t) {
     }
   return Array.isArray(t) ? t : null;
 }
-const _t = (t) => String(t ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("de"), lt = (t) => typeof t == "string" && t.trim() && !/[\r\n]/.test(t), Ht = (t) => typeof t == "string" && !/[;{}]/.test(t) ? t.trim() : "", Y = (t) => Array.isArray(t) ? t : typeof t == "string" ? t.split(/[,;\n]/).map((e) => e.trim()).filter(Boolean) : [], he = (t) => {
+const _t = (t) => String(t ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("de"), lt = (t) => typeof t == "string" && t.trim() && !/[\r\n]/.test(t), Ht = (t) => typeof t == "string" && !/[;{}]/.test(t) ? t.trim() : "", Z = (t) => Array.isArray(t) ? t : typeof t == "string" ? t.split(/[,;\n]/).map((e) => e.trim()).filter(Boolean) : [], he = (t) => {
   const e = _t(t), i = e.match(/^(\d+)\.\s*\d{1,2}:\d{2}\s*[-\u2013\u2014]\s*\d{1,2}:\d{2}$/);
   return i ? i[1] : e.replace(/\.$/, "");
 }, oe = (t) => (t?.action ?? "note") === "note" && t?.match === "period";
 function ri(t, e = B(/* @__PURE__ */ new Date())) {
-  const i = [...new Set(Y(t?.dates ?? t?.date).filter(tt))].sort(), n = (o) => o.split("-").reverse().join("."), r = i.find((o) => o >= e), s = Y(t?.periods).map(he), a = i.length ? i.length === 1 ? n(i[0]) : `${i.length} Termine · ${r ? `nächster: ${n(r)} · ` : ""}letzter: ${n(i.at(-1))}` : "Datum noch auswählen";
+  const i = [...new Set(Z(t?.dates ?? t?.date).filter(tt))].sort(), n = (o) => o.split("-").reverse().join("."), r = i.find((o) => o >= e), s = Z(t?.periods).map(he), a = i.length ? i.length === 1 ? n(i[0]) : `${i.length} Termine · ${r ? `nächster: ${n(r)} · ` : ""}letzter: ${n(i.at(-1))}` : "Datum noch auswählen";
   return {
     title: typeof t?.text == "string" && t.text.trim() || "Neuer Termin",
     detail: `${a}${s.length ? ` · ${s.join(", ")}${s.length === 1 ? ". Stunde" : ". Stunden"}` : ""}${t?.enabled === !1 ? " · inaktiv" : ""}`
@@ -94,8 +94,8 @@ function Ri(t, e, i = B(/* @__PURE__ */ new Date())) {
 function Ge(t) {
   if (!t || typeof t != "object" || Array.isArray(t)) return "Eintrag muss ein Objekt sein.";
   if (t.enabled === !1) return "";
-  const e = Y(t.dates ?? t.date);
-  return !e.length || !e.every(tt) ? "Bitte gültige Termine als JJJJ-MM-TT angeben." : t.match != null && !["period", "subject"].includes(t.match) ? "Unbekannte Terminzuordnung." : !oe(t) && !lt(t.subject) ? "Bitte das Fach für die Zuordnung angeben (eine Zeile)." : ["note", "replace"].includes(t.action ?? "note") ? lt(t.text) ? t.periods != null && !Array.isArray(t.periods) && typeof t.periods != "string" ? "Stunden bitte als Liste angeben." : Y(t.periods).every((i) => (typeof i == "string" || typeof i == "number") && lt(String(i))) ? oe(t) && !Y(t.periods).length ? "Bitte mindestens eine Unterrichtsstunde angeben, z. B. 1 oder 2." : "" : "Ungültige Stundenbezeichnung." : "Bitte einen Hinweis oder neuen Fachnamen angeben (eine Zeile)." : "Unbekannte Aktion.";
+  const e = Z(t.dates ?? t.date);
+  return !e.length || !e.every(tt) ? "Bitte gültige Termine als JJJJ-MM-TT angeben." : t.match != null && !["period", "subject"].includes(t.match) ? "Unbekannte Terminzuordnung." : !oe(t) && !lt(t.subject) ? "Bitte das Fach für die Zuordnung angeben (eine Zeile)." : ["note", "replace"].includes(t.action ?? "note") ? lt(t.text) ? t.periods != null && !Array.isArray(t.periods) && typeof t.periods != "string" ? "Stunden bitte als Liste angeben." : Z(t.periods).every((i) => (typeof i == "string" || typeof i == "number") && lt(String(i))) ? oe(t) && !Z(t.periods).length ? "Bitte mindestens eine Unterrichtsstunde angeben, z. B. 1 oder 2." : "" : "Ungültige Stundenbezeichnung." : "Bitte einen Hinweis oder neuen Fachnamen angeben (eine Zeile)." : "Unbekannte Aktion.";
 }
 function Qe(t, e) {
   const i = Ot(t.dated_entries) ?? [], n = [];
@@ -111,9 +111,9 @@ function Qe(t, e) {
   }
   let s = 0;
   const a = [...i, ...r].flatMap((o) => Ge(o) ? (s++, []) : o.enabled === !1 ? [] : [{
-    dates: Y(o.dates ?? o.date),
+    dates: Z(o.dates ?? o.date),
     subject: _t(o.subject),
-    periods: [...new Set(Y(o.periods).map(he))],
+    periods: [...new Set(Z(o.periods).map(he))],
     match: oe(o) ? "period" : "subject",
     action: o.action ?? "note",
     text: o.text.trim(),
@@ -124,7 +124,7 @@ function Qe(t, e) {
 }
 function Wt(t, e = B(/* @__PURE__ */ new Date())) {
   if (!tt(e) || Ge({ ...t, enabled: !0 })) return !1;
-  const i = Y(t?.dates ?? t?.date);
+  const i = Z(t?.dates ?? t?.date);
   return i.length > 0 && i.every((n) => n < e);
 }
 function ht(t, e, i, n, r) {
@@ -137,9 +137,9 @@ function ht(t, e, i, n, r) {
   });
   for (const p of r) oe(p) && p.dates.includes(a) && p.periods.includes(o) && u(f(p));
   return s.text = s.text.split(/\r?\n\s*\r?\n/).map((p) => {
-    const g = p.split(/\r?\n/), c = _t(g[0]);
-    if (!c || /^[-\u2013\u2014]+$/.test(c)) return p;
-    const h = r.filter((_) => !oe(_) && _.dates.includes(a) && _.subject === c && (!_.periods.length || _.periods.includes(o)));
+    const g = p.split(/\r?\n/), d = _t(g[0]);
+    if (!d || /^[-\u2013\u2014]+$/.test(d)) return p;
+    const h = r.filter((_) => !oe(_) && _.dates.includes(a) && _.subject === d && (!_.periods.length || _.periods.includes(o)));
     if (!h.length) return p;
     const y = /entfällt|fällt\s+aus|ausfall|abgesagt|cancel(?:led|ed)|vertretung|ersatz|verlegt|\bstatt\b|geändert/i.test(p), v = [...new Set(h.filter((_) => _.action === "replace").map((_) => _.text))];
     !y && v.length === 1 && (g[0] = v[0]), !y && v.length > 1 && u({ text: "Widersprüchliche Fachwechsel: Original bleibt." });
@@ -190,7 +190,7 @@ const ji = (t) => new si(typeof t == "string" ? t : t + "", void 0, yt), ai = (t
   let i = "";
   for (const n of e.cssRules) i += n.cssText;
   return ji(i);
-})(t) : t, { is: Pi, defineProperty: Fi, getOwnPropertyDescriptor: Bi, getOwnPropertyNames: Oi, getOwnPropertySymbols: Hi, getPrototypeOf: Wi } = Object, Z = globalThis, Vt = Z.trustedTypes, Ui = Vt ? Vt.emptyScript : "", Li = Z.reactiveElementPolyfillSupport, De = (t, e) => t, Xe = { toAttribute(t, e) {
+})(t) : t, { is: Pi, defineProperty: Fi, getOwnPropertyDescriptor: Bi, getOwnPropertyNames: Oi, getOwnPropertySymbols: Hi, getPrototypeOf: Wi } = Object, G = globalThis, Vt = G.trustedTypes, Ui = Vt ? Vt.emptyScript : "", Li = G.reactiveElementPolyfillSupport, De = (t, e) => t, Xe = { toAttribute(t, e) {
   switch (e) {
     case Boolean:
       t = t ? Ui : null;
@@ -219,7 +219,7 @@ const ji = (t) => new si(typeof t == "string" ? t : t + "", void 0, yt), ai = (t
   }
   return i;
 } }, wt = (t, e) => !Pi(t, e), Kt = { attribute: !0, type: String, converter: Xe, reflect: !1, useDefault: !1, hasChanged: wt };
-Symbol.metadata ?? (Symbol.metadata = /* @__PURE__ */ Symbol("metadata")), Z.litPropertyMetadata ?? (Z.litPropertyMetadata = /* @__PURE__ */ new WeakMap());
+Symbol.metadata ?? (Symbol.metadata = /* @__PURE__ */ Symbol("metadata")), G.litPropertyMetadata ?? (G.litPropertyMetadata = /* @__PURE__ */ new WeakMap());
 let de = class extends HTMLElement {
   static addInitializer(t) {
     this._$Ei(), (this.l ?? (this.l = [])).push(t);
@@ -401,10 +401,10 @@ let de = class extends HTMLElement {
   firstUpdated(t) {
   }
 };
-de.elementStyles = [], de.shadowRootOptions = { mode: "open" }, de[De("elementProperties")] = /* @__PURE__ */ new Map(), de[De("finalized")] = /* @__PURE__ */ new Map(), Li?.({ ReactiveElement: de }), (Z.reactiveElementVersions ?? (Z.reactiveElementVersions = [])).push("2.1.2");
-const Me = globalThis, It = (t) => t, et = Me.trustedTypes, Jt = et ? et.createPolicy("lit-html", { createHTML: (t) => t }) : void 0, oi = "$lit$", q = `lit$${Math.random().toFixed(9).slice(2)}$`, li = "?" + q, Vi = `<${li}>`, le = document, Te = () => le.createComment(""), Ce = (t) => t === null || typeof t != "object" && typeof t != "function", vt = Array.isArray, Ki = (t) => vt(t) || typeof t?.[Symbol.iterator] == "function", ct = `[ 	
-\f\r]`, Se = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, qt = /-->/g, Yt = />/g, te = RegExp(`>|${ct}(?:([^\\s"'>=/]+)(${ct}*=${ct}*(?:[^ 	
-\f\r"'\`<>=]|("|')|))|$)`, "g"), Zt = /'/g, Gt = /"/g, ci = /^(?:script|style|textarea|title)$/i, Ii = (t) => (e, ...i) => ({ _$litType$: t, strings: e, values: i }), d = Ii(1), fe = /* @__PURE__ */ Symbol.for("lit-noChange"), b = /* @__PURE__ */ Symbol.for("lit-nothing"), Qt = /* @__PURE__ */ new WeakMap(), re = le.createTreeWalker(le, 129);
+de.elementStyles = [], de.shadowRootOptions = { mode: "open" }, de[De("elementProperties")] = /* @__PURE__ */ new Map(), de[De("finalized")] = /* @__PURE__ */ new Map(), Li?.({ ReactiveElement: de }), (G.reactiveElementVersions ?? (G.reactiveElementVersions = [])).push("2.1.2");
+const Me = globalThis, It = (t) => t, et = Me.trustedTypes, Jt = et ? et.createPolicy("lit-html", { createHTML: (t) => t }) : void 0, oi = "$lit$", Y = `lit$${Math.random().toFixed(9).slice(2)}$`, li = "?" + Y, Vi = `<${li}>`, le = document, Te = () => le.createComment(""), Ce = (t) => t === null || typeof t != "object" && typeof t != "function", vt = Array.isArray, Ki = (t) => vt(t) || typeof t?.[Symbol.iterator] == "function", ct = `[ 	
+\f\r]`, Se = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, qt = /-->/g, Yt = />/g, ie = RegExp(`>|${ct}(?:([^\\s"'>=/]+)(${ct}*=${ct}*(?:[^ 	
+\f\r"'\`<>=]|("|')|))|$)`, "g"), Zt = /'/g, Gt = /"/g, ci = /^(?:script|style|textarea|title)$/i, Ii = (t) => (e, ...i) => ({ _$litType$: t, strings: e, values: i }), c = Ii(1), fe = /* @__PURE__ */ Symbol.for("lit-noChange"), b = /* @__PURE__ */ Symbol.for("lit-nothing"), Qt = /* @__PURE__ */ new WeakMap(), re = le.createTreeWalker(le, 129);
 function di(t, e) {
   if (!vt(t) || !t.hasOwnProperty("raw")) throw Error("invalid template strings array");
   return Jt !== void 0 ? Jt.createHTML(e) : e;
@@ -415,9 +415,9 @@ const Ji = (t, e) => {
   for (let o = 0; o < i; o++) {
     const l = t[o];
     let u, f, p = -1, g = 0;
-    for (; g < l.length && (a.lastIndex = g, f = a.exec(l), f !== null); ) g = a.lastIndex, a === Se ? f[1] === "!--" ? a = qt : f[1] !== void 0 ? a = Yt : f[2] !== void 0 ? (ci.test(f[2]) && (r = RegExp("</" + f[2], "g")), a = te) : f[3] !== void 0 && (a = te) : a === te ? f[0] === ">" ? (a = r ?? Se, p = -1) : f[1] === void 0 ? p = -2 : (p = a.lastIndex - f[2].length, u = f[1], a = f[3] === void 0 ? te : f[3] === '"' ? Gt : Zt) : a === Gt || a === Zt ? a = te : a === qt || a === Yt ? a = Se : (a = te, r = void 0);
-    const c = a === te && t[o + 1].startsWith("/>") ? " " : "";
-    s += a === Se ? l + Vi : p >= 0 ? (n.push(u), l.slice(0, p) + oi + l.slice(p) + q + c) : l + q + (p === -2 ? o : c);
+    for (; g < l.length && (a.lastIndex = g, f = a.exec(l), f !== null); ) g = a.lastIndex, a === Se ? f[1] === "!--" ? a = qt : f[1] !== void 0 ? a = Yt : f[2] !== void 0 ? (ci.test(f[2]) && (r = RegExp("</" + f[2], "g")), a = ie) : f[3] !== void 0 && (a = ie) : a === ie ? f[0] === ">" ? (a = r ?? Se, p = -1) : f[1] === void 0 ? p = -2 : (p = a.lastIndex - f[2].length, u = f[1], a = f[3] === void 0 ? ie : f[3] === '"' ? Gt : Zt) : a === Gt || a === Zt ? a = ie : a === qt || a === Yt ? a = Se : (a = ie, r = void 0);
+    const d = a === ie && t[o + 1].startsWith("/>") ? " " : "";
+    s += a === Se ? l + Vi : p >= 0 ? (n.push(u), l.slice(0, p) + oi + l.slice(p) + Y + d) : l + Y + (p === -2 ? o : d);
   }
   return [di(t, s + (t[i] || "<?>") + (e === 2 ? "</svg>" : e === 3 ? "</math>" : "")), n];
 };
@@ -434,21 +434,21 @@ class ze {
     for (; (r = re.nextNode()) !== null && l.length < o; ) {
       if (r.nodeType === 1) {
         if (r.hasAttributes()) for (const p of r.getAttributeNames()) if (p.endsWith(oi)) {
-          const g = f[a++], c = r.getAttribute(p).split(q), h = /([.?@])?(.*)/.exec(g);
-          l.push({ type: 1, index: s, name: h[2], strings: c, ctor: h[1] === "." ? Yi : h[1] === "?" ? Zi : h[1] === "@" ? Gi : it }), r.removeAttribute(p);
-        } else p.startsWith(q) && (l.push({ type: 6, index: s }), r.removeAttribute(p));
+          const g = f[a++], d = r.getAttribute(p).split(Y), h = /([.?@])?(.*)/.exec(g);
+          l.push({ type: 1, index: s, name: h[2], strings: d, ctor: h[1] === "." ? Yi : h[1] === "?" ? Zi : h[1] === "@" ? Gi : it }), r.removeAttribute(p);
+        } else p.startsWith(Y) && (l.push({ type: 6, index: s }), r.removeAttribute(p));
         if (ci.test(r.tagName)) {
-          const p = r.textContent.split(q), g = p.length - 1;
+          const p = r.textContent.split(Y), g = p.length - 1;
           if (g > 0) {
             r.textContent = et ? et.emptyScript : "";
-            for (let c = 0; c < g; c++) r.append(p[c], Te()), re.nextNode(), l.push({ type: 2, index: ++s });
+            for (let d = 0; d < g; d++) r.append(p[d], Te()), re.nextNode(), l.push({ type: 2, index: ++s });
             r.append(p[g], Te());
           }
         }
       } else if (r.nodeType === 8) if (r.data === li) l.push({ type: 2, index: s });
       else {
         let p = -1;
-        for (; (p = r.data.indexOf(q, p + 1)) !== -1; ) l.push({ type: 7, index: s }), p += q.length - 1;
+        for (; (p = r.data.indexOf(Y, p + 1)) !== -1; ) l.push({ type: 7, index: s }), p += Y.length - 1;
       }
       s++;
     }
@@ -681,7 +681,7 @@ function ui(t) {
     return r.constructor.createProperty(s, n), a ? Object.getOwnPropertyDescriptor(r, s) : void 0;
   })(t, e, i);
 }
-function G(t) {
+function Q(t) {
   return ui({ ...t, state: !0, attribute: !1 });
 }
 var sn = Object.defineProperty, an = Object.getOwnPropertyDescriptor, hi = (t) => {
@@ -713,13 +713,13 @@ function Xt(t, e) {
   return (Array.isArray(t) ? t : []).map((i) => {
     if (S(i))
       return { break: !0, time: (i.time ?? "").toString(), label: (i.label ?? "Pause").toString() };
-    const n = Array.isArray(i?.cells) ? i.cells : [], r = Array.from({ length: e.length }, (c, h) => (n[h] ?? "").toString()), s = Array.isArray(i?.cell_styles) ? i.cell_styles : [], a = Array.from({ length: e.length }, (c, h) => xt(s[h])), o = Array.isArray(i?.cell_times) ? Array.from({ length: e.length }, (c, h) => fi(i.cell_times[h])) : [], l = (i?.time ?? "").toString(), u = ge(l), f = (i?.start ?? "").toString().trim(), p = (i?.end ?? "").toString().trim(), g = {
+    const n = Array.isArray(i?.cells) ? i.cells : [], r = Array.from({ length: e.length }, (d, h) => (n[h] ?? "").toString()), s = Array.isArray(i?.cell_styles) ? i.cell_styles : [], a = Array.from({ length: e.length }, (d, h) => xt(s[h])), o = Array.isArray(i?.cell_times) ? Array.from({ length: e.length }, (d, h) => fi(i.cell_times[h])) : [], l = (i?.time ?? "").toString(), u = ge(l), f = (i?.start ?? "").toString().trim(), p = (i?.end ?? "").toString().trim(), g = {
       time: l,
       start: f || u.start || void 0,
       end: p || u.end || void 0,
       cells: r
     };
-    return a.some((c) => !!c) && (g.cell_styles = a), o.some((c) => !!c) && (g.cell_times = o), g;
+    return a.some((d) => !!d) && (g.cell_styles = a), o.some((d) => !!d) && (g.cell_times = o), g;
   });
 }
 function gi(t) {
@@ -954,8 +954,8 @@ const U = (Ae = class extends pe {
               Number.isFinite(g) && g !== 0 && (t.callService("number", "set_value", { entity_id: p, value: 0 }).catch?.(() => {
               }), window.setTimeout(() => {
                 try {
-                  const c = ((e?.source_entity_integration ?? e?.source_entity ?? "") + "").toString().trim();
-                  c && this.hass?.callService("homeassistant", "update_entity", { entity_id: c });
+                  const d = ((e?.source_entity_integration ?? e?.source_entity ?? "") + "").toString().trim();
+                  d && this.hass?.callService("homeassistant", "update_entity", { entity_id: d });
                 } catch {
                 }
               }, 400));
@@ -970,8 +970,8 @@ const U = (Ae = class extends pe {
           const u = l && r?.states && l in r.states, f = n + "|" + l;
           if (u && this.__autokickSig !== f) {
             this.__autokickSig = f;
-            const p = r.states[l]?.state, g = Number(p), c = Number.isFinite(g) ? g : 0;
-            r.callService("number", "set_value", { entity_id: l, value: c }).catch?.(() => {
+            const p = r.states[l]?.state, g = Number(p), d = Number.isFinite(g) ? g : 0;
+            r.callService("number", "set_value", { entity_id: l, value: d }).catch?.(() => {
             }), window.setTimeout(() => {
               try {
                 this.hass?.callService("homeassistant", "update_entity", { entity_id: n });
@@ -1165,13 +1165,13 @@ const U = (Ae = class extends pe {
     };
   }
   normalizeConfig(t) {
-    const e = Ae.getStubConfig(), i = Array.isArray(t.days) && t.days.length ? t.days.map((T) => (T ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], n = Xt(t.rows, i), r = Xt(t.rows_b, i), s = ((t.view_mode ?? "week") + "").toString().trim(), a = s === "rolling" ? "rolling" : "week", o = ((t.display_mode ?? "default") + "").toString().trim(), l = o === "compact" ? "compact" : "default", u = Number(t.days_ahead), f = Number.isFinite(u) ? Math.max(0, Math.min(6, Math.floor(u))) : 0, p = ((t.rolling_switch_mode ?? e.rolling_switch_mode ?? "midnight") + "").toString().trim(), g = p === "after_last_lesson" || p === "fixed_time" ? p : "midnight", c = ((t.rolling_switch_time ?? e.rolling_switch_time ?? "") + "").toString().trim(), h = ((t.week_mode ?? e.week_mode) + "").toString().trim(), y = h === "kw_parity" || h === "week_map" || h === "off" ? h : "off", v = (() => {
+    const e = Ae.getStubConfig(), i = Array.isArray(t.days) && t.days.length ? t.days.map((T) => (T ?? "").toString()) : ["Mo", "Di", "Mi", "Do", "Fr"], n = Xt(t.rows, i), r = Xt(t.rows_b, i), s = ((t.view_mode ?? "week") + "").toString().trim(), a = s === "rolling" ? "rolling" : "week", o = ((t.display_mode ?? "default") + "").toString().trim(), l = o === "compact" ? "compact" : "default", u = Number(t.days_ahead), f = Number.isFinite(u) ? Math.max(0, Math.min(6, Math.floor(u))) : 0, p = ((t.rolling_switch_mode ?? e.rolling_switch_mode ?? "midnight") + "").toString().trim(), g = p === "after_last_lesson" || p === "fixed_time" ? p : "midnight", d = ((t.rolling_switch_time ?? e.rolling_switch_time ?? "") + "").toString().trim(), h = ((t.week_mode ?? e.week_mode) + "").toString().trim(), y = h === "kw_parity" || h === "week_map" || h === "off" ? h : "off", v = (() => {
       const T = ((t.source_type ?? "") + "").toString().trim();
       if (T === "manual" || T === "entity" || T === "json" || T === "sensor") return T;
-      const Q = ((t.source_entity ?? e.source_entity) + "").toString().trim();
-      if (Q) {
-        const _e = ((t.source_attribute ?? "") + "").toString().trim(), X = ((t.source_time_key ?? "") + "").toString().trim();
-        return !(/_woche$/i.test(Q) && (_e === "" || _e === "rows_table") && (X === "" || X === "time")) && (_e || X) ? "legacy" : "entity";
+      const X = ((t.source_entity ?? e.source_entity) + "").toString().trim();
+      if (X) {
+        const _e = ((t.source_attribute ?? "") + "").toString().trim(), ee = ((t.source_time_key ?? "") + "").toString().trim();
+        return !(/_woche$/i.test(X) && (_e === "" || _e === "rows_table") && (ee === "" || ee === "time")) && (_e || ee) ? "legacy" : "entity";
       }
       return "manual";
     })(), _ = (t.source_entity ?? e.source_entity).toString().trim(), w = (t.source_entity_integration ?? "").toString().trim(), x = (t.source_entity_legacy ?? "").toString().trim(), D = v === "sensor" ? x || _ : v === "entity" && w || _, O = (t.week_offset_entity ?? "").toString().trim() || _i(D);
@@ -1189,6 +1189,7 @@ const U = (Ae = class extends pe {
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
       hidden_subjects: qe(t.hidden_subjects),
       dated_entries: Array.isArray(t.dated_entries) ? t.dated_entries : [],
+      show_upcoming_notes: q(t.show_upcoming_notes, !1),
       dated_entries_entity: typeof t.dated_entries_entity == "string" ? t.dated_entries_entity.trim() : "",
       dated_entries_attribute: typeof t.dated_entries_attribute == "string" && t.dated_entries_attribute.trim() || "entries",
       merge_double_lessons: t.merge_double_lessons ?? e.merge_double_lessons,
@@ -1199,7 +1200,7 @@ const U = (Ae = class extends pe {
       days_ahead: f,
       rolling_switch_mode: g,
       rolling_week_only: t.rolling_week_only === !0,
-      rolling_switch_time: c,
+      rolling_switch_time: d,
       tap_action: this.normalizeTapAction(t.tap_action ?? e.tap_action),
       highlight_today: t.highlight_today ?? e.highlight_today,
       highlight_current: t.highlight_current ?? e.highlight_current,
@@ -1294,7 +1295,7 @@ const U = (Ae = class extends pe {
       const l = (o?.time ?? o?.[n] ?? o?.[r] ?? o?.[s] ?? "").toString(), u = ge(l), f = Array.isArray(o?.cells) ? Array.from({ length: i.length }, (v, _) => (o?.cells?.[_] ?? "").toString()) : Array.from({ length: i.length }, (v, _) => {
         const w = (i[_] ?? "").toString();
         return (o?.[w] ?? "").toString();
-      }), p = Array.isArray(o?.cell_styles) ? Array.from({ length: i.length }, (v, _) => xt(o?.cell_styles?.[_])) : [], g = Array.isArray(o?.cell_times) ? Array.from({ length: i.length }, (v, _) => fi(o.cell_times[_])) : [], c = (o?.start ?? "").toString().trim() || u.start, h = (o?.end ?? "").toString().trim() || u.end, y = { time: l, start: c || void 0, end: h || void 0, cells: f };
+      }), p = Array.isArray(o?.cell_styles) ? Array.from({ length: i.length }, (v, _) => xt(o?.cell_styles?.[_])) : [], g = Array.isArray(o?.cell_times) ? Array.from({ length: i.length }, (v, _) => fi(o.cell_times[_])) : [], d = (o?.start ?? "").toString().trim() || u.start, h = (o?.end ?? "").toString().trim() || u.end, y = { time: l, start: d || void 0, end: h || void 0, cells: f };
       return p.some((v) => !!v) && (y.cell_styles = p), g.some((v) => !!v) && (y.cell_times = g), y;
     });
     return a.length ? a : null;
@@ -1510,17 +1511,17 @@ const U = (Ae = class extends pe {
     if (!z(this)) return;
     e.stopPropagation();
     let a = e.currentTarget.parentElement;
-    for (let c = 1; c < s && (a = a?.nextElementSibling, a && e.clientY >= a.getBoundingClientRect().top); c++)
+    for (let d = 1; d < s && (a = a?.nextElementSibling, a && e.clientY >= a.getBoundingClientRect().top); d++)
       i++;
     const o = this.getManualRowForDate(t, this._rowsCache[i], i, r), l = he(o?.cell_times?.[n]?.time || o?.time);
     if (n >= 0 && o && !S(o) && l && B(r)) {
-      const c = new CustomEvent("stundenplan-add-note", {
+      const d = new CustomEvent("stundenplan-add-note", {
         bubbles: !0,
         composed: !0,
         cancelable: !0,
         detail: { config: this.config, date: B(r), period: l }
       });
-      if (!this.dispatchEvent(c)) return;
+      if (!this.dispatchEvent(d)) return;
     }
     if (t.source_type !== "manual") return;
     let u = t.week_mode === "kw_parity" ? r instanceof Date ? this.weekFromParityAtDate(t, r) : this.getActiveWeek(t) : "A";
@@ -1621,11 +1622,11 @@ const U = (Ae = class extends pe {
     const r = i[0];
     if (/^(—|\-|–|---)$/.test(r)) return null;
     const s = (g) => {
-      const c = (g ?? "").toString().trim();
-      return /^[🟠🔴🟡🟢⚪️🟣🟤]/.test(c) || /\bfällt\s+aus\b/i.test(c) || /\bverlegt\b/i.test(c) || /\bentfällt\b/i.test(c) || /\bvertretung\b/i.test(c) || /\bstatt\b/i.test(c) || /\bgehalten\b/i.test(c) || /\bAufgaben\b/i.test(c) || /^für\b/i.test(c);
+      const d = (g ?? "").toString().trim();
+      return /^[🟠🔴🟡🟢⚪️🟣🟤]/.test(d) || /\bfällt\s+aus\b/i.test(d) || /\bverlegt\b/i.test(d) || /\bentfällt\b/i.test(d) || /\bvertretung\b/i.test(d) || /\bstatt\b/i.test(d) || /\bgehalten\b/i.test(d) || /\bAufgaben\b/i.test(d) || /^für\b/i.test(d);
     }, a = (g) => {
-      const c = (g ?? "").toString().trim();
-      return /^\d{1,4}$/.test(c) || /^[A-Za-zÄÖÜäöüß]{1,8}\s*\d{1,4}$/i.test(c) || /^[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}$/i.test(c) || /^\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12}$/i.test(c);
+      const d = (g ?? "").toString().trim();
+      return /^\d{1,4}$/.test(d) || /^[A-Za-zÄÖÜäöüß]{1,8}\s*\d{1,4}$/i.test(d) || /^[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}$/i.test(d) || /^\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12}$/i.test(d);
     }, o = i.slice(1);
     let l = -1;
     for (let g = 0; g < o.length; g++)
@@ -1644,14 +1645,14 @@ const U = (Ae = class extends pe {
     const u = o[l];
     let f;
     for (let g = l + 1; g < o.length; g++) {
-      const c = o[g];
-      if (!s(c) && !a(c)) {
-        f = c;
+      const d = o[g];
+      if (!s(d) && !a(d)) {
+        f = d;
         break;
       }
     }
     if (!f) {
-      const g = o.filter((c) => !s(c) && !a(c));
+      const g = o.filter((d) => !s(d) && !a(d));
       f = g.length ? g[g.length - 1] : void 0;
     }
     const p = i.slice(1).filter((g) => s(g));
@@ -1659,13 +1660,13 @@ const U = (Ae = class extends pe {
   }
   renderCell(t, e) {
     const i = (t ?? "").toString(), n = this.filterCellText(i, e);
-    if (ne(n)) return d``;
+    if (ne(n)) return c``;
     const r = (() => {
-      let c = n.replace(/\r/g, "").split(`
+      let d = n.replace(/\r/g, "").split(`
 `).map((y) => (y ?? "").toString().trim());
-      for (; c.length && /^(—|–|-)$/.test(c[0]); ) c.shift();
+      for (; d.length && /^(—|–|-)$/.test(d[0]); ) d.shift();
       const h = [];
-      for (const y of c) {
+      for (const y of d) {
         const v = y.length === 0;
         if (!/^(—|–|-)$/.test(y)) {
           if (v) {
@@ -1680,105 +1681,105 @@ const U = (Ae = class extends pe {
       return h.join(`
 `);
     })();
-    if (ne(r)) return d``;
-    const s = r.split(/\n\s*\n/).map((c) => c.trim()).filter(Boolean), a = (c) => {
-      if (c.startsWith("🔴")) return "note noteRed";
-      if (c.startsWith("🟠")) return "note noteOrange";
-      if (c.startsWith("🟡")) return "note noteYellow";
-      const h = c;
+    if (ne(r)) return c``;
+    const s = r.split(/\n\s*\n/).map((d) => d.trim()).filter(Boolean), a = (d) => {
+      if (d.startsWith("🔴")) return "note noteRed";
+      if (d.startsWith("🟠")) return "note noteOrange";
+      if (d.startsWith("🟡")) return "note noteYellow";
+      const h = d;
       return /\bfällt\s+aus\b/i.test(h) || /\bverlegt\b/i.test(h) || /\bstatt\b/i.test(h) || /\bgehalten\b/i.test(h) || /\bentfällt\b/i.test(h) ? "note noteRed" : "note";
-    }, o = (c) => (c ?? "").toString().replace(/^\p{Extended_Pictographic}+\s*/u, "").replace(/^[�]+\s*/, "").trim(), l = (c) => {
-      const h = (c ?? "").toString().trim();
-      if (!h) return d``;
+    }, o = (d) => (d ?? "").toString().replace(/^\p{Extended_Pictographic}+\s*/u, "").replace(/^[�]+\s*/, "").trim(), l = (d) => {
+      const h = (d ?? "").toString().trim();
+      if (!h) return c``;
       const y = this.parseCellTriplet(h);
       if (y?.fach && y?.raum && y?.lehrer)
-        return d`
+        return c`
           <div class="cellWrap">
             <div class="fach">${y.fach}</div>
             <div class="lehrer">${y.lehrer}</div>
             <div class="raum">${y.raum}</div>
 
-            ${y.notes?.length ? d`
+            ${y.notes?.length ? c`
                   <div class="notes">
                     ${y.notes.map((x) => {
           const D = a(x), O = o(x) || x;
-          return d`<div class=${D}><span class="txt">${O}</span></div>`;
+          return c`<div class=${D}><span class="txt">${O}</span></div>`;
         })}
                   </div>
-                ` : d``}
+                ` : c``}
           </div>
         `;
       const v = h.split(`
 `).map((x) => x.trim()).filter(Boolean), _ = (v[0] ?? "").trim(), w = v.slice(1);
-      return _ && w.length ? d`
+      return _ && w.length ? c`
           <div class="cellWrap">
             <div class="fach">${_}</div>
             <div class="notes">
               ${w.map((x) => {
         const D = a(x), O = o(x) || x;
-        return d`<div class=${D}><span class="txt">${O}</span></div>`;
+        return c`<div class=${D}><span class="txt">${O}</span></div>`;
       })}
             </div>
           </div>
-        ` : d`<span class="cellText">${h}</span>`;
+        ` : c`<span class="cellText">${h}</span>`;
     };
     if (s.length > 1)
-      return d`<div class="cellMulti">${s.map((c) => l(c))}</div>`;
+      return c`<div class="cellMulti">${s.map((d) => l(d))}</div>`;
     const u = (r ?? "").split(`
-`).map((c) => c.trim()).filter(Boolean), f = /^(?:\d{1,4}|[A-Za-zÄÖÜäöüß]{1,8}\s*\d{1,4}|[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}|\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12})$/i, p = /^[A-Za-zÄÖÜäöüß]{2,12}$/i, g = (c) => {
-      const h = (c ?? "").trim();
+`).map((d) => d.trim()).filter(Boolean), f = /^(?:\d{1,4}|[A-Za-zÄÖÜäöüß]{1,8}\s*\d{1,4}|[A-ZÄÖÜ]{1,4}\d{0,3}[-/][A-ZÄÖÜ0-9]{1,4}|\d{1,4}\s+[A-Za-zÄÖÜäöüß]{2,12})$/i, p = /^[A-Za-zÄÖÜäöüß]{2,12}$/i, g = (d) => {
+      const h = (d ?? "").trim();
       if (!h || f.test(h)) return !1;
       const y = h.toLowerCase();
       return y.startsWith("statt ") || y.includes("fällt aus") || y.includes("verlegt") || y.includes("gehalten") || /^[🔴🟠🟡🟢🟣🟤🟦🟥🟧🟨🟩🟪🟫]/.test(h) ? !1 : /[a-z0-9äöü]/i.test(h);
     };
     if (u.length >= 6 && u.length % 3 === 0) {
-      const c = [];
+      const d = [];
       for (let h = 0; h < u.length; h += 3) {
         const y = u[h] ?? "", v = u[h + 1] ?? "", _ = u[h + 2] ?? "";
         if (!g(y) || !f.test(v) || !p.test(_)) {
-          c.length = 0;
+          d.length = 0;
           break;
         }
-        c.push([y, v, _].join(`
+        d.push([y, v, _].join(`
 `));
       }
-      if (c.length >= 2)
-        return d`<div class="cellMulti">${c.map((h) => l(h))}</div>`;
+      if (d.length >= 2)
+        return c`<div class="cellMulti">${d.map((h) => l(h))}</div>`;
     }
     return l(r);
   }
   renderCardLayout(t, e = null, i = !1) {
-    const n = this._rowsCache, r = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], r), a = ((e ?? this._uiViewMode ?? t.view_mode ?? "week") + "").toString(), o = Number(t.days_ahead), l = Number.isFinite(o) ? Math.max(0, Math.min(6, Math.floor(o))) : 0, u = "1px solid var(--stundenplan-divider-color, var(--divider-color))", f = ei(t.highlight_today_color ?? "", 0.12), p = ei(t.highlight_current_color ?? "", 0.18), g = (t.highlight_current_text_color ?? "").toString().trim(), c = (t.highlight_current_time_text_color ?? "").toString().trim(), h = t.week_mode !== "off", y = h ? this.getActiveWeek(t) : null, v = this.getWeekOffsetValue(t), _ = (t.source_type ?? "manual").toString(), w = t.show_time_column !== !1, x = !i && (t.week_offset_entity ?? "").trim().length > 0, D = x && (_ === "entity" || _ === "sensor" && (t.week_mode ?? "off") !== "off"), O = D && t.show_week_navigation !== !1, T = r && r.length >= (t.days?.length ?? 0) ? r : null, Q = this.getHeaderUpdatedFromEntity(t), _e = this.getBaseDate(t), X = this.mondayOfWeek(_e), St = this.normalizeTapAction(t.tap_action), yi = i ? "default" : t.display_mode ?? "default", wi = `${yi === "compact" ? "compact" : ""}${!i && St.action !== "none" ? " tappable" : ""}${i ? " popupCard" : ""}${t.header_table_gap != null ? " customHeaderGap" : ""}`, At = t.show_title !== !1 && (t.title ?? "").toString().trim().length > 0, vi = this.getTitleStyle(t), $i = At || h || O, xi = a === "rolling" && (i || !D || (v ?? 0) === 0), be = xi ? this.getRollingVisibleSlots(t, l) : [], L = be.length ? be.map((m) => m.orig) : Array.from({ length: t.days?.length ?? 0 }, (m, $) => $), ye = L.map((m) => t.days[m]), A = be.length ? be.map((m) => m.date) : null, ee = Qe(t, this.hass), H = (m) => {
+    const n = this._rowsCache, r = this.getHeaderDaysFromEntity(t), s = this.getTodayIndex(t.days ?? [], r), a = ((e ?? this._uiViewMode ?? t.view_mode ?? "week") + "").toString(), o = Number(t.days_ahead), l = Number.isFinite(o) ? Math.max(0, Math.min(6, Math.floor(o))) : 0, u = "1px solid var(--stundenplan-divider-color, var(--divider-color))", f = ei(t.highlight_today_color ?? "", 0.12), p = ei(t.highlight_current_color ?? "", 0.18), g = (t.highlight_current_text_color ?? "").toString().trim(), d = (t.highlight_current_time_text_color ?? "").toString().trim(), h = t.week_mode !== "off", y = h ? this.getActiveWeek(t) : null, v = this.getWeekOffsetValue(t), _ = (t.source_type ?? "manual").toString(), w = t.show_time_column !== !1, x = !i && (t.week_offset_entity ?? "").trim().length > 0, D = x && (_ === "entity" || _ === "sensor" && (t.week_mode ?? "off") !== "off"), O = D && t.show_week_navigation !== !1, T = r && r.length >= (t.days?.length ?? 0) ? r : null, X = this.getHeaderUpdatedFromEntity(t), _e = this.getBaseDate(t), ee = this.mondayOfWeek(_e), St = this.normalizeTapAction(t.tap_action), yi = i ? "default" : t.display_mode ?? "default", wi = `${yi === "compact" ? "compact" : ""}${!i && St.action !== "none" ? " tappable" : ""}${i ? " popupCard" : ""}${t.header_table_gap != null ? " customHeaderGap" : ""}`, At = t.show_title !== !1 && (t.title ?? "").toString().trim().length > 0, vi = this.getTitleStyle(t), $i = At || h || O, xi = a === "rolling" && (i || !D || (v ?? 0) === 0), be = xi ? this.getRollingVisibleSlots(t, l) : [], L = be.length ? be.map((m) => m.orig) : Array.from({ length: t.days?.length ?? 0 }, (m, $) => $), ye = L.map((m) => t.days[m]), A = be.length ? be.map((m) => m.date) : null, te = Qe(t, this.hass), H = (m) => {
       if (A) return A[m];
       const $ = ut(t.days[L[m]]);
       if (!$) return null;
       if (T) return T.find((M) => (M.getDay() || 7) === $) ?? null;
-      const k = new Date(X);
+      const k = new Date(ee);
       return k.setDate(k.getDate() + $ - 1), k;
     }, rt = be.length ? 0 : Math.max(0, L.indexOf(s)), je = L[rt] ?? 0, Ne = A?.[rt] ?? null, Dt = Ne instanceof Date ? this.fmtYMD(Ne) === this.fmtYMD(/* @__PURE__ */ new Date()) : je === s, we = t.trim_empty_rows || t.hidden_subjects?.length ? dn(n, L, (m, $, k, M) => {
-      const j = this.getManualRowForDate(t, m, $, A?.[M]), N = this.getDatedCell(t, j ?? m, k, H(M), ee.entries);
+      const j = this.getManualRowForDate(t, m, $, A?.[M]), N = this.getDatedCell(t, j ?? m, k, H(M), te.entries);
       return N.text + N.notes.map((V) => V.text).join(" ");
-    }) : n, Mt = /* @__PURE__ */ new Set(), Et = (this._noData || we.forEach((m, $) => {
+    }) : n, Mt = /* @__PURE__ */ new Set(), Et = t.show_upcoming_notes ? (this._noData || we.forEach((m, $) => {
       S(m) || L.forEach((k, M) => {
         const j = this.getManualRowForDate(t, m, $, H(M)) ?? m;
         Mt.add(`${B(H(M))}/${he(j.cell_times?.[k]?.time || j.time)}`);
       });
-    }), Ri(ee.entries, Mt)), Tt = (() => {
+    }), Ri(te.entries, Mt)) : [], Tt = (() => {
       const m = /* @__PURE__ */ new Map();
-      return !T || !Q || T.forEach(($, k) => {
-        const M = Q[k];
+      return !T || !X || T.forEach(($, k) => {
+        const M = X[k];
         $ instanceof Date && M && m.set(this.fmtYMD($), M);
       }), m;
     })();
-    return d`
+    return c`
       <ha-card class=${wi} style=${[this.getTypographyStyle(t), this.getAppearanceStyle(t)].filter(Boolean).join(";")} @click=${i ? (m) => this.closeWeekPopup(m) : (m) => this.handleCardAction(t, m)}>
-        ${$i ? d`<div class="headerRow">
-          ${At ? d`<div class="title" style=${vi}>${t.title ?? ""}</div>` : d`<div class="titleSpacer"></div>`}
+        ${$i ? c`<div class="headerRow">
+          ${At ? c`<div class="title" style=${vi}>${t.title ?? ""}</div>` : c`<div class="titleSpacer"></div>`}
 
           <div class="headRight">
-            ${h ? d`<div class="weekBadgeInline">Woche <b>${y}</b></div>` : d``}
+            ${h ? c`<div class="weekBadgeInline">Woche <b>${y}</b></div>` : c``}
 
-            ${O ? d`
+            ${O ? c`
                   <div class="offsetInline">
                     <button class="btnMini" @click=${(m) => {
       m.stopPropagation(), v != null && this.setWeekOffset(t, v - 1);
@@ -1788,15 +1789,15 @@ const U = (Ae = class extends pe {
       m.stopPropagation(), v != null && this.setWeekOffset(t, v + 1);
     }}>&gt;</button>
                   </div>
-                ` : d``}
+                ` : c``}
           </div>
-        </div>` : d``}
+        </div>` : c``}
 
         <div class="card">
           <table class=${t.equal_column_widths ? "equalColumns" : ""}>
             <thead>
               <tr>
-                ${w ? d`<th class="time">Stunde</th>` : d``}
+                ${w ? c`<th class="time">Stunde</th>` : c``}
                 ${ye.map((m, $) => {
       const k = L[$], M = t.highlight_today && (A ? this.fmtYMD(A[$]) === this.fmtYMD(/* @__PURE__ */ new Date()) : k === s) ? "today" : "";
       let j = "";
@@ -1807,15 +1808,15 @@ const U = (Ae = class extends pe {
       else {
         const N = ut(m);
         if (N) {
-          const V = new Date(X);
-          V.setDate(X.getDate() + (N - 1)), j = this.fmtDDMMYYYY(V);
+          const V = new Date(ee);
+          V.setDate(ee.getDate() + (N - 1)), j = this.fmtDDMMYYYY(V);
         }
       }
-      return d`
+      return c`
                     <th class=${M} style=${`--sp-hl:${f};`}>
                       <div>${m}</div>
-                      ${t.show_header_date !== !1 ? d`<div class="thDate">${j}</div>` : d``}
-                      ${A?.[$] ? Tt.get(this.fmtYMD(A[$])) ? d`<div class="thUpdated">(aktualisiert: ${Tt.get(this.fmtYMD(A[$]))})</div>` : d`` : Q?.[k] ? d`<div class="thUpdated">(aktualisiert: ${Q[k]})</div>` : d``}
+                      ${t.show_header_date !== !1 ? c`<div class="thDate">${j}</div>` : c``}
+                      ${A?.[$] ? Tt.get(this.fmtYMD(A[$])) ? c`<div class="thUpdated">(aktualisiert: ${Tt.get(this.fmtYMD(A[$]))})</div>` : c`` : X?.[k] ? c`<div class="thUpdated">(aktualisiert: ${X[k]})</div>` : c``}
                     </th>
                   `;
     })}
@@ -1823,33 +1824,33 @@ const U = (Ae = class extends pe {
             </thead>
 
             <tbody>
-              ${this._noData ? d`<tr class="nodata"><td class="nodataCell" colspan=${ye.length + (w ? 1 : 0)}>${this._noDataMsg}</td></tr>` : t.hidden_subjects?.length && n.length && !we.length ? d`<tr class="nodata"><td class="nodataCell" colspan=${ye.length + (w ? 1 : 0)}>Keine Einträge nach Filterung.</td></tr>` : we.map((m, $) => {
+              ${this._noData ? c`<tr class="nodata"><td class="nodataCell" colspan=${ye.length + (w ? 1 : 0)}>${this._noDataMsg}</td></tr>` : t.hidden_subjects?.length && n.length && !we.length ? c`<tr class="nodata"><td class="nodataCell" colspan=${ye.length + (w ? 1 : 0)}>Keine Einträge nach Filterung.</td></tr>` : we.map((m, $) => {
       if (S(m)) {
         const ve = ge(m.time), R = !!ve.start && !!ve.end && this.isNowBetween(ve.start, ve.end), E = !!t.highlight_breaks && R;
         let P = `--sp-hl:${p};`, Be = "";
-        return E && (P += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", Be += `--sp-hl:${p}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), E && t.highlight_current_time_text && c && (P += `color:${c};`), d`
+        return E && (P += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", Be += `--sp-hl:${p}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), E && t.highlight_current_time_text && d && (P += `color:${d};`), c`
                     <tr class="break">
-                      ${w ? d`<td class="time" style=${P}>${m.time}</td>` : d``}
+                      ${w ? c`<td class="time" style=${P}>${m.time}</td>` : c``}
                       <td colspan=${ye.length} style=${Be} @click=${($e) => this.handlePreviewCell(t, $e, $, -1, Ne)}>${m.label ?? ""}</td>
                     </tr>
                   `;
       }
-      const k = m, M = k.cells ?? [], j = k.cell_styles ?? [], N = this.getManualRowForDate(t, k, $, Ne), V = (N?.cell_times ?? k.cell_times)?.[je] ?? null, Ct = V?.time || N?.time || k.time, Pe = V?.start || N?.start || k.start, Fe = V?.end || N?.end || k.end, st = Dt && !!Pe && !!Fe && this.isNowBetween(Pe, Fe), ki = s >= 0 ? M[s] ?? "" : "", Si = ee.entries.length ? this.getDatedCell(t, N ?? k, je, H(rt), ee.entries).text : s >= 0 ? this.filterCellText(ki, t) : "", Ai = s >= 0 ? ne(Si) : !1, at = !(t.free_only_column_highlight && Ai), zt = ge(Ct), Di = !!(zt.start && zt.end), Rt = !Di && Pe && Fe ? `${Pe}–${Fe}` : "";
+      const k = m, M = k.cells ?? [], j = k.cell_styles ?? [], N = this.getManualRowForDate(t, k, $, Ne), V = (N?.cell_times ?? k.cell_times)?.[je] ?? null, Ct = V?.time || N?.time || k.time, Pe = V?.start || N?.start || k.start, Fe = V?.end || N?.end || k.end, st = Dt && !!Pe && !!Fe && this.isNowBetween(Pe, Fe), ki = s >= 0 ? M[s] ?? "" : "", Si = te.entries.length ? this.getDatedCell(t, N ?? k, je, H(rt), te.entries).text : s >= 0 ? this.filterCellText(ki, t) : "", Ai = s >= 0 ? ne(Si) : !1, at = !(t.free_only_column_highlight && Ai), zt = ge(Ct), Di = !!(zt.start && zt.end), Rt = !Di && Pe && Fe ? `${Pe}–${Fe}` : "";
       let ot = `--sp-hl:${p};`;
-      return at && t.highlight_current && st && (ot += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), at && st && t.highlight_current_time_text && c && (ot += `color:${c};`), d`
+      return at && t.highlight_current && st && (ot += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), at && st && t.highlight_current_time_text && d && (ot += `color:${d};`), c`
                   <tr>
-                    ${w ? d`<td class="time" style=${ot}>
+                    ${w ? c`<td class="time" style=${ot}>
                       <div class="timeWrap">
                         <div class="timeSt">${Ct}</div>
-                        ${Rt ? d`<div class="timeHm">${Rt}</div>` : d``}
+                        ${Rt ? c`<div class="timeHm">${Rt}</div>` : c``}
                       </div>
-                    </td>` : d``}
+                    </td>` : c``}
 
                     ${ye.map((ve, R) => {
         const E = L[R], P = this.getManualRowForDate(t, k, $, A?.[R]);
         P?.cells;
-        const Be = P?.cell_styles ?? j, $e = A ? this.fmtYMD(A[R]) === this.fmtYMD(/* @__PURE__ */ new Date()) : E === s, jt = this.getDatedCell(t, P ?? k, E, H(R), ee.entries), Nt = jt.text, Mi = Be[E] ?? null, Ei = t.highlight_today && $e ? "today" : "", xe = t.merge_double_lessons ? pn(we, $, (C, F) => {
-          const ce = this.getManualRowForDate(t, C, F, A?.[R]), ke = this.getDatedCell(t, ce ?? C, E, H(R), ee.entries);
+        const Be = P?.cell_styles ?? j, $e = A ? this.fmtYMD(A[R]) === this.fmtYMD(/* @__PURE__ */ new Date()) : E === s, jt = this.getDatedCell(t, P ?? k, E, H(R), te.entries), Nt = jt.text, Mi = Be[E] ?? null, Ei = t.highlight_today && $e ? "today" : "", xe = t.merge_double_lessons ? pn(we, $, (C, F) => {
+          const ce = this.getManualRowForDate(t, C, F, A?.[R]), ke = this.getDatedCell(t, ce ?? C, E, H(R), te.entries);
           return { text: ke.text, notes: ke.notes, style: (ce?.cell_styles ?? C?.cell_styles ?? [])[E] ?? null };
         }) : { covered: !1, span: 1 };
         if (xe.covered) return b;
@@ -1859,7 +1860,7 @@ const U = (Ae = class extends pe {
           const C = (P?.cell_times ?? k.cell_times)?.[E] ?? null, F = $ + xe.span - 1, ce = we[F], ke = this.getManualRowForDate(t, ce, F, A?.[R]), zi = (ke?.cell_times ?? ce?.cell_times)?.[E] ?? null, Ft = C?.start || P?.start || k.start, Bt = zi?.end || ke?.end || ce?.end;
           return !!Ft && !!Bt && this.isNowBetween(Ft, Bt);
         })();
-        return at && Ti && ($e && (st || Ci)) && t.highlight_current_text && g && s >= 0 && E === s && (Pt += `color:${g};`), d`<td class=${Ei} style=${Pt} rowspan=${xe.span} @mouseenter=${(C) => this.updatePreviewTooltip(t, C)} @click=${(C) => this.handlePreviewCell(t, C, $, E, H(R), xe.span)}>${this.renderCell(Nt, t)}${jt.notes.map((C) => d`<div class="datedNote" style=${ni(C)}
+        return at && Ti && ($e && (st || Ci)) && t.highlight_current_text && g && s >= 0 && E === s && (Pt += `color:${g};`), c`<td class=${Ei} style=${Pt} rowspan=${xe.span} @mouseenter=${(C) => this.updatePreviewTooltip(t, C)} @click=${(C) => this.handlePreviewCell(t, C, $, E, H(R), xe.span)}>${this.renderCell(Nt, t)}${jt.notes.map((C) => c`<div class="datedNote" style=${ni(C)}
           title=${z(this) ? "Hinweis bearbeiten" : b}
           role=${z(this) ? "button" : b} tabindex=${z(this) ? "0" : b}
           @click=${(F) => this.handlePreviewNote(t, F, P ?? k, E, H(R), C)}
@@ -1872,9 +1873,9 @@ const U = (Ae = class extends pe {
     })}
             </tbody>
           </table>
-          ${Et.length ? d`<div class="upcomingNotes"><strong>Anstehende Termine</strong>
+          ${Et.length ? c`<div class="upcomingNotes"><strong>Anstehende Termine</strong>
             <div class="datedWarning">Termine außerhalb der angezeigten Stunden. Noch nicht geladener Unterricht wird dadurch nicht bestätigt.</div>
-            ${Et.map((m) => d`<div class="datedNote" style=${ni(m)}
+            ${Et.map((m) => c`<div class="datedNote" style=${ni(m)}
               title=${z(this) ? "Hinweis bearbeiten" : b}
               role=${z(this) ? "button" : b} tabindex=${z(this) ? "0" : b}
               @click=${($) => this.handlePreviewNote(t, $, { time: m.periods[0] }, 0, /* @__PURE__ */ new Date(`${m.date}T12:00:00`), m)}
@@ -1882,23 +1883,23 @@ const U = (Ae = class extends pe {
       z(this) && ($.key === "Enter" || $.key === " ") && ($.preventDefault(), this.handlePreviewNote(t, $, { time: m.periods[0] }, 0, /* @__PURE__ */ new Date(`${m.date}T12:00:00`), m));
     }}><strong>${m.text}</strong><br>${ri(m).detail}</div>`)}
           </div>` : b}
-          ${ee.warnings.map((m) => d`<div class="datedWarning" role="status">${m}</div>`)}
+          ${te.warnings.map((m) => c`<div class="datedWarning" role="status">${m}</div>`)}
         </div>
       </ha-card>
     `;
   }
   render() {
-    if (!this.config) return d``;
+    if (!this.config) return c``;
     const t = this.config;
-    return d`
+    return c`
       ${this.renderCardLayout(t)}
-      ${this._uiPopupOpen ? d`
+      ${this._uiPopupOpen ? c`
         <div class="popupBackdrop" @click=${(e) => this.closeWeekPopup(e)}>
           <div class="popupShell">
             ${this.renderCardLayout(t, "week", !0)}
           </div>
         </div>
-      ` : d``}
+      ` : c``}
     `;
   }
 }, Ae.styles = ai`
@@ -2266,25 +2267,25 @@ W([
   ui({ attribute: !1 })
 ], U.prototype, "hass", 1);
 W([
-  G()
+  Q()
 ], U.prototype, "config", 1);
 W([
-  G()
+  Q()
 ], U.prototype, "_rowsCache", 1);
 W([
-  G()
+  Q()
 ], U.prototype, "_noData", 1);
 W([
-  G()
+  Q()
 ], U.prototype, "_noDataMsg", 1);
 W([
-  G()
+  Q()
 ], U.prototype, "_jsonRows", 1);
 W([
-  G()
+  Q()
 ], U.prototype, "_jsonStatus", 1);
 W([
-  G()
+  Q()
 ], U.prototype, "_jsonError", 1);
 let Ye = U;
 function z(t) {
@@ -2301,7 +2302,7 @@ function Ze(t, e, i) {
     })
   );
 }
-function ie(t, e = !1) {
+function q(t, e = !1) {
   if (typeof t == "boolean") return t;
   if (t == null) return e;
   const i = String(t).trim().toLowerCase();
@@ -2354,8 +2355,8 @@ const mt = class extends pe {
     if (!(!this._config || JSON.stringify(i) !== JSON.stringify(this._config) || !tt(n) || !r) && !(!s && this._config.source_type === "manual" && !this._open.dates)) {
       if (e.preventDefault(), e.stopPropagation(), this._open = { ...this._open, dates: !0 }, this._datedReadOnly = !1, s) {
         const o = /* @__PURE__ */ new Date(`${n}T12:00:00`), l = (this._config.dated_entries ?? []).findIndex((g) => {
-          const c = Qe({ dated_entries: [g] }).entries;
-          return ht(a, { time: r }, 0, o, c).notes.some((h) => h.text === s.text && (h.color || "") === (s.color || "") && (h.background || "") === (s.background || ""));
+          const d = Qe({ dated_entries: [g] }).entries;
+          return ht(a, { time: r }, 0, o, d).notes.some((h) => h.text === s.text && (h.color || "") === (s.color || "") && (h.background || "") === (s.background || ""));
         });
         if (l < 0) {
           this._datedReadOnly = !0, this.requestUpdate();
@@ -2493,14 +2494,14 @@ const mt = class extends pe {
       colors: ["Farben und Transparenz der Hervorhebungen.", "M12 3C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-12zM8 15a4 4 0 0 0 4 4"],
       appearance: ["Kartenflächen, Tabellenlinien und Transparenz.", "M3 4h18v16H3zM3 9h18M3 14h18M9 9v11"]
     }, [a, o] = s[i] ?? ["", "M4 4h16v16H4z"];
-    return d`
+    return c`
       <div class="section" data-section=${i}>
         <button type="button" class="sectionHead" aria-expanded=${String(r)} aria-controls=${`section-${i}`} @click=${() => this.toggleOpen(i)}>
           <svg class="sectionIcon" viewBox="0 0 24 24" aria-hidden="true"><path d=${o}></path></svg>
           <span class="sectionLabels"><span class="sectionTitle">${e}</span><span class="sectionDescription">${a}</span></span>
           <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d=${r ? "m6 15 6-6 6 6" : "m6 9 6 6 6-6"}></path></svg>
         </button>
-        ${r ? d`<div class="sectionBody" id=${`section-${i}`}>${n}</div>` : d``}
+        ${r ? c`<div class="sectionBody" id=${`section-${i}`}>${n}</div>` : c``}
       </div>
     `;
   }
@@ -2526,15 +2527,15 @@ const mt = class extends pe {
   renderFilterSettings() {
     if (!this._open.filters) return this.renderSection("Inhalte filtern", "filters", b);
     const e = this._config.hidden_subjects ?? [], i = this.getFilterSubjects();
-    return this.renderSection("Inhalte filtern", "filters", d`
+    return this.renderSection("Inhalte filtern", "filters", c`
       <div class="hint">Wähle die Fächer/Angebote aus, an denen dein Kind nicht teilnimmt. Nur diese Karte wird gefiltert; die Quelldaten bleiben unverändert.</div>
-      ${i.length ? d`<div class="subjectChoices" role="group" aria-label="Zum Ausblenden auswählen">
-        ${i.map((n) => d`<label class="subjectChoice">
+      ${i.length ? c`<div class="subjectChoices" role="group" aria-label="Zum Ausblenden auswählen">
+        ${i.map((n) => c`<label class="subjectChoice">
           <input type="checkbox" .checked=${e.some((r) => se(r) === se(n))}
             @change=${(r) => this.setValue("hidden_subjects", r.target.checked ? qe([...e, n]) : e.filter((s) => se(s) !== se(n)))}>
           <span>${n}</span>
         </label>`)}
-      </div>` : d`<div class="hint">Keine Fächer/Angebote in der aktuellen Quelle gefunden. Du kannst sie unten selbst ergänzen.</div>`}
+      </div>` : c`<div class="hint">Keine Fächer/Angebote in der aktuellen Quelle gefunden. Du kannst sie unten selbst ergänzen.</div>`}
       <form class="subjectAdd" @submit=${(n) => {
       n.preventDefault();
       const r = n.currentTarget.elements.namedItem("subject");
@@ -2544,7 +2545,7 @@ const mt = class extends pe {
         <button type="submit" class="spBtn">Hinzufügen</button>
       </form>
       <div class="hint">Verglichen wird der vollständige Fachname in der ersten Zeile, nicht Raum, Lehrkraft oder Hinweise. Groß-/Kleinschreibung spielt keine Rolle. Neue Namen werden nicht automatisch ausgewählt.</div>
-      ${e.length ? d`<div class="infoBox slim">${e.length} Fächer/Angebote ausgeblendet. Vollständig leere Endzeilen werden gekürzt. „Nach der letzten Stunde“ berücksichtigt nur die verbleibenden Einträge des jeweiligen Tages.</div>
+      ${e.length ? c`<div class="infoBox slim">${e.length} Fächer/Angebote ausgeblendet. Vollständig leere Endzeilen werden gekürzt. „Nach der letzten Stunde“ berücksichtigt nur die verbleibenden Einträge des jeweiligen Tages.</div>
         <button type="button" class="spBtn" @click=${() => this.setValue("hidden_subjects", [])}>Alle Einträge wieder anzeigen</button>` : b}
     `);
   }
@@ -2566,41 +2567,41 @@ const mt = class extends pe {
   renderDatedSettings(e = "note") {
     const i = e === "replace", n = i ? "replacements" : "dates", r = i ? "Fachabweichungen an bestimmten Tagen" : "Termine und Hinweise eintragen";
     if (!this._open[n]) return this.renderSection(r, n, b);
-    const s = this._config, a = s.dated_entries ?? [], o = a.map((g, c) => ({ raw: g, index: c })).filter(({ raw: g }) => g?.action === "replace" === i), l = o.filter(({ raw: g }) => !Wt(g, this._datedToday));
+    const s = this._config, a = s.dated_entries ?? [], o = a.map((g, d) => ({ raw: g, index: d })).filter(({ raw: g }) => g?.action === "replace" === i), l = o.filter(({ raw: g }) => !Wt(g, this._datedToday));
     !i && this._datedDraftEntry && l.push({ raw: this._datedDraftEntry, index: -1 }), i && this._datedReplacementDraft && l.push({ raw: this._datedReplacementDraft, index: -2 });
-    const u = o.filter(({ raw: g }) => Wt(g, this._datedToday)), f = (g) => Array.isArray(g) ? g.join(", ") : typeof g == "string" ? g : "", p = ({ raw: g, index: c }) => {
+    const u = o.filter(({ raw: g }) => Wt(g, this._datedToday)), f = (g) => Array.isArray(g) ? g.join(", ") : typeof g == "string" ? g : "", p = ({ raw: g, index: d }) => {
       const h = g && typeof g == "object" ? g : {}, y = Ge(g), v = oe(h), _ = ri(h, this._datedToday);
-      return d`<details class="datedEntry" data-entry-index=${c} .open=${this._datedOpen === c}>
-          <summary><span class="datedTitle">${i ? `${h.subject || "Fach"} → ${h.text || "Neuer Fachname"}` : _.title}</span><span class="datedMeta">${c < 0 ? "Entwurf · " : ""}${_.detail}</span>
-            <button type="button" class="datedRemove" aria-label=${c < 0 ? "Entwurf verwerfen" : "Eintrag entfernen"}
-              title=${c < 0 ? "Entwurf verwerfen" : `${_.title} entfernen`} @click=${(w) => {
-        if (w.preventDefault(), w.stopPropagation(), this._datedOpen = -1, c < 0) {
-          this[c === -1 ? "_datedDraftEntry" : "_datedReplacementDraft"] = null, this.requestUpdate();
+      return c`<details class="datedEntry" data-entry-index=${d} .open=${this._datedOpen === d}>
+          <summary><span class="datedTitle">${i ? `${h.subject || "Fach"} → ${h.text || "Neuer Fachname"}` : _.title}</span><span class="datedMeta">${d < 0 ? "Entwurf · " : ""}${_.detail}</span>
+            <button type="button" class="datedRemove" aria-label=${d < 0 ? "Entwurf verwerfen" : "Eintrag entfernen"}
+              title=${d < 0 ? "Entwurf verwerfen" : `${_.title} entfernen`} @click=${(w) => {
+        if (w.preventDefault(), w.stopPropagation(), this._datedOpen = -1, d < 0) {
+          this[d === -1 ? "_datedDraftEntry" : "_datedReplacementDraft"] = null, this.requestUpdate();
           return;
         }
-        this.setValue("dated_entries", a.filter((x, D) => D !== c));
+        this.setValue("dated_entries", a.filter((x, D) => D !== d));
       }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
           </summary>
           <div class="datedFields">
-            ${c < 0 ? d`<div class="hint">${i ? "Noch nicht übernommen. Erst mit ursprünglichem Fach, neuem Fachnamen und Datum wird daraus eine Abweichung." : "Noch nicht übernommen. Erst mit Text, Datum und Stunde wird daraus ein Termin. Weitere Fachklicks ändern nur diesen Entwurf."}</div>` : b}
+            ${d < 0 ? c`<div class="hint">${i ? "Noch nicht übernommen. Erst mit ursprünglichem Fach, neuem Fachnamen und Datum wird daraus eine Abweichung." : "Noch nicht übernommen. Erst mit Text, Datum und Stunde wird daraus ein Termin. Weitere Fachklicks ändern nur diesen Entwurf."}</div>` : b}
             <label class="subjectChoice"><input type="checkbox" .checked=${h.enabled !== !1}
-              @change=${(w) => this.updateDatedEntry(c, { enabled: w.target.checked })}><span>Aktiv</span></label>
-            ${i ? d`<label>Ursprüngliches Fach<input type="text" .value=${h.subject ?? ""} placeholder="z. B. Sport oder Mathe"
-              @change=${(w) => this.updateDatedEntry(c, { subject: w.target.value })}></label>` : v ? b : d`<details class="legacyAssignment"><summary>Bisherige Fachzuordnung: ${h.subject || "nicht angegeben"}</summary>
+              @change=${(w) => this.updateDatedEntry(d, { enabled: w.target.checked })}><span>Aktiv</span></label>
+            ${i ? c`<label>Ursprüngliches Fach<input type="text" .value=${h.subject ?? ""} placeholder="z. B. Sport oder Mathe"
+              @change=${(w) => this.updateDatedEntry(d, { subject: w.target.value })}></label>` : v ? b : c`<details class="legacyAssignment"><summary>Bisherige Fachzuordnung: ${h.subject || "nicht angegeben"}</summary>
               <div class="datedFields"><div class="hint">Dieser ältere Eintrag gilt weiterhin nur beim gewählten Fach. Für die Umstellung Unterrichtsstunden angeben; danach gilt er dort unabhängig vom Fachnamen.</div>
-              <label>Fach für bisherigen Eintrag<input type="text" .value=${h.subject ?? ""} @change=${(w) => this.updateDatedEntry(c, { subject: w.target.value })}></label>
+              <label>Fach für bisherigen Eintrag<input type="text" .value=${h.subject ?? ""} @change=${(w) => this.updateDatedEntry(d, { subject: w.target.value })}></label>
               <button type="button" class="spBtn" ?disabled=${!f(h.periods).trim()} @click=${() => {
         const w = { ...h, match: "period" };
         delete w.subject;
         const x = [...a];
-        x[c] = w, this.setValue("dated_entries", x);
+        x[d] = w, this.setValue("dated_entries", x);
       }}>Auf Datum und Stunde umstellen</button></div>
             </details>`}
             <label>${h.action === "replace" ? "Neuer Fachname" : "Termin / Hinweis"}<input type="text" data-note-text .value=${h.text ?? ""}
               placeholder=${h.action === "replace" ? "z. B. Schwimmen" : "z. B. Schulaufgabe"}
-              @change=${(w) => this.updateDatedEntry(c, { text: w.target.value })}></label>
+              @change=${(w) => this.updateDatedEntry(d, { text: w.target.value })}></label>
             <label>${v ? "Unterrichtsstunden" : "Stunden (optional)"}<input type="text" .value=${f(h.periods)} placeholder="z. B. 1, 2"
-              @change=${(w) => this.updateDatedEntry(c, { periods: w.target.value })}></label>
+              @change=${(w) => this.updateDatedEntry(d, { periods: w.target.value })}></label>
             <div class="hint">${v ? "Nummern der Unterrichtsstunden, z. B. 1 oder 1, 2. Der Termin gilt dort unabhängig vom Fachnamen." : "Leer lassen = alle Stunden des gewählten Fachs. Für einzelne Unterrichtsstunden z. B. 1, 2 eintragen."}</div>
             <div class="dateAdd"><label>Datum auswählen<input type="date" aria-label="Datum auswählen"></label>
               <button type="button" class="spBtn" @click=${(w) => {
@@ -2610,27 +2611,29 @@ const mt = class extends pe {
           return;
         }
         const D = f(h.dates ?? h.date).split(/[,;\n]/).map((O) => O.trim()).filter(Boolean);
-        this.updateDatedEntry(c, { dates: [.../* @__PURE__ */ new Set([...D, x.value])] });
+        this.updateDatedEntry(d, { dates: [.../* @__PURE__ */ new Set([...D, x.value])] });
       }}>Datum hinzufügen</button>
             </div>
             <label>Termine (JJJJ-MM-TT, mit Komma getrennt)<textarea rows="2" .value=${f(h.dates ?? h.date)}
-              @change=${(w) => this.updateDatedEntry(c, { dates: w.target.value })}></textarea></label>
-            ${h.action !== "replace" ? d`<details class="datedColors"><summary>Hinweisfarben (optional)</summary>
+              @change=${(w) => this.updateDatedEntry(d, { dates: w.target.value })}></textarea></label>
+            ${h.action !== "replace" ? c`<details class="datedColors"><summary>Hinweisfarben (optional)</summary>
               <div class="datedFields">
                 <div class="hint">Färbt nur den Hinweis, nicht die Fachzelle. Ohne Auswahl bleibt die bisherige Darstellung erhalten.</div>
-                ${this.renderColorPicker("Hinweis: Text", ae(h.color), (w) => this.updateDatedEntry(c, { color: ae(w) }), "#ffffff")}
-                ${this.renderColorPicker("Hinweis: Hintergrund", ae(h.background), (w) => this.updateDatedEntry(c, { background: ae(w) }), "#ffeb3b", 0.25)}
+                ${this.renderColorPicker("Hinweis: Text", ae(h.color), (w) => this.updateDatedEntry(d, { color: ae(w) }), "#ffffff")}
+                ${this.renderColorPicker("Hinweis: Hintergrund", ae(h.background), (w) => this.updateDatedEntry(d, { background: ae(w) }), "#ffeb3b", 0.25)}
               </div>
             </details>` : b}
-            ${y ? d`<div class="hint" role="status">${y} Dieser Eintrag wird noch nicht angewendet.</div>` : b}
+            ${y ? c`<div class="hint" role="status">${y} Dieser Eintrag wird noch nicht angewendet.</div>` : b}
           </div>
         </details>`;
     };
-    return this.renderSection(r, n, d`
+    return this.renderSection(r, n, c`
+      ${i ? b : c`${this.renderToggle("show_upcoming_notes", "Anstehende Termine unter der Tabelle anzeigen")}
+        <div class="hint">Standardmäßig aus. Hinweise in den Unterrichtsstunden bleiben sichtbar; gespeicherte Termine werden nicht gelöscht.</div>`}
       <div class="hint">${i ? "Gib das ursprüngliche Fach und den neuen Fachnamen ein, z. B. Schwimmen → Sport. Wähle die Tage, an denen die Änderung gelten soll. Die Quelldaten bleiben unverändert; kein automatischer Zweiwochenwechsel." : "Klicke auf „+ Termin hinzufügen“ oder auf ein Fach in der Vorschau, um einen Termin oder Hinweis anzulegen. Zukünftige Termine sind auch ohne geladenen Stundenplan über die Datumseingabe möglich. Vorhandene Hinweise kannst du zum Bearbeiten anklicken."}</div>
-      ${!i && this._datedReadOnly ? d`<div class="hint" role="status">Dieser Hinweis gehört zu keinem lokalen Termin. Hinweise aus einer Sensorquelle bitte dort bearbeiten.</div>` : b}
-      ${!i && s.source_type === "manual" ? d`<div class="hint">Solange dieser Bereich geöffnet ist, legt ein Vorschauklick einen Termin an. Zum Bearbeiten der Fächer diesen Bereich schließen.</div>` : b}
-      ${l.length ? b : d`<div class="infoBox slim">${i ? "Keine aktuellen oder zukünftigen Abweichungen." : "Keine aktuellen oder zukünftigen Hinweise."}</div>`}
+      ${!i && this._datedReadOnly ? c`<div class="hint" role="status">Dieser Hinweis gehört zu keinem lokalen Termin. Hinweise aus einer Sensorquelle bitte dort bearbeiten.</div>` : b}
+      ${!i && s.source_type === "manual" ? c`<div class="hint">Solange dieser Bereich geöffnet ist, legt ein Vorschauklick einen Termin an. Zum Bearbeiten der Fächer diesen Bereich schließen.</div>` : b}
+      ${l.length ? b : c`<div class="infoBox slim">${i ? "Keine aktuellen oder zukünftigen Abweichungen." : "Keine aktuellen oder zukünftigen Hinweise."}</div>`}
       ${l.map(p)}
       <button type="button" class="spBtn" @click=${async () => {
       if (!i) {
@@ -2641,13 +2644,13 @@ const mt = class extends pe {
       const g = this.shadowRoot.querySelector('[data-entry-index="-2"] input[type="text"]');
       g?.focus(), g?.scrollIntoView({ block: "nearest" });
     }}>${i ? "+ Abweichung hinzufügen" : "+ Termin hinzufügen"}</button>
-      ${u.length ? d`<details class="pastDatedEntries">
+      ${u.length ? c`<details class="pastDatedEntries">
         <summary>Vergangene Termine (${u.length})</summary>
         <div class="hint">Alle Termine dieser Einträge liegen vor heute. Sie bleiben bearbeitbar und im früheren Stundenplan sichtbar. Ein neuer zukünftiger Termin macht einen Eintrag wieder aktuell.</div>
         ${u.map(p)}
       </details>` : b}
-      ${i ? d`<div class="hint">Erkennbare Ausfall- und Vertretungshinweise werden nicht ersetzt. Bei widersprüchlichen Abweichungen bleibt das Original stehen.</div>` : b}
-      ${Qe(s, this.hass).warnings.map((g) => d`<div class="hint" role="status">${g}</div>`)}
+      ${i ? c`<div class="hint">Erkennbare Ausfall- und Vertretungshinweise werden nicht ersetzt. Bei widersprüchlichen Abweichungen bleibt das Original stehen.</div>` : b}
+      ${Qe(s, this.hass).warnings.map((g) => c`<div class="hint" role="status">${g}</div>`)}
     `);
   }
   onToggle(e, i) {
@@ -2743,9 +2746,9 @@ const mt = class extends pe {
     o[i] = { ...l, ...n }, r[e] = { ...a, cell_styles: o }, this.emitManualRows(r);
   }
   renderManualRows() {
-    if (!this._config) return d``;
+    if (!this._config) return c``;
     const e = this._config, i = e.days ?? ["Mo", "Di", "Mi", "Do", "Fr"], n = e.week_mode === "kw_parity", r = n && this._manualWeek === "B" ? "B" : "A", s = r === "B" && Array.isArray(e.rows_b) ? e.rows_b : Array.isArray(e.rows) ? e.rows : [];
-    return d`
+    return c`
       <div class="manualWeekBox">
         <div class="optRow">
           <div>
@@ -2761,10 +2764,10 @@ const mt = class extends pe {
           ></ha-switch>
         </div>
 
-        ${n ? d`
+        ${n ? c`
           <ha-form
             .hass=${this.hass}
-            .data=${{ week_a_is_even_kw: ie(e.week_a_is_even_kw, !0) }}
+            .data=${{ week_a_is_even_kw: q(e.week_a_is_even_kw, !0) }}
             .schema=${[{
       name: "week_a_is_even_kw",
       selector: {
@@ -2785,7 +2788,7 @@ const mt = class extends pe {
           ></ha-form>
 
           <div class="manualWeekTabs">
-            ${["A", "B"].map((a) => d`
+            ${["A", "B"].map((a) => c`
               <button
                 type="button"
                 class=${`spBtn ${r === a ? "spBtnActive" : ""}`}
@@ -2796,10 +2799,10 @@ const mt = class extends pe {
             `)}
           </div>
           <div class="hint">Aktuell bearbeitest du Woche ${r}. Die Karte zeigt automatisch den zur Kalenderwoche passenden Plan.</div>
-        ` : d``}
+        ` : c``}
       </div>
 
-      ${s.length ? d`<div class="rowsTop">
+      ${s.length ? c`<div class="rowsTop">
         <div class="rowsTitle">Stundenplan${n ? ` · Woche ${r}` : ""}</div>
 
         <div class="btnBar">
@@ -2821,7 +2824,7 @@ const mt = class extends pe {
       <div class="sub" style="margin-bottom:10px;">
         Pro Zeile: Zeit sowie optional Start und Ende. Ein Klick in der Vorschau öffnet direkt die passende Zelle.
       </div>
-      ` : d`<div class="manualEmpty">
+      ` : c`<div class="manualEmpty">
         <div class="rowsTitle">${n ? `Woche ${r}: Noch keine Einträge` : "Noch keine Stunden angelegt"}</div>
         <div class="hint">Lege zuerst eine Stunde an, um Zeiten und Fächer einzutragen. Die Eingabefelder öffnen sich automatisch.</div>
         <div class="btnBar">
@@ -2831,8 +2834,8 @@ const mt = class extends pe {
       </div>`}
 
       ${s.map((a, o) => {
-      const l = S(a), u = l ? `Pause · ${(a.time ?? "").toString()}` : `Stunde · ${(a.time ?? "").toString()}`, f = a, p = (f.start ?? "").toString(), g = (f.end ?? "").toString(), c = (a.label ?? "Pause").toString();
-      return d`
+      const l = S(a), u = l ? `Pause · ${(a.time ?? "").toString()}` : `Stunde · ${(a.time ?? "").toString()}`, f = a, p = (f.start ?? "").toString(), g = (f.end ?? "").toString(), d = (a.label ?? "Pause").toString();
+      return c`
           <details
             class="rowPanel"
             ?open=${this._rowOpen?.[o] ?? !1}
@@ -2846,7 +2849,7 @@ const mt = class extends pe {
             <summary>
               <div class="rowHead">
                 <div class="rowHeadTitle">${u || `Zeile ${o + 1}`}</div>
-                <div class="rowHeadMeta">${l ? c : `${p || "Start?"} – ${g || "Ende?"}`}</div>
+                <div class="rowHeadMeta">${l ? d : `${p || "Start?"} – ${g || "Ende?"}`}</div>
               </div>
             </summary>
 
@@ -2868,14 +2871,14 @@ const mt = class extends pe {
                 </div>
               </div>
 
-              ${l ? d`
+              ${l ? c`
                     <ha-input
                       label="Pausentext"
-                      .value=${c}
+                      .value=${d}
                       placeholder="z. B. Große Pause"
                       @input=${(h) => this.updateManualRow(o, { label: h?.target?.value ?? "" })}
                     ></ha-input>
-                  ` : d`
+                  ` : c`
                     <div class="grid2" style="margin-top:10px;">
                       <ha-input
                         label="Start (HH:MM)"
@@ -2892,7 +2895,7 @@ const mt = class extends pe {
                     <div class="cellsGrid">
                       ${i.map((h, y) => {
         const v = (f.cells?.[y] ?? "").toString(), _ = (Array.isArray(f.cell_styles) ? f.cell_styles?.[y] : void 0) ?? {}, w = typeof _?.bg_alpha == "number" && !Number.isNaN(_.bg_alpha) ? _.bg_alpha : 0.18;
-        return d`
+        return c`
                           <div class="cellEditor">
                             <div class="cellEditorHead">${h}</div>
 
@@ -2933,8 +2936,8 @@ const mt = class extends pe {
     return typeof customElements < "u" && !!customElements.get("ha-entity-picker");
   }
   renderToggle(e, i, n = !1) {
-    return d`<label class="toggleRow"><span>${i}</span><ha-switch
-      .checked=${ie(this._config[e], n)}
+    return c`<label class="toggleRow"><span>${i}</span><ha-switch
+      .checked=${q(this._config[e], n)}
       @change=${(r) => this.onToggle(r, e)}></ha-switch></label>`;
   }
   renderColorPicker(e, i, n, r = "#2196f3", s = 1) {
@@ -2953,10 +2956,10 @@ const mt = class extends pe {
       const p = $t(u);
       p && n(`rgba(${p.r}, ${p.g}, ${p.b}, ${Math.round(f * 100) / 100})`);
     };
-    return d`<fieldset class="colorPicker">
+    return c`<fieldset class="colorPicker">
       <legend>${e}</legend>
       <div class="palette">
-        ${o.map(([u, f]) => d`<button type="button" class="swatch"
+        ${o.map(([u, f]) => c`<button type="button" class="swatch"
           style=${`--swatch:${u}`} title=${f} aria-label=${`${e}: ${f}`}
           aria-pressed=${a.hex.toLowerCase() === u}
           @click=${() => l(u, a.alpha)}></button>`)}
@@ -2991,7 +2994,7 @@ const mt = class extends pe {
     }, n);
   }
   renderTypographyInput(e) {
-    return d`<ha-input
+    return c`<ha-input
       label=${e.label} type="number" min=${e.min} max=${e.max} step="1"
       placeholder="Standard" .value=${String(this._config[e.key] ?? "")}
       @change=${(i) => {
@@ -3010,7 +3013,7 @@ const mt = class extends pe {
     return this.renderSection(
       "Datenquellen",
       "sources",
-      d`
+      c`
             <div class="grid2">
               <ha-form
                 .hass=${this.hass}
@@ -3046,13 +3049,13 @@ const mt = class extends pe {
               ></ha-form>
             </div>
 
-            ${(e.source_type ?? "manual") === "entity" ? d`
+            ${(e.source_type ?? "manual") === "entity" ? c`
                   <div class="hint">Stundenplan Suite: Wochensensor für Stundenplan24 oder Schulmanager auswählen.</div>
 
-                  ${this.isHaEntityPickerAvailable() ? d`
+                  ${this.isHaEntityPickerAvailable() ? c`
                     ${(() => {
         const i = Object.keys(this.hass?.states ?? {}), n = i.filter((r) => /^sensor\./.test(r) && (/_woche$/i.test(r) || this.hass?.states?.[r]?.attributes?.rows_table != null));
-        return i.length < 5 || n.length === 0 ? d`<div class="hint">Keine <code>*_woche</code>-Sensoren gefunden – Integration noch nicht geladen?</div>` : d``;
+        return i.length < 5 || n.length === 0 ? c`<div class="hint">Keine <code>*_woche</code>-Sensoren gefunden – Integration noch nicht geladen?</div>` : c``;
       })()}
 
                     <ha-entity-picker
@@ -3073,20 +3076,20 @@ const mt = class extends pe {
         }
       }}
                     ></ha-entity-picker>
-                  ` : d``}
+                  ` : c``}
 
-                  ${this.isHaEntityPickerAvailable() ? b : d`<ha-input
+                  ${this.isHaEntityPickerAvailable() ? b : c`<ha-input
                     label="Stundenplan Suite Entity-ID"
                     .value=${e.source_entity_integration ?? e.source_entity ?? ""}
                     @input=${(i) => this.setSourceEntity(i?.detail?.value ?? i?.target?.value ?? i?.currentTarget?.value)} @change=${(i) => this.setSourceEntity(i?.detail?.value ?? i?.target?.value ?? i?.currentTarget?.value)} @value-changed=${(i) => this.setSourceEntity(i?.detail?.value ?? i?.target?.value ?? i?.currentTarget?.value)}
 placeholder="sensor.05b_woche"
                   ></ha-input>`}
-                ` : d``}
+                ` : c``}
 
-            ${(e.source_type ?? "manual") === "sensor" ? d`
+            ${(e.source_type ?? "manual") === "sensor" ? c`
                   <div class="hint">Beliebiger Sensor (JSON): beliebiger <code>sensor.*</code> (z.B. REST-Sensor). Attribut/Time-Key nach Datenformat.</div>
 
-                  ${this.isHaEntityPickerAvailable() ? d`
+                  ${this.isHaEntityPickerAvailable() ? c`
                     <ha-entity-picker
                       .hass=${this.hass}
                       .value=${e.source_entity ?? ""}
@@ -3105,9 +3108,9 @@ placeholder="sensor.05b_woche"
         }
       }}
                     ></ha-entity-picker>
-                  ` : d``}
+                  ` : c``}
 
-                  ${this.isHaEntityPickerAvailable() ? b : d`<ha-input
+                  ${this.isHaEntityPickerAvailable() ? b : c`<ha-input
                     label="Sensor Entity-ID (manuell)"
                     .value=${e.source_entity ?? ""}
                     @input=${(i) => this.setSourceEntity(i?.detail?.value ?? i?.target?.value ?? i?.currentTarget?.value)} @change=${(i) => this.setSourceEntity(i?.detail?.value ?? i?.target?.value ?? i?.currentTarget?.value)} @value-changed=${(i) => this.setSourceEntity(i?.detail?.value ?? i?.target?.value ?? i?.currentTarget?.value)}
@@ -3129,7 +3132,7 @@ placeholder="sensor.stundenplan"
                       .hass=${this.hass}
                       .data=${{
         week_mode: e.week_mode ?? "off",
-        week_a_is_even_kw: ie(e.week_a_is_even_kw, !0)
+        week_a_is_even_kw: q(e.week_a_is_even_kw, !0)
       }}
                       .schema=${[
         {
@@ -3164,21 +3167,21 @@ placeholder="sensor.stundenplan"
           const n = i?.detail?.value ?? {}, r = n.week_mode ?? e.week_mode ?? "off";
           r !== (e.week_mode ?? "off") && this.setValue("week_mode", r);
           const s = n.week_a_is_even_kw;
-          typeof s == "boolean" && s !== ie(e.week_a_is_even_kw, !0) && this.setValue("week_a_is_even_kw", s);
+          typeof s == "boolean" && s !== q(e.week_a_is_even_kw, !0) && this.setValue("week_a_is_even_kw", s);
         } catch (n) {
           console.error("stundenplan-card editor: week settings change failed", n);
         }
       }}
                     ></ha-form>
                   </div>
-` : d``}
+` : c``}
 
           `
     );
   }
   renderRollingSettings() {
     const e = this._config;
-    return this.renderSection("Ansicht & Rolling", "rolling", d`
+    return this.renderSection("Ansicht & Rolling", "rolling", c`
       <ha-form
         .hass=${this.hass}
         .data=${{ view_mode: e.view_mode ?? "week" }}
@@ -3191,10 +3194,10 @@ placeholder="sensor.stundenplan"
       i.stopPropagation(), this.setValue("view_mode", i.detail?.value?.view_mode ?? "week");
     }}
       ></ha-form>
-      ${(e.view_mode ?? "week") === "rolling" ? d`
+      ${(e.view_mode ?? "week") === "rolling" ? c`
       <div class="grid2">
         <div class="gridFull">${this.renderToggle("rolling_week_only", "Auf Kalenderwoche begrenzen")}</div>
-        ${e.rolling_week_only ? d`<div class="hint gridFull">Endet am Sonntag der Startwoche. Am Wochenende beginnt die Ansicht beim nächsten Schultag; auch „Nach der letzten Stunde“ bleibt wirksam.</div>` : b}
+        ${e.rolling_week_only ? c`<div class="hint gridFull">Endet am Sonntag der Startwoche. Am Wochenende beginnt die Ansicht beim nächsten Schultag; auch „Nach der letzten Stunde“ bleibt wirksam.</div>` : b}
         <ha-input
           label="Zusätzliche Tage im Voraus"
           type="number"
@@ -3227,28 +3230,28 @@ placeholder="sensor.stundenplan"
       }
     }}
         ></ha-form>
-        ${(e.rolling_switch_mode ?? "midnight") === "fixed_time" ? d`
+        ${(e.rolling_switch_mode ?? "midnight") === "fixed_time" ? c`
           <ha-input class="gridFull"
             label="Umschaltzeit (HH:MM)"
             .value=${e.rolling_switch_time ?? ""}
             @input=${(i) => this.onText(i, "rolling_switch_time")}
             hint="Beispiel: 15:00"
           ></ha-input>
-        ` : d`<div class="infoBox slim gridFull">${(e.rolling_switch_mode ?? "midnight") === "after_last_lesson" ? "Der Sprung auf den nächsten Schultag folgt nach der letzten Endzeit aus deinem Plan." : "Der Sprung auf den nächsten Schultag folgt direkt ab Mitternacht."}</div>`}
+        ` : c`<div class="infoBox slim gridFull">${(e.rolling_switch_mode ?? "midnight") === "after_last_lesson" ? "Der Sprung auf den nächsten Schultag folgt nach der letzten Endzeit aus deinem Plan." : "Der Sprung auf den nächsten Schultag folgt direkt ab Mitternacht."}</div>`}
       </div>
       <div class="hint">Ab dem Starttag werden die nächsten passenden Schultage angezeigt. Beim Blättern in andere Wochen beginnt die Ansicht am Montag.</div>
       ` : b}
     `);
   }
   render() {
-    if (!this._config) return d``;
+    if (!this._config) return c``;
     const e = this._config;
-    return d`
+    return c`
       <div class="wrap">
         ${this.renderSection(
       "Allgemein",
       "general",
-      d`
+      c`
 <div class="generalDivider first">Grunddaten</div>
             <div class="grid2">
               <ha-input label="Titel der Karte" .value=${e.title ?? ""} @input=${(i) => this.onText(i, "title")}></ha-input>
@@ -3304,7 +3307,7 @@ placeholder="sensor.stundenplan"
                   <div class="optTitle">Leere Endstunden ausblenden</div>
                   <div class="sub">Nur bis zur letzten belegten Stunde anzeigen.</div>
                 </div>
-                <ha-switch .checked=${ie(e.trim_empty_rows, !1)} @change=${(i) => this.onToggle(i, "trim_empty_rows")}></ha-switch>
+                <ha-switch .checked=${q(e.trim_empty_rows, !1)} @change=${(i) => this.onToggle(i, "trim_empty_rows")}></ha-switch>
               </div>
 
               <div class="optRow gridFull">
@@ -3312,7 +3315,7 @@ placeholder="sensor.stundenplan"
                   <div class="optTitle">Gleiche Folgestunden verbinden</div>
                   <div class="sub">Identische Fächer ohne Pausenzeile zusammenfassen.</div>
                 </div>
-                <ha-switch .checked=${ie(e.merge_double_lessons, !1)} @change=${(i) => this.onToggle(i, "merge_double_lessons")}></ha-switch>
+                <ha-switch .checked=${q(e.merge_double_lessons, !1)} @change=${(i) => this.onToggle(i, "merge_double_lessons")}></ha-switch>
               </div>
 
               <div class="optRow gridFull">
@@ -3320,7 +3323,7 @@ placeholder="sensor.stundenplan"
                   <div class="optTitle">Gleichmäßige Spaltenbreiten</div>
                   <div class="sub">Für mehrere gleich breite Karten untereinander.</div>
                 </div>
-                <ha-switch .checked=${ie(e.equal_column_widths, !1)} @change=${(i) => this.onToggle(i, "equal_column_widths")}></ha-switch>
+                <ha-switch .checked=${q(e.equal_column_widths, !1)} @change=${(i) => this.onToggle(i, "equal_column_widths")}></ha-switch>
               </div>
 
             </div>
@@ -3357,11 +3360,11 @@ placeholder="sensor.stundenplan"
       }}
               ></ha-form>
 
-              ${((e.tap_action?.action ?? "none") + "").toString() === "toggle_view" ? d`
+              ${((e.tap_action?.action ?? "none") + "").toString() === "toggle_view" ? c`
                 <div class="hint">Ein Tipp auf die Karte wechselt zwischen „Ganze Woche“ und „Ab heute (rolling)“.</div>
-              ` : ((e.tap_action?.action ?? "none") + "").toString() === "popup_week" ? d`
+              ` : ((e.tap_action?.action ?? "none") + "").toString() === "popup_week" ? c`
                 <div class="hint">Ein Tipp auf die Karte öffnet ein Popup mit der aktuellen ganzen Woche. Ein weiterer Tipp auf das Popup schließt es wieder.</div>
-              ` : d`<div class="hint">Für Wallpanels sind meist „Ansicht umschalten“ oder „Wochen-Popup“ die sinnvollsten Varianten.</div>`}
+              ` : c`<div class="hint">Für Wallpanels sind meist „Ansicht umschalten“ oder „Wochen-Popup“ die sinnvollsten Varianten.</div>`}
             </div>
           `
     )}
@@ -3373,9 +3376,9 @@ placeholder="sensor.stundenplan"
         ${this.renderDatedSettings()}
         ${this.renderDatedSettings("replace")}
 
-        ${this.renderSection("Schrift & Abstände", "typography", d`
+        ${this.renderSection("Schrift & Abstände", "typography", c`
           <div class="hint">Alle Größen in Pixeln. Leere Felder verwenden die bisherigen Vorgaben der normalen oder kompakten Ansicht.</div>
-          ${e.show_title !== !1 ? d`
+          ${e.show_title !== !1 ? c`
             <div class="generalDivider first">Kartentitel</div>
             <div class="grid2">
               <ha-input label="Titelgröße normal (px)" type="number" min="10" max="40" step="1"
@@ -3406,7 +3409,7 @@ placeholder="sensor.stundenplan"
         ${this.renderSection(
       "Highlights",
       "highlights",
-      d`
+      c`
             <div class="toggleGroup">
               ${this.renderToggle("highlight_today", "Heute-Spalte hervorheben", !0)}
               ${this.renderToggle("highlight_current", "Aktuelle Stunde hervorheben", !0)}
@@ -3421,7 +3424,7 @@ placeholder="sensor.stundenplan"
         ${this.renderSection(
       "Farben",
       "colors",
-      d`
+      c`
             <div class="stack">
               ${this.renderConfigColor("Heute-Spalte", "highlight_today_color", "#0096ff", 0.12)}
               ${this.renderConfigColor("Aktuelle Stunde / Pause", "highlight_current_color", "#4caf50", 0.18)}
@@ -3433,7 +3436,7 @@ placeholder="sensor.stundenplan"
         ${this.renderSection(
       "Hintergründe & Linien",
       "appearance",
-      d`
+      c`
         <div class="hint">Optional für transparente Dashboards. Zurücksetzen verwendet wieder Theme oder CSS-Vorgaben. Eigene Fachfarben und Highlights bleiben erhalten.</div>
         <div class="stack">
           ${kt.map((i) => this.renderAppearanceColor(i))}
@@ -3951,7 +3954,7 @@ mt.properties = {
   `;
 let bi = mt;
 W([
-  G()
+  Q()
 ], bi.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Ye);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", bi);
