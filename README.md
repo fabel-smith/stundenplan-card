@@ -32,6 +32,10 @@ Stundenplan Suite an und kann den aktuellen Unterricht hervorheben.
 > **Neu ab v3.9.0:** [Termine & Abweichungen](docs/DATED_ENTRIES.md)
 > ergänzt Klassenarbeiten, Erinnerungen und Fachwechsel an bestimmten Tagen.
 
+**Termine aus einem Kalender übernehmen:** Die [Kalenderanleitung mit YAML-Beispiel](docs/CALENDAR.md)
+zeigt, wie etwa `Mathearbeit [3,4]` automatisch am richtigen Tag in der Karte erscheint.
+Mit der Karte ab v3.9.0 nutzbar, ohne zusätzliches Karten-Update.
+
 -   Tabellenansicht (Tage × Stunden)
 -   Ganze Woche oder **Ab heute (rolling)**, optional auf die Kalenderwoche begrenzt
 -   Normale und kompakte Darstellung

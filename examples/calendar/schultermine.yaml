@@ -1,0 +1,70 @@
+# Home-Assistant-Package: /config/packages/schultermine.yaml
+# Kalender unten anpassen. Ganztagsereignisse mit Titel: Mathearbeit [3,4]
+template:
+  - triggers:
+      - trigger: homeassistant
+        event: start
+      - trigger: time_pattern
+        minutes: "/15"
+    variables:
+      schulkalender: calendar.schultermine
+    actions:
+      - variables:
+          kalenderdaten: {}
+      - action: calendar.get_events
+        target:
+          entity_id: "{{ schulkalender }}"
+        data:
+          start_date_time: "{{ today_at().isoformat() }}"
+          end_date_time: "{{ (today_at() + timedelta(days=60)).isoformat() }}"
+        response_variable: kalenderdaten
+        continue_on_error: true
+      - variables:
+          response_ok: >-
+            {{ kalenderdaten is mapping
+               and schulkalender in kalenderdaten
+               and kalenderdaten[schulkalender] is mapping
+               and kalenderdaten[schulkalender].get('events') is sequence
+               and kalenderdaten[schulkalender].get('events') is not string
+               and kalenderdaten[schulkalender].get('events') is not mapping }}
+      - variables:
+          import_result: >-
+            {% set ns = namespace(entries=[], ignored=0) %}
+            {% set events = kalenderdaten[schulkalender]['events'] if response_ok else [] %}
+            {% set pattern = '^[^\\r\\n]+[ \\t]*\\[[ \\t]*[1-9][0-9]?(?:[ \\t]*,[ \\t]*[1-9][0-9]?)*[ \\t]*\\]\\Z' %}
+            {% for event in events %}
+              {% set title = event.get('summary', '') if event is mapping else '' %}
+              {% set start = event.get('start', '') if event is mapping else '' %}
+              {% set end = event.get('end', '') if event is mapping else '' %}
+              {% set date_only = start is string and end is string
+                 and start | regex_match('^\\d{4}-\\d{2}-\\d{2}\\Z')
+                 and end | regex_match('^\\d{4}-\\d{2}-\\d{2}\\Z') %}
+              {% set start_dt = as_datetime(start, none) if date_only else none %}
+              {% set end_dt = as_datetime(end, none) if date_only else none %}
+              {% set text = title | regex_replace('\\s*\\[[^\\[\\]]*\\]$', '') | trim if title is string else '' %}
+              {% if title is string and title | regex_match(pattern) and text
+                    and start_dt is not none and end_dt is not none
+                    and end_dt - start_dt == timedelta(days=1)
+                    and today_at().date().isoformat() <= start
+                    and start < (today_at() + timedelta(days=60)).date().isoformat() %}
+                {% set hours = title | regex_replace('^.*\\[', '') | regex_replace('\\]$', '') %}
+                {% set periods = hours.split(',') | map('trim') | unique | list %}
+                {% set entry = dict(date=start, match='period', action='note', text=text, periods=periods) %}
+                {% if entry not in ns.entries %}
+                  {% set ns.entries = ns.entries + [entry] %}
+                {% endif %}
+              {% else %}
+                {% set ns.ignored = ns.ignored + 1 %}
+              {% endif %}
+            {% endfor %}
+            {{ dict(entries=ns.entries | sort(attribute='date'), ignored=ns.ignored) }}
+    sensor:
+      - name: Stundenplan Kalendertermine
+        unique_id: stundenplan_kalendertermine
+        icon: mdi:calendar-text
+        availability: "{{ response_ok }}"
+        state: "{{ import_result.entries | count }}"
+        attributes:
+          entries: "{{ import_result.entries }}"
+          ignorierte_termine: "{{ import_result.ignored }}"
+          kalender: "{{ schulkalender }}"

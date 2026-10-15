@@ -120,6 +120,10 @@ Regel zeigt unveraendert die Daten der Quelle, also beispielsweise `BSC`.
 
 ## Zusaetzliche Datenquelle
 
+Fuer einen Kalender gibt es eine [Schritt-fuer-Schritt-Anleitung mit fertigem YAML-Beispiel](CALENDAR.md).
+Sie wandelt etwa einen ganztaegigen Termin `Mathearbeit [3,4]` in Hinweise fuer die
+dritte und vierte Stunde um. Die bestehende Funktion ab v3.9.0 reicht dafuer aus.
+
 Die optionale Sensorquelle wird vorerst nicht im visuellen Editor angeboten.
 Bestehende YAML-Konfigurationen bleiben unterstuetzt und werden beim Bearbeiten
 im Editor beibehalten. Diese Quelle gilt
