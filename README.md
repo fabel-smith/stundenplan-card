@@ -1,7 +1,6 @@
 # Stundenplan Card (Home Assistant)
 
-[![HACS
-Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://hacs.xyz)
+[![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/default/pull/11272)
 ![Version](https://img.shields.io/github/v/release/fabel-smith/stundenplan-card)
 ![Maintenance](https://img.shields.io/maintenance/yes/2026)
 ![License](https://img.shields.io/github/license/fabel-smith/stundenplan-card)
@@ -105,15 +104,25 @@ kein YAML und keine JSON-Dateien notwendig.
 
 ### Installation über HACS (empfohlen)
 
-Die Karte ist derzeit als **benutzerdefiniertes Repository** verfügbar;
-eine Aufnahme in den HACS-Standardkatalog ist noch nicht erfolgt.
+Die Karte ist im **HACS-Standardkatalog** gelistet. Ein benutzerdefiniertes
+Repository muss nicht mehr hinzugefügt werden.
 
-1. HACS öffnen und im Drei-Punkte-Menü **Benutzerdefinierte Repositories** wählen.
-2. `https://github.com/fabel-smith/stundenplan-card` eintragen und als Typ **Dashboard** auswählen.
-3. **Stundenplan Card** in HACS suchen und herunterladen.
-4. Home Assistant im Browser neu laden (bei Bedarf den Browser-Cache aktualisieren).
+1. HACS öffnen und nach **Stundenplan Card** suchen.
+2. Den Eintrag von **fabel-smith** öffnen und herunterladen.
+3. Home Assistant im Browser neu laden (bei Bedarf den Browser-Cache aktualisieren).
+4. Im Dashboard **Karte hinzufügen** wählen und nach **Stundenplan** suchen.
 
 Die Lovelace-Resource wird in der Regel automatisch hinzugefügt.
+Bereits über HACS installierte Karten müssen nicht neu installiert werden.
+
+> **HACS / künftig Home Assistant Marketplace:**\
+> Ab Home Assistant 2026.11 soll HACS als **Marketplace** direkt enthalten sein.
+> Marketplace verwendet denselben Katalog; die Aufnahme der Karte bleibt gültig.
+> Siehe [offizielle Ankündigung](https://github.com/hacs/integration/issues/5590).
+
+Falls der Eintrag unmittelbar nach der Aufnahme noch nicht erscheint, kann
+die Verteilung des HACS-Katalogs bis zu acht Stunden dauern. Prüfe auch, ob
+aktive Suchfilter den Eintrag ausblenden.
 
 ### Manuelle Prüfung der Resource (nur falls nötig)
 
@@ -126,6 +135,19 @@ URL:
 Typ:
 
     JavaScript-Modul
+
+### Manuelle Installation (ohne HACS)
+
+1. In den [Releases](https://github.com/fabel-smith/stundenplan-card/releases)
+   die gewünschte Version öffnen. Die Datei `dist/stundenplan-card.js` aus
+   dem Quellcode-Archiv dieser Version verwenden, nicht aus einem Teststand.
+2. Die Datei als `/config/www/stundenplan-card.js` in Home Assistant ablegen.
+3. Unter **Einstellungen → Dashboards → Ressourcen** die URL
+   `/local/stundenplan-card.js` als **JavaScript-Modul** hinzufügen.
+4. Den Browser neu laden und die Karte zum Dashboard hinzufügen.
+
+Nicht gleichzeitig eine manuelle und eine HACS-Resource derselben Karte laden.
+Bei manueller Installation müssen spätere Updates ebenfalls manuell erfolgen.
 
 > **Hinweis (Browser-Cache):**\
 > Nach einem Update der Card kann es notwendig sein den Browser-Cache zu
@@ -550,7 +572,8 @@ Fachfarben und Highlights wie bisher.
 
 **v3.5.1** ergänzt die MIT-Lizenz, Lizenzhinweise für eingebundenen Lit-Code und
 die automatische HACS-Validierung. Die HACS-Installationsanleitung wurde berichtigt.
-Funktionen und Darstellung bleiben unverändert; die Aufnahme in den Standardkatalog steht noch aus.
+Funktionen und Darstellung bleiben unverändert. Die damals noch ausstehende
+Aufnahme in den HACS-Standardkatalog ist seit dem 20. Oktober 2026 erfolgt.
 
 **v3.5.0** ergänzt den Bereich **Schrift & Abstände** mit optionalen Schriftgrößen,
 Mindesthöhe für Stundenzeilen und CSS-Variablen. Titelgröße und Titel-Schriftfamilie
