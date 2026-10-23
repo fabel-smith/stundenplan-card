@@ -1,4 +1,7 @@
 import { collectEntries, applyDatedEntries, validateEntry, isPastEntry, dateKey, validDate, periodKey, isPeriodNote, entrySummary, pendingNotes } from "./dated-entries.js";
+import { CalendarSource } from "./calendar-entries.js";
+import { normalizeSubjectColors, subjectColorStyle } from "./subject-colors.js";
+import { parseTimeRange, timeLabelParts } from "./time-label.js";
 // Bundled Lit runtime: see THIRD_PARTY_NOTICES for its BSD-3-Clause license.
 const Q = globalThis, $t = Q.ShadowRoot && (Q.ShadyCSS === void 0 || Q.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, vt = /* @__PURE__ */ Symbol(), Dt = /* @__PURE__ */ new WeakMap();
 let Ft = class {
@@ -608,8 +611,7 @@ function Lt(r, t) {
   return e;
 }
 function mt(r) {
-  const e = (r ?? "").toString().match(/(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})/);
-  return e ? { start: e[1], end: e[2] } : {};
+  return parseTimeRange(r);
 }
 function normalizeCellTime(r) {
   if (r == null) return null;
@@ -800,6 +802,15 @@ const v = (D = class extends U {
   getGridOptions() {
     return { columns: "full" };
   }
+  syncCalendar() {
+    this._calendar ??= new CalendarSource(() => this.requestUpdate());
+    if (this.isConnected) void this._calendar.update(this.hass, this.config?.calendar_entity ?? "");
+  }
+  collectDatedEntries(config) {
+    const result = collectEntries({ ...config, dated_entries: [...(config.dated_entries ?? []), ...(this._calendar?.entries ?? [])] }, this.hass);
+    result.warnings.push(...(this._calendar?.warnings ?? []));
+    return result;
+  }
   get hass() {
     return k(this, X);
   }
@@ -946,14 +957,18 @@ const v = (D = class extends U {
     c = Math.max(l, c), c = Math.min(a, c), await this.hass.callService("number", "set_value", { entity_id: s, value: c });
   }
   connectedCallback() {
+    this.syncCalendar();
     super.connectedCallback(), this._tick = window.setInterval(() => {
+      this.syncCalendar();
       this.requestUpdate();
     }, 3e4);
   }
   disconnectedCallback() {
+    this._calendar?.reset();
     super.disconnectedCallback(), this._tick && window.clearInterval(this._tick), this._tick = void 0;
   }
   updated(t) {
+    this.syncCalendar();
     if (super.updated(t), t.has("config")) {
       this.recomputeRows(), this._lastWatchSig = null;
       return;
@@ -978,6 +993,7 @@ const v = (D = class extends U {
       show_week_navigation: !0,
       trim_empty_rows: !1,
       hidden_subjects: [],
+      subject_colors: [],
       merge_double_lessons: !1,
       equal_column_widths: !1,
       days: ["Mo", "Di", "Mi", "Do", "Fr"],
@@ -1082,9 +1098,11 @@ const v = (D = class extends U {
       show_week_navigation: t.show_week_navigation ?? e.show_week_navigation,
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
       hidden_subjects: normalizeHiddenSubjects(t.hidden_subjects),
+      subject_colors: normalizeSubjectColors(t.subject_colors),
       dated_entries: Array.isArray(t.dated_entries) ? t.dated_entries : [],
       show_upcoming_notes: E(t.show_upcoming_notes, !1),
       dated_entries_entity: typeof t.dated_entries_entity === "string" ? t.dated_entries_entity.trim() : "",
+      calendar_entity: typeof t.calendar_entity === "string" ? t.calendar_entity.trim() : "",
       dated_entries_attribute: typeof t.dated_entries_attribute === "string" ? t.dated_entries_attribute.trim() || "entries" : "entries",
       merge_double_lessons: t.merge_double_lessons ?? e.merge_double_lessons,
       equal_column_widths: t.equal_column_widths ?? e.equal_column_widths,
@@ -1332,7 +1350,7 @@ const v = (D = class extends U {
   getLastLessonEnd(config = this.config, date = new Date()) {
     const t = this._rowsCache ?? [];
     if (config?.hidden_subjects?.length) {
-      const entries = collectEntries(config, this.hass).entries;
+      const entries = this.collectDatedEntries(config).entries;
       const day = this.findConfiguredDayIndexForDate(date, config.days);
       if (day < 0) return "";
       let latest = "";
@@ -1668,7 +1686,7 @@ const v = (D = class extends U {
     const p = s.slice(1).filter((u) => o(u));
     return { fach: n, raum: _, lehrer: h, notes: p.length ? p : void 0 };
   }
-  renderCell(t, e) {
+  renderCell(t, e, cellOverride = false, currentColor = "") {
     const raw = (t ?? "").toString();
     const filtered0 = this.filterCellText(raw, e);
     if (yt(filtered0)) return d``;
@@ -1781,8 +1799,12 @@ const v = (D = class extends U {
       return d`<span class="cellText">${v}</span>`;
     };
 
+    const renderColoredBlock = (part) => {
+      const style = cellOverride ? "" : subjectColorStyle(part, e.subject_colors);
+      return style ? d`<div class="subjectColorBlock" style=${style + (currentColor ? `color:${currentColor};` : "")}>${renderOne(part)}</div>` : renderOne(part);
+    };
     if (partsByBlank.length > 1) {
-      return d`<div class="cellMulti">${partsByBlank.map((p) => renderOne(p))}</div>`;
+      return d`<div class="cellMulti">${partsByBlank.map(renderColoredBlock)}</div>`;
     }
 
     // Heuristik: 6/9/12… Zeilen ohne Notes => als 2+ Spalten rendern (typisch: Fach/Raum/Lehrer je Block)
@@ -1831,7 +1853,7 @@ const v = (D = class extends U {
         idxs = rollingSlots.length ? rollingSlots.map((y) => y.orig) : Array.from({ length: t.days?.length ?? 0 }, (y, m) => m),
         daysVis = idxs.map((y) => t.days[y]),
         rollingDates = rollingSlots.length ? rollingSlots.map((y) => y.date) : null,
-        dated = collectEntries(t, this.hass),
+        dated = this.collectDatedEntries(t),
         dateForColumn = (visibleIndex) => {
           if (rollingDates) return rollingDates[visibleIndex];
           const day = Oe(t.days[idxs[visibleIndex]]);
@@ -1924,20 +1946,19 @@ const v = (D = class extends U {
         let I = `--sp-hl:${o};`, G = "";
         return F && (I += "box-shadow: inset 0 0 0 9999px var(--sp-hl);", G += `--sp-hl:${o}; box-shadow: inset 0 0 0 9999px var(--sp-hl);`), F && t.highlight_current_time_text && a && (I += `color:${a};`), d`
                     <tr class="break">
-                      ${showTimeColumn ? d`<td class="time" style=${I}>${y.time}</td>` : d``}
+                      ${showTimeColumn ? d`<td class="time" style=${I}>${Object.values(timeLabelParts(y.time)).filter(Boolean).join(" ")}</td>` : d``}
                       <td colspan=${daysVis.length} style=${G} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, -1, focusDate)}>${y.label ?? ""}</td>
                     </tr>
                   `;
       }
       const m = y, W = m.cells ?? [], b = m.cell_styles ?? [], focusedRow = this.getManualRowForDate(t, m, rowIndex, focusDate), cellTime = (focusedRow?.cell_times ?? m.cell_times)?.[focusDayIndex] ?? null, displayTime = cellTime?.time || focusedRow?.time || m.time, displayStart = cellTime?.start || focusedRow?.start || m.start, displayEnd = cellTime?.end || focusedRow?.end || m.end, w = focusIsToday && !!displayStart && !!displayEnd && this.isNowBetween(displayStart, displayEnd), x = s >= 0 ? W[s] ?? "" : "", te = dated.entries.length ? this.getDatedCell(t, focusedRow ?? m, focusDayIndex, dateForColumn(focusVisibleIndex), dated.entries).text : s >= 0 ? this.filterCellText(x, t) : "", ee = s >= 0 ? yt(te) : !1, pt = !(!!t.free_only_column_highlight && ee), __rng = mt(displayTime),
-      __timeHasRange = !!(__rng.start && __rng.end),
-      Et = (!__timeHasRange && displayStart && displayEnd) ? `${displayStart}–${displayEnd}` : "";
+      timeParts = timeLabelParts(displayTime, displayStart, displayEnd), Et = timeParts.range;
       let gt = `--sp-hl:${o};`;
       return pt && t.highlight_current && w && (gt += "box-shadow: inset 0 0 0 9999px var(--sp-hl);"), pt && w && t.highlight_current_time_text && a && (gt += `color:${a};`), d`
                   <tr>
                     ${showTimeColumn ? d`<td class="time" style=${gt}>
                       <div class="timeWrap">
-                        <div class="timeSt">${displayTime}</div>
+                        <div class="timeSt">${timeParts.label}</div>
                         ${Et ? d`<div class="timeHm">${Et}</div>` : d``}
                       </div>
                     </td>` : d``}
@@ -1951,7 +1972,8 @@ const v = (D = class extends U {
           return { text: cell.text, notes: cell.notes, style: (resolved?.cell_styles ?? candidate?.cell_styles ?? [])[orig] ?? null };
         }) : { covered: !1, span: 1 };
         if (merge.covered) return f;
-        let Ct = `--sp-hl:${n};` + Te(I, i);
+        const subjectStyle = /\n\s*\n/.test(F) ? "" : subjectColorStyle(F, t.subject_colors);
+        let Ct = `--sp-hl:${n};` + subjectStyle + Te(I, i);
         const se = !yt(F), mergedCurrent = (() => {
           if (!isToday || !focusIsToday || orig !== focusDayIndex || merge.span <= 1) return !1;
           const firstTime = (rowForDay?.cell_times ?? m.cell_times)?.[orig] ?? null;
@@ -1959,7 +1981,8 @@ const v = (D = class extends U {
           const start = firstTime?.start || rowForDay?.start || m.start, end = lastTime?.end || lastRow?.end || lastBase?.end;
           return !!start && !!end && this.isNowBetween(start, end);
         })(), cellCurrent = isToday && (w || mergedCurrent);
-        return pt && se && cellCurrent && t.highlight_current_text && l && s >= 0 && orig === s && (Ct += `color:${l};`), d`<td class=${G} style=${Ct} rowspan=${merge.span} @mouseenter=${event => this.updatePreviewTooltip(t, event)} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, orig, dateForColumn(P), merge.span)}>${this.renderCell(F, t)}${datedCell.notes.map(note => d`<div class="datedNote" style=${datedNoteStyle(note)}
+        const currentColor = pt && se && cellCurrent && t.highlight_current_text && l && s >= 0 && orig === s ? l : "";
+        return currentColor && (Ct += `color:${currentColor};`), d`<td class=${G} style=${Ct} rowspan=${merge.span} @mouseenter=${event => this.updatePreviewTooltip(t, event)} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, orig, dateForColumn(P), merge.span)}>${this.renderCell(F, t, !!I, currentColor)}${datedCell.notes.map(note => d`<div class="datedNote" style=${datedNoteStyle(note)}
           title=${cardEditDialog(this) ? "Hinweis bearbeiten" : f}
           role=${cardEditDialog(this) ? "button" : f} tabindex=${cardEditDialog(this) ? "0" : f}
           @click=${event => this.handlePreviewNote(t, event, rowForDay ?? m, orig, dateForColumn(P), note)}
@@ -1971,7 +1994,6 @@ const v = (D = class extends U {
             </tbody>
           </table>
           ${upcoming.length ? d`<div class="upcomingNotes"><strong>Anstehende Termine</strong>
-            <div class="datedWarning">Termine außerhalb der angezeigten Stunden. Noch nicht geladener Unterricht wird dadurch nicht bestätigt.</div>
             ${upcoming.map(note => d`<div class="datedNote" style=${datedNoteStyle(note)}
               title=${cardEditDialog(this) ? "Hinweis bearbeiten" : f}
               role=${cardEditDialog(this) ? "button" : f} tabindex=${cardEditDialog(this) ? "0" : f}
@@ -2152,14 +2174,20 @@ const v = (D = class extends U {
 
     .time {
       font-weight: 700;
-      white-space: nowrap;
+      white-space: normal;
       width: 125px;
     }
     .timeWrap {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       gap: 2px;
       justify-items: center;
       line-height: 1.1;
+    }
+    .timeSt, .timeHm {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
     }
     .timeSt {
       font-size: var(--stundenplan-font-size-time, 13px);
@@ -2201,6 +2229,8 @@ const v = (D = class extends U {
       flex: 1 1 0;
       min-width: 0;
     }
+    .subjectColorBlock { flex: 1 1 0; min-width: 0; padding: 4px; border-radius: 4px; }
+    td.today .subjectColorBlock { box-shadow: inset 0 0 0 9999px var(--sp-hl); }
     .fach {
       font-weight: 800;
       font-size: var(--stundenplan-font-size-subject, 14px);
@@ -2824,12 +2854,24 @@ const ut = class ut extends U {
         </details>`;
     };
     return this.renderSection(title, section, d`
+      ${!replacement ? d`<div class="datedFields">
+        ${this.isHaEntityPickerAvailable() ? d`<ha-entity-picker
+          .hass=${this.hass} .value=${config.calendar_entity ?? ""} .includeDomains=${["calendar"]}
+          .label=${"Kalender für Termine (optional)"} .allowCustomEntity=${false}
+          @value-changed=${event => { event.stopPropagation(); this.setValue("calendar_entity", event.detail?.value ?? ""); }}
+        ></ha-entity-picker>` : d`<label>Kalender für Termine (optional)<select aria-label="Kalender für Termine (optional)"
+          .value=${config.calendar_entity ?? ""} @change=${event => this.setValue("calendar_entity", event.target.value)}>
+          <option value="">Kein Kalender</option>
+          ${Object.keys(this.hass?.states ?? {}).filter(id => id.startsWith("calendar.")).sort().map(id => d`<option value=${id} ?selected=${config.calendar_entity === id}>${this.hass.states[id].attributes?.friendly_name ?? id}</option>`)}
+        </select></label>`}
+        <div class="hint">Ganztägige Einzeltermine im Kalender anlegen, z. B. „Mathearbeit [3,4]“ für die 3. und 4. Stunde. Die nächsten 60 Tage werden alle 5 Minuten geladen, auch ohne vorliegenden Stundenplan. Kein zusätzlicher Sensor nötig. Termine bitte im Kalender bearbeiten.</div>
+      </div>` : f}
       ${!replacement ? d`${this.renderToggle("show_upcoming_notes", "Anstehende Termine unter der Tabelle anzeigen")}
         <div class="hint">Standardmäßig aus. Hinweise in den Unterrichtsstunden bleiben sichtbar; gespeicherte Termine werden nicht gelöscht.</div>` : f}
       <div class="hint">${replacement ? "Gib das ursprüngliche Fach und den neuen Fachnamen ein, z. B. Schwimmen → Sport. Wähle die Tage, an denen die Änderung gelten soll. Die Quelldaten bleiben unverändert; kein automatischer Zweiwochenwechsel." : "Klicke auf „+ Termin hinzufügen“ oder auf ein Fach in der Vorschau, um einen Termin oder Hinweis anzulegen. Zukünftige Termine sind auch ohne geladenen Stundenplan über die Datumseingabe möglich. Vorhandene Hinweise kannst du zum Bearbeiten anklicken."}</div>
-      ${!replacement && this._datedReadOnly ? d`<div class="hint" role="status">Dieser Hinweis gehört zu keinem lokalen Termin. Hinweise aus einer Sensorquelle bitte dort bearbeiten.</div>` : f}
+      ${!replacement && this._datedReadOnly ? d`<div class="hint" role="status">Dieser Hinweis gehört zu keinem lokalen Termin. Hinweise aus einem Kalender oder einer Sensorquelle bitte dort bearbeiten.</div>` : f}
       ${!replacement && config.source_type === "manual" ? d`<div class="hint">Solange dieser Bereich geöffnet ist, legt ein Vorschauklick einen Termin an. Zum Bearbeiten der Fächer diesen Bereich schließen.</div>` : f}
-      ${!currentEntries.length ? d`<div class="infoBox slim">${replacement ? "Keine aktuellen oder zukünftigen Abweichungen." : "Keine aktuellen oder zukünftigen Hinweise."}</div>` : f}
+      ${!currentEntries.length ? d`<div class="infoBox slim">${replacement ? "Keine aktuellen oder zukünftigen Abweichungen." : config.calendar_entity || config.dated_entries_entity ? "Keine aktuellen oder zukünftigen manuell eingetragenen Hinweise." : "Keine aktuellen oder zukünftigen Hinweise."}</div>` : f}
       ${currentEntries.map(renderEntry)}
       <button type="button" class="spBtn" @click=${async () => {
         if (!replacement) { await this.addDatedNote(); return; }
@@ -3224,6 +3266,30 @@ const ut = class ut extends U {
     return this.renderColorPicker(label, this._config[key], value => {
       this.setValue(key, value || Xt.getStubConfig()[key]);
     }, fallback, alpha);
+  }
+  updateSubjectColor(index, patch) {
+    const rules = [...this._config.subject_colors];
+    rules[index] = { ...rules[index], ...patch };
+    this.setValue("subject_colors", normalizeSubjectColors(rules));
+  }
+  renderSubjectColors() {
+    const rules = this._config.subject_colors ?? [];
+    return d`<details class="subjectColors">
+      <summary>Farben pro Fach</summary>
+      <div class="hint">Wähle ein Fach oder trage sein Kürzel wie im Stundenplan ein. Die Farben gelten für alle Datenquellen und bleiben beim Wochenwechsel erhalten. Eigene Zellfarben und Highlights haben Vorrang.</div>
+      <datalist id="subject-color-options">${this.getFilterSubjects().map(subject => d`<option value=${subject}></option>`)}</datalist>
+      <div class="stack">
+        ${rules.map((rule, index) => d`<details class="subjectColorRule" open>
+          <summary>${rule.subject || "Neues Fach"}</summary>
+          <label>Fach / Kürzel<input class="subjectColorName" list="subject-color-options" aria-label="Fach für Farbe" placeholder="z. B. M oder Mathe" .value=${rule.subject}
+            @change=${event => this.updateSubjectColor(index, { subject: event.target.value })}></label>
+          ${this.renderColorPicker("Hintergrund", rule.background, value => this.updateSubjectColor(index, { background: value }), "#03a9f4", 0.25)}
+          ${this.renderColorPicker("Text", rule.color, value => this.updateSubjectColor(index, { color: value }), "#ffffff")}
+          <button type="button" class="spBtn" @click=${() => this.setValue("subject_colors", rules.filter((_, i) => i !== index))}>Fachfarbe entfernen</button>
+        </details>`)}
+        <button type="button" class="spBtn" @click=${() => this.setValue("subject_colors", [...rules, { subject: "", background: "", color: "" }])}>+ Fachfarbe hinzufügen</button>
+      </div>
+    </details>`;
   }
   renderAppearanceColor(field) {
     const theme = getComputedStyle(this).getPropertyValue(field.theme).trim();
@@ -3690,6 +3756,7 @@ placeholder="sensor.stundenplan"
       "Farben",
       "colors",
       d`
+            ${this.renderSubjectColors()}
             <div class="stack">
               ${this.renderConfigColor("Heute-Spalte", "highlight_today_color", "#0096ff", 0.12)}
               ${this.renderConfigColor("Aktuelle Stunde / Pause", "highlight_current_color", "#4caf50", 0.18)}
@@ -4084,6 +4151,12 @@ ut.properties = {
       gap: 8px;
     }
     .cellStyles--hidden { display: none !important; }
+    .subjectColors { margin-bottom: 16px; }
+    .subjectColors summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+    .subjectColorRule { min-width: 0; padding: 10px; border: 1px solid var(--divider-color); border-radius: 10px; }
+    .subjectColorRule > label { display: block; margin-bottom: 12px; }
+    .subjectColorName { display: block; width: 100%; min-width: 0; margin-top: 5px; padding: 10px; color: inherit; background: var(--secondary-background-color); border: 1px solid var(--divider-color); border-radius: 6px; font: inherit; }
+    .subjectColorRule .colorPicker { margin-bottom: 10px; }
     .colorPicker { min-width: 0; margin: 0; padding: 10px; border: 1px solid var(--divider-color); border-radius: 10px; }
     .colorPicker legend { padding: 0 5px; font-size: 13px; font-weight: 600; }
     .palette { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
@@ -4223,14 +4296,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.9.0";
+window.__STUNDENPLAN_CARD_VERSION = "v3.10.0";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.9.0 (marker: STUNDENPLAN_CARD_v3.9.0)",
+  description: "Stundenplan Card v3.10.0 (marker: STUNDENPLAN_CARD_v3.10.0)",
   preview: !0
 });
 export {

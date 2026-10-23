@@ -110,6 +110,7 @@ assert.equal(filterHiddenSubjects('---\nVertretung fuer LZ_GS', hidden), '---\nV
 assert.equal(filterHiddenSubjects('M\n\nE', []), 'M\n\nE');
 const lastEnd = method('getLastLessonEnd', 'shouldAdvanceRollingDay', {ct:isBreak,yt:isEmpty,collectEntries});
 const endContext = {
+  collectDatedEntries: method('collectDatedEntries', 'get hass', {collectEntries}),
   _rowsCache:[{end:'12:25',cells:['M','M']},{end:'13:15',cells:['Ess/Spi GT','evR']},
     {end:'15:45',cells:['AG GS 1','LZ_GS']}],
   findConfiguredDayIndexForDate:date=>date.getDay()===5?1:0,

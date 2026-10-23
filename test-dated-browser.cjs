@@ -195,6 +195,8 @@ module.exports = async function testDatedEntries(browser, url) {
       assert(slots.hiddenByDefault&&slots.hiddenWhenOff&&slots.entriesUnchanged,source);
       assert(slots.cellWhenOff.includes('Arbeit ohne Fach'),source);
       assert(slots.pending.includes('Zukünftige Arbeit')&&slots.pending.includes('23.10.2026'),source);
+      assert(slots.pending.includes('Anstehende Termine'),source);
+      assert(!slots.pending.includes('Noch nicht geladener Unterricht'),source);
       assert(!slots.pending.includes('Vergangene Arbeit'),source);
       assert(slots.rolling.includes('Zukünftige Arbeit'),source);
       assert(!slots.pendingRolling.includes('Zukünftige Arbeit'),source);

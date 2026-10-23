@@ -23,7 +23,7 @@ const noteColor = value => typeof value === 'string' && !/[;{}]/.test(value) ? v
 const list = value => Array.isArray(value) ? value : typeof value === 'string' ? value.split(/[,;\n]/).map(x => x.trim()).filter(Boolean) : [];
 export const periodKey = value => {
   const text = key(value);
-  const numberedTime = text.match(/^(\d+)\.\s*\d{1,2}:\d{2}\s*[-\u2013\u2014]\s*\d{1,2}:\d{2}$/);
+  const numberedTime = text.match(/^(\d+)\.\s*\d{1,2}:\d{2}(?::\d{2})?\s*[-\u2013\u2014]\s*\d{1,2}:\d{2}(?::\d{2})?$/);
   return numberedTime ? numberedTime[1] : text.replace(/\.$/, '');
 };
 

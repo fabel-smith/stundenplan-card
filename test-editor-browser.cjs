@@ -35,7 +35,8 @@ customElements.define('ha-card',HaCard);
  const previousBundle=execFileSync('git',['show',baselineRef+':dist/stundenplan-card.js'],{cwd:__dirname,maxBuffer:1024*1024});
  const server=http.createServer((req,res)=>{
    res.setHeader('Content-Type',req.url.endsWith('.js')?'text/javascript':'text/html');
-   res.end(req.url==='/bundle.js'?fs.readFileSync(path.join(__dirname,'dist/stundenplan-card.js')):
+   res.end(req.url==='/calendar-test.js'?fs.readFileSync(path.join(__dirname,'dist-calendar-test/stundenplan-card-calendar-test.js')):
+     req.url==='/bundle.js'?fs.readFileSync(path.join(__dirname,'dist/stundenplan-card.js')):
      req.url==='/old.js'?previousBundle:req.url==='/old.html'?html.replace('/bundle.js','/old.js'):html);
  });
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -243,6 +244,9 @@ customElements.define('ha-card',HaCard);
   assert.equal(await page.evaluate(()=>editor._config.source_type),'sensor');
   assert.equal(await page.getByText('Manueller Stundenplan',{exact:true}).count(),0);
   await require('./test-dated-browser.cjs')(browser,'http://127.0.0.1:'+server.address().port);
+  await require('./test-calendar-browser.cjs')(browser,'http://127.0.0.1:'+server.address().port);
+  await require('./test-subject-colors-browser.cjs')(browser,'http://127.0.0.1:'+server.address().port);
+  await require('./test-time-label-browser.cjs')(browser,'http://127.0.0.1:'+server.address().port);
   assert.deepEqual(errors,[]);
   const oldPage=await browser.newPage();
   const newPage=await browser.newPage();

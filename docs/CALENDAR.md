@@ -1,5 +1,10 @@
 # Schulkalender mit der Stundenplan Card verbinden
 
+**Ab v3.10.0 einfacher:** Den Kalender direkt im Karteneditor auswaehlen.
+Die [Anleitung zur direkten Kalenderauswahl](CALENDAR_DIRECT_TEST.md) kommt ohne
+Template-Sensor aus. Das folgende YAML-Beispiel bleibt fuer v3.9.0 und fuer
+individuelle Aufbereitungen nutzbar. Bitte nicht beide Wege fuer dieselben Termine verwenden.
+
 Dieses Beispiel uebernimmt Klassenarbeiten und Erinnerungen aus einem Kalender in Home Assistant in die **Stundenplan Card ab v3.9.0**. Die Karte liest den Kalender nicht direkt: Ein kleiner Template-Sensor bereitet die Termine fuer ihre zusaetzliche Terminquelle auf.
 
 ## Beispiel herunterladen

@@ -87,6 +87,28 @@ customElements.define('ha-switch',Switch);customElements.define('ha-card',HaCard
    await Promise.all([week.updateComplete,editor.updateComplete,preview.updateComplete]);
   });
   const output=path.join(__dirname,'docs/screenshots');fs.mkdirSync(output,{recursive:true});
+  if (process.argv.includes('--release-3.10.0')) {
+    await page.evaluate(async () => {
+      const {base,rows,editor,preview}=docFixture;
+      const config={...base,source_type:'sensor',source_entity:'sensor.beispiel',source_attribute:'rows_table',
+        view_mode:'week',show_week_navigation:false,highlight_today:false,highlight_current:false,
+        subject_colors:[{subject:'M',background:'rgba(3,169,244,0.3)',color:'#ffffff'},
+          {subject:'D',background:'rgba(76,175,80,0.25)'},{subject:'E',background:'rgba(255,193,7,0.25)'}]};
+      const hass={states:{'sensor.beispiel':{state:'ok',attributes:{rows_table:rows.map(r=>r.break?r:
+        {time:`${r.time} ${r.start}:00 - ${r.end}:00`,cells:r.cells})}}}};
+      editor.hass=hass;preview.hass=hass;editor.setConfig(config);preview.setConfig(config);
+      editor._open={colors:true};await editor.updateComplete;await preview.updateComplete;
+      editor.shadowRoot.querySelector('.subjectColors').open=true;
+      editor.shadowRoot.querySelectorAll('.subjectColorRule').forEach((el,i)=>el.open=i===0);
+      document.querySelector('#capture').style.display='none';document.querySelector('#editor-view').style.display='block';
+      const pane=document.querySelector('#editor');pane.style.height='760px';pane.style.overflow='auto';
+      pane.scrollTop=editor.shadowRoot.querySelector('.subjectColors').getBoundingClientRect().top-pane.getBoundingClientRect().top;
+    });
+    await page.locator('#editor-view').screenshot({path:path.join(output,'release-3.10.0.png')});
+    if(errors.length) throw new Error(errors.join('\n'));
+    console.log('Generated v3.10.0 screenshot with fictional data only.');
+    return;
+  }
   await page.locator('#capture').screenshot({path:path.join(output,'week.png')});
   await page.evaluate(() => {document.querySelector('#capture').style.display='none';document.querySelector('#editor-view').style.display='block';});
   await page.locator('#editor-view').screenshot({path:path.join(output,'editor.png')});
