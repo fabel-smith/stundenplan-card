@@ -23,14 +23,19 @@ const parseTime = value => {
   return match ? {start: match[1], end: match[2]} : {};
 };
 const normalizeCellTime = standalone('normalizeCellTime', 'wt', {mt: parseTime});
+const normalizeSubjectChanges = standalone('normalizeSubjectChanges', 'filterHiddenSubjects');
 const build = method('buildRowsFromArray', 'getRowsFromEntity', {
-  mt: parseTime, De: x => x, normalizeCellTime,
+  mt: parseTime, De: x => x, normalizeCellTime, normalizeSubjectChanges,
 });
 const read = method('getRowsFromEntity', 'async loadJsonRows');
 const config = {days:['Mo','Di','Mi','Do','Fr'],source_time_key:'time'};
 const row = {time:'1.',start:'07:45',end:'08:30',cells:['D','M','SU','Veranstaltung','Entfällt: D']};
 const table = {time:'1.',start:'07:45',end:'08:30',...Object.fromEntries(config.days.map((d,i)=>[d,row.cells[i]]))};
 assert.deepEqual(build(config,[row]), build(config,[table]));
+const comparison = {Fr:[{current:'E',original:'M'}]};
+assert.deepEqual(build(config,[{...table,subject_changes:comparison}])[0].subject_changes,comparison);
+assert.deepEqual(normalizeSubjectChanges({Fr:[null,{current:1,original:'M'},{current:'E',original:''}]}),{});
+assert.deepEqual(normalizeSubjectChanges({unknown:[{current:'E',original:'M'}]}),{});
 const obj = {buildRowsFromArray:build,readEntityJson:(_,attr)=>attr==='rows_table'?[table]:null};
 assert.deepEqual(read.call(obj,config,'sensor.child_woche','rows_table'),build(config,[row]));
 const fallback = {buildRowsFromArray:build,readEntityJson:(_,attr)=>attr==='rows'?[row]:null};

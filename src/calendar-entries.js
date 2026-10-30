@@ -1,4 +1,12 @@
-import { dateKey, validDate } from './dated-entries.js';
+import { dateKey, validDate, periodKey } from './dated-entries.js';
+
+function calendarPeriods(value) {
+  const parts = value.split(',').map(part => part.trim());
+  // Keep the numeric protocol strict; named rows must start with a letter.
+  if (!parts.every(part => /^[1-9][0-9]?$/.test(part) ||
+      /^[\p{L}][\p{L}\p{M}\p{N} _./&()+-]{0,63}$/u.test(part))) return null;
+  return [...new Set(parts.map(periodKey))].sort((a, b) => a.localeCompare(b, 'de', { numeric: true }));
+}
 
 export function calendarRange(now = new Date()) {
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -14,15 +22,16 @@ export function calendarEntries(events, range) {
   for (const event of events) {
     const start = event?.start?.date, end = event?.end?.date;
     const title = typeof event?.summary === 'string' ? event.summary.trim() : '';
-    const match = /^([^\r\n]+?)\s*\[\s*([1-9][0-9]?(?:[ \t]*,[ \t]*[1-9][0-9]?)*)[ \t]*\]$/.exec(title);
+    const match = /^([^\r\n]+?)[ \t]*\[([^\[\]\r\n]+)\]$/.exec(title);
+    const periods = match ? calendarPeriods(match[2]) : null;
     if (!validDate(start) || !validDate(end) || event.start.dateTime || event.end.dateTime ||
-        Date.parse(end) - Date.parse(start) !== 86400000 || !match || !match[1].trim()) {
+        Date.parse(end) - Date.parse(start) !== 86400000 || !match || !periods || !match[1].trim()) {
       ignored++;
       continue;
     }
     if (start < range.first || start >= range.last) continue;
     const entry = { date: start, match: 'period', action: 'note', text: match[1].trim(),
-      periods: [...new Set(match[2].split(',').map(period => period.trim()))].sort((a, b) => Number(a) - Number(b)) };
+      periods };
     entries.set(JSON.stringify(entry), entry);
   }
   return { entries: [...entries.values()].sort((a, b) => a.date.localeCompare(b.date)), ignored };
@@ -30,8 +39,14 @@ export function calendarEntries(events, range) {
 
 // Each card owns its requests. A late response must never overwrite another calendar.
 export class CalendarSource {
-  constructor(changed) {
+  constructor(changed, options = {}) {
     this.changed = changed;
+    this.parse = options.parse ?? calendarEntries;
+    this.messages = options.messages ?? {
+      unavailable: 'Kalender nicht verfügbar; Kalendertermine werden nicht angezeigt.',
+      failed: 'Kalender konnte nicht geladen werden. Erneuter Versuch in einer Minute; manuelle Termine bleiben erhalten.',
+      ignored: count => `${count} Kalendertermine ohne unterstützte Tages-/Stundenangabe übersprungen.`
+    };
     this.entries = [];
     this.warnings = [];
     this.generation = 0;
@@ -47,8 +62,8 @@ export class CalendarSource {
     this.entries = [];
     this.warnings = [];
   }
-  async update(hass, entity, now = new Date()) {
-    const range = calendarRange(now), key = entity ? `${entity}|${range.first}` : '';
+  async update(hass, entity, now = new Date(), range = calendarRange(now)) {
+    const key = entity ? `${entity}|${range.first}|${range.last}` : '';
     if (key !== this.key) {
       this.reset(); this.key = key; this.changed();
     }
@@ -59,7 +74,7 @@ export class CalendarSource {
     if (!available) {
       if (!this.unavailable) {
         this.reset(); this.key = key; this.unavailable = true;
-        this.warnings = ['Kalender nicht verfügbar; Kalendertermine werden nicht angezeigt.'];
+        this.warnings = [this.messages.unavailable];
         this.changed();
       }
       return;
@@ -76,14 +91,14 @@ export class CalendarSource {
         new Promise((_, reject) => { timeout = setTimeout(() => reject(new Error('Calendar timeout')), 20000); })
       ]);
       if (generation !== this.generation) return;
-      const result = calendarEntries(events, range);
+      const result = this.parse(events, range);
       this.entries = result.entries;
-      this.warnings = result.ignored ? [`${result.ignored} Kalendertermine ohne unterstützte Tages-/Stundenangabe übersprungen.`] : [];
+      this.warnings = result.ignored ? [this.messages.ignored(result.ignored)] : [];
       this.next = now.getTime() + 5 * 60000;
     } catch {
       if (generation !== this.generation) return;
       this.entries = [];
-      this.warnings = ['Kalender konnte nicht geladen werden. Erneuter Versuch in einer Minute; manuelle Termine bleiben erhalten.'];
+      this.warnings = [this.messages.failed];
       this.next = now.getTime() + 60000;
     } finally {
       clearTimeout(timeout);

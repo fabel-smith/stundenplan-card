@@ -28,6 +28,13 @@ Stundenplan Suite an und kann den aktuellen Unterricht hervorheben.
 
 ## ✨ Features
 
+> **Vorabversion v3.11.0-beta.1 (nur zum freiwilligen Testen):**
+> [Ferienkalender](docs/HOLIDAYS.md), geteilte Anzeige bei
+> Fachwechseln und eine Übersicht der bereits durch die Suite ausgeblendeten Kurse.
+> Fachwechsel und Kursübersicht benötigen **Suite v0.4.0b1** mit der neuen
+> Schulmanager-Anbindung. [Details](RELEASE_NOTES_3.11.0-beta.1.md) ·
+> [Kurze Testanleitung](docs/PRERELEASE_TEST.md).
+
 > **Neu ab v3.10.0:** [Farben pro Fach](docs/SUBJECT_COLORS.md), auch mit externen
 > Datenquellen, und [direkte Kalenderauswahl](docs/CALENDAR_DIRECT_TEST.md) im Editor.
 > Zeitangaben mit Sekunden aus Schulmanager werden kompakt unter der Stundennummer angezeigt.

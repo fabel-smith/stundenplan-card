@@ -19,6 +19,21 @@ erforderlich. Ohne Auswahl bleibt das bisherige Verhalten erhalten.
 
 ## Aktualisierung und Grenzen
 
+### Benannte Zeilen ab v3.11.0
+
+Neben Zahlen sind benannte Zeilen moeglich: `Pasta [Essen]`, `Erinnerung [MP]`
+oder `Treffpunkt [Lernzeit A]`. Gemeint ist die Bezeichnung in der linken
+Stundenspalte, nicht das Fach in einer Tageszelle. Die Zeile muss bereits im
+Stundenplan angelegt sein; der Kalendereintrag erzeugt keine neue Zeile.
+Gross-/Kleinschreibung und mehrfach vorhandene Leerzeichen spielen keine Rolle.
+Mehrere Zeilen werden mit Kommas getrennt, z. B. `[5,Essen]`.
+Benannte Zeilen beginnen mit einem Buchstaben. Zahlen bleiben auf 1 bis 99
+begrenzt; Bereiche wie `[3-4]` sind weiterhin keine gueltige Stundenangabe.
+Diese Erweiterung betrifft die direkte Kalenderauswahl, nicht das alte
+Template-Sensor-Beispiel. Mit v3.10.0 sind nur nummerierte Stunden moeglich.
+
+## Abruf
+
 Die Karte liest beim Laden und danach alle fuenf Minuten die kommenden 60 Tage
 ab heute. Zum sofortigen Einlesen kann die Dashboard-Seite neu geladen werden.
 Auch Termine ohne bereits geladenen Stundenplan werden beruecksichtigt. Der

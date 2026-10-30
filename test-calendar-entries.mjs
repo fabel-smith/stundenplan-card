@@ -11,6 +11,18 @@ const parsed = calendarEntries([event(), event(' Mathearbeit [4, 3,3] '), event(
 assert.equal(parsed.entries.length, 2);
 assert.deepEqual(parsed.entries[0].periods, ['3', '4']);
 assert.equal(parsed.ignored, 0);
+const named = calendarEntries([event('Pasta [Essen]'), event('Pasta [ essen , ESSEN ]'),
+  event('Treffpunkt [Lernzeit A]'), event('Erinnerung [5,MP]'), event('Buch [Förderung]')], range);
+assert.equal(named.ignored, 0);
+assert.equal(named.entries.length, 4, 'Equivalent named rows are deduplicated');
+const namedEntries = collectEntries({ dated_entries: named.entries }).entries;
+assert.deepEqual(applyDatedEntries('', { time: 'Essen' }, 0, now, namedEntries).notes.map(n => n.text), ['Pasta']);
+assert.equal(applyDatedEntries('Essen', { time: '6.' }, 0, now, namedEntries).notes.length, 0, 'Match row label, never subject');
+assert.equal(applyDatedEntries('', { time: ' LERNZEIT   A ' }, 0, now, namedEntries).notes[0].text, 'Treffpunkt');
+assert.equal(applyDatedEntries('', { time: 'Förderung' }, 0, now, namedEntries).notes[0].text, 'Buch');
+assert.equal(applyDatedEntries('', { time: 'MP', break: true }, 0, now, namedEntries).notes.length, 0);
+assert.equal(calendarEntries(['x [3-4]', 'x [03]', 'x [Essen,]', 'x [,MP]', 'x [Essen;MP]',
+  'x [[Essen]]', 'x [Essen\nMP]', 'x [Essen\u0000]', `x [${'A'.repeat(65)}]`].map(title => event(title)), range).ignored, 9);
 assert.equal(calendarEntries([null, {}, event('No period'), event('x [0]'), event('x [1.5]'),
   event('x [1]\nbad'), event('x [100]'), event('x [1]', '2026-02-30'), event('x [1]', '2026-10-15', '2026-10-17'),
   { summary: 'x [1]', start: { dateTime: '2026-10-15T09:00:00+02:00' }, end: { dateTime: '2026-10-15T10:00:00+02:00' } }

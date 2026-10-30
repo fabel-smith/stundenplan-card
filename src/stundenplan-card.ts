@@ -1,7 +1,9 @@
 import { collectEntries, applyDatedEntries, validateEntry, isPastEntry, dateKey, validDate, periodKey, isPeriodNote, entrySummary, pendingNotes } from "./dated-entries.js";
 import { CalendarSource } from "./calendar-entries.js";
+import { HolidaySource, holidayTitles, normalizeHolidayTitles, holidaysOnDate, holidayPeriod } from "./holiday-calendar.js";
 import { normalizeSubjectColors, subjectColorStyle } from "./subject-colors.js";
 import { parseTimeRange, timeLabelParts } from "./time-label.js";
+import { suiteFilterInfo } from "./suite-filters.js";
 // Bundled Lit runtime: see THIRD_PARTY_NOTICES for its BSD-3-Clause license.
 const Q = globalThis, $t = Q.ShadowRoot && (Q.ShadyCSS === void 0 || Q.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, vt = /* @__PURE__ */ Symbol(), Dt = /* @__PURE__ */ new WeakMap();
 let Ft = class {
@@ -569,6 +571,7 @@ function normalizeRowsForDays(r, t) {
       end: p || h.end || void 0,
       cells: i
     };
+    u.subject_changes = normalizeSubjectChanges(e?.subject_changes);
     return o.some((c) => !!c) && (u.cell_styles = o), a.some((c) => !!c) && (u.cell_times = a), u;
   });
 }
@@ -680,6 +683,17 @@ function normalizeHiddenSubjects(value) {
 function cellSubject(block) {
   return block.trim().split(/\r?\n/, 1)[0].trim();
 }
+function normalizeSubjectChanges(value) {
+  const result = {};
+  for (const day of ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]) {
+    if (!Array.isArray(value?.[day])) continue;
+    const entries = value[day].filter(entry => typeof entry?.current === "string" &&
+      typeof entry?.original === "string" && entry.current.trim() && entry.original.trim())
+      .map(entry => ({ current: entry.current, original: entry.original }));
+    if (entries.length) result[day] = entries;
+  }
+  return result;
+}
 function filterHiddenSubjects(text, subjects) {
   if (!subjects?.length) return text;
   const hidden = new Set(subjects.map(subjectKey));
@@ -732,7 +746,7 @@ function mergedCellInfo(r, t, e) {
     const info = e(rows[index], index) ?? {};
     const text = mergedCellTextKey(info.text);
     if (yt(text)) return null;
-    return JSON.stringify([text, mergedCellStyleKey(info.style), info.notes ?? []]);
+    return JSON.stringify([text, mergedCellStyleKey(info.style), info.notes ?? [], info.subjectChanges ?? []]);
   };
   const current = signature(t);
   if (!current) return { covered: !1, span: 1 };
@@ -805,6 +819,28 @@ const v = (D = class extends U {
   syncCalendar() {
     this._calendar ??= new CalendarSource(() => this.requestUpdate());
     if (this.isConnected) void this._calendar.update(this.hass, this.config?.calendar_entity ?? "");
+    this._holidays ??= new HolidaySource(() => this.requestUpdate());
+    if (this.isConnected && this.config) void this._holidays.update(this.hass,
+      this.config.holiday_calendar_entity ?? "", this.getHolidayDates(this.config), this.config.holiday_extra_titles);
+  }
+  getColumnDates(config, rollingDates = null) {
+    if (rollingDates?.length) return rollingDates;
+    const header = this.getHeaderDaysFromEntity(config);
+    const dates = header && header.length >= (config.days?.length ?? 0) ? header : null;
+    const monday = this.mondayOfWeek(this.getBaseDate(config));
+    return (config.days ?? []).map(label => {
+      const weekday = Oe(label);
+      if (!weekday) return null;
+      if (dates) return dates.find(date => (date.getDay() || 7) === weekday) ?? null;
+      const date = new Date(monday); date.setDate(date.getDate() + weekday - 1); return date;
+    });
+  }
+  getHolidayDates(config) {
+    const type = config.source_type ?? "manual";
+    const hasPager = !!config.week_offset_entity && (type === "entity" || (type === "sensor" && config.week_mode !== "off"));
+    const rolling = (this._uiViewMode ?? config.view_mode) === "rolling" && (!hasPager || (this.getWeekOffsetValue(config) ?? 0) === 0);
+    const dates = this.getColumnDates(config, rolling ? this.getRollingVisibleSlots(config, config.days_ahead ?? 0).map(slot => slot.date) : null);
+    return this._uiPopupOpen ? [...dates, ...this.getColumnDates(config)] : dates;
   }
   collectDatedEntries(config) {
     const result = collectEntries({ ...config, dated_entries: [...(config.dated_entries ?? []), ...(this._calendar?.entries ?? [])] }, this.hass);
@@ -965,6 +1001,7 @@ const v = (D = class extends U {
   }
   disconnectedCallback() {
     this._calendar?.reset();
+    this._holidays?.reset();
     super.disconnectedCallback(), this._tick && window.clearInterval(this._tick), this._tick = void 0;
   }
   updated(t) {
@@ -1103,6 +1140,8 @@ const v = (D = class extends U {
       show_upcoming_notes: E(t.show_upcoming_notes, !1),
       dated_entries_entity: typeof t.dated_entries_entity === "string" ? t.dated_entries_entity.trim() : "",
       calendar_entity: typeof t.calendar_entity === "string" ? t.calendar_entity.trim() : "",
+      holiday_calendar_entity: typeof t.holiday_calendar_entity === "string" ? t.holiday_calendar_entity.trim() : "",
+      holiday_extra_titles: normalizeHolidayTitles(t.holiday_extra_titles),
       dated_entries_attribute: typeof t.dated_entries_attribute === "string" ? t.dated_entries_attribute.trim() || "entries" : "entries",
       merge_double_lessons: t.merge_double_lessons ?? e.merge_double_lessons,
       equal_column_widths: t.equal_column_widths ?? e.equal_column_widths,
@@ -1226,6 +1265,7 @@ const v = (D = class extends U {
         const O = (s[g] ?? "").toString();
         return (o?.[O] ?? "").toString();
       }), _ = Array.isArray(o?.cell_styles) ? Array.from({ length: s.length }, (u, g) => De(o?.cell_styles?.[g])) : [], h = Array.isArray(o?.cell_times) ? Array.from({ length: s.length }, (u, g) => normalizeCellTime(o.cell_times[g])) : [], f = (o?.start ?? "").toString().trim() || a.start, p = (o?.end ?? "").toString().trim() || a.end, x = { time: l, start: f || void 0, end: p || void 0, cells: c };
+      x.subject_changes = normalizeSubjectChanges(o?.subject_changes);
       return _.some((u) => !!u) && (x.cell_styles = _), h.some((u) => !!u) && (x.cell_times = h), x;
     });
     return n.length ? n : null;
@@ -1686,7 +1726,7 @@ const v = (D = class extends U {
     const p = s.slice(1).filter((u) => o(u));
     return { fach: n, raum: _, lehrer: h, notes: p.length ? p : void 0 };
   }
-  renderCell(t, e, cellOverride = false, currentColor = "") {
+  renderCell(t, e, cellOverride = false, currentColor = "", subjectChanges = []) {
     const raw = (t ?? "").toString();
     const filtered0 = this.filterCellText(raw, e);
     if (yt(filtered0)) return d``;
@@ -1748,13 +1788,16 @@ const v = (D = class extends U {
 
     // Multi-Block (z.B. geteilte Gruppen nebeneinander): entweder durch Leerzeile getrennt
     // oder als 3er-Gruppen (Fach / Raum / Lehrer) hintereinander.
-    const renderOne = (val: string) => {
+    const renderDetails = (val: string) => {
       const v = (val ?? "").toString().trim();
       if (!v) return d``;
 
       // Erst normal versuchen (Fach + Lehrer + Raum + Notes)
       const p = this.parseCellTriplet(v);
       if (p?.fach && p?.raum && p?.lehrer) {
+        // Keep extra rooms, teachers and plain notes instead of discarding them.
+        p.notes = v.split("\n").slice(1).map(line => line.trim()).filter(line =>
+          line && line !== p.raum && line !== p.lehrer);
         return d`
           <div class="cellWrap">
             <div class="fach">${p.fach}</div>
@@ -1799,12 +1842,25 @@ const v = (D = class extends U {
       return d`<span class="cellText">${v}</span>`;
     };
 
+    const renderOne = (part) => {
+      const matches = subjectChanges.filter(change =>
+        mergedCellTextKey(change.current) === mergedCellTextKey(part));
+      if (matches.length !== 1) return renderDetails(part);
+      return d`<div class="subjectChange" role="group" aria-label="Fachwechsel">
+        <div class="subjectChangeOriginal"><div class="subjectChangeLabel">Bisher</div>${renderDetails(matches[0].original)}</div>
+        <div><div class="subjectChangeLabel">Jetzt</div>${renderDetails(part)}</div>
+      </div>`;
+    };
     const renderColoredBlock = (part) => {
       const style = cellOverride ? "" : subjectColorStyle(part, e.subject_colors);
       return style ? d`<div class="subjectColorBlock" style=${style + (currentColor ? `color:${currentColor};` : "")}>${renderOne(part)}</div>` : renderOne(part);
     };
     if (partsByBlank.length > 1) {
       return d`<div class="cellMulti">${partsByBlank.map(renderColoredBlock)}</div>`;
+    }
+    // Explicit source metadata takes precedence over the legacy line-count heuristic.
+    if (subjectChanges.some(change => mergedCellTextKey(change.current) === mergedCellTextKey(filtered))) {
+      return renderOne(filtered);
     }
 
     // Heuristik: 6/9/12… Zeilen ohne Notes => als 2+ Spalten rendern (typisch: Fach/Raum/Lehrer je Block)
@@ -1854,13 +1910,11 @@ const v = (D = class extends U {
         daysVis = idxs.map((y) => t.days[y]),
         rollingDates = rollingSlots.length ? rollingSlots.map((y) => y.date) : null,
         dated = this.collectDatedEntries(t),
-        dateForColumn = (visibleIndex) => {
-          if (rollingDates) return rollingDates[visibleIndex];
-          const day = Oe(t.days[idxs[visibleIndex]]);
-          if (!day) return null;
-          if (g) return g.find(date => (date.getDay() || 7) === day) ?? null;
-          const date = new Date(B); date.setDate(date.getDate() + day - 1); return date;
-        },
+        columnDates = this.getColumnDates(t, rollingDates),
+        dateForColumn = (visibleIndex) => columnDates[visibleIndex] ?? null,
+        holidays = t.holiday_calendar_entity ? this._holidays?.entries ?? [] : [],
+        columnHolidays = columnDates.map(date => holidaysOnDate(holidays, date)),
+        visibleHolidays = [...new Set(columnHolidays.flat())],
         focusVisibleIndex = rollingSlots.length ? 0 : Math.max(0, idxs.indexOf(s)),
         focusDayIndex = idxs[focusVisibleIndex] ?? 0,
         focusDate = rollingDates?.[focusVisibleIndex] ?? null,
@@ -1910,6 +1964,9 @@ const v = (D = class extends U {
         </div>` : d``}
 
         <div class="card">
+          ${visibleHolidays.length ? d`<div class="holidayBanner" role="note" aria-label="Ferien im angezeigten Zeitraum">
+            ${visibleHolidays.map(holiday => d`<div><strong>${holiday.title}</strong><span>${holidayPeriod(holiday)}</span></div>`)}
+          </div>` : f}
           <table class=${t.equal_column_widths ? "equalColumns" : ""}>
             <thead>
               <tr>
@@ -1932,6 +1989,7 @@ const v = (D = class extends U {
                     <th class=${W} style=${`--sp-hl:${n};`}>
                       <div>${y}</div>
                       ${t.show_header_date !== !1 ? d`<div class="thDate">${b}</div>` : d``}
+                      ${columnHolidays[m]?.length ? d`<div class="holidayDay" title=${columnHolidays[m].map(holiday => holiday.title).join(", ")}>Ferien</div>` : f}
                       ${rollingDates?.[m] ? (updMap.get(this.fmtYMD(rollingDates[m])) ? d`<div class="thUpdated">(aktualisiert: ${updMap.get(this.fmtYMD(rollingDates[m]))})</div>` : d``) : (upd?.[orig] ? d`<div class="thUpdated">(aktualisiert: ${upd[orig]})</div>` : d``)}
                     </th>
                   `;
@@ -1969,7 +2027,8 @@ const v = (D = class extends U {
         const datedCell = this.getDatedCell(t, rowForDay ?? m, orig, dateForColumn(P), dated.entries), F = datedCell.text, I = rowStyles[orig] ?? null, G = t.highlight_today && isToday ? "today" : "", merge = t.merge_double_lessons ? mergedCellInfo(visibleRows, rowIndex, (candidate, candidateIndex) => {
           const resolved = this.getManualRowForDate(t, candidate, candidateIndex, rollingDates?.[P]);
           const cell = this.getDatedCell(t, resolved ?? candidate, orig, dateForColumn(P), dated.entries);
-          return { text: cell.text, notes: cell.notes, style: (resolved?.cell_styles ?? candidate?.cell_styles ?? [])[orig] ?? null };
+          return { text: cell.text, notes: cell.notes, style: (resolved?.cell_styles ?? candidate?.cell_styles ?? [])[orig] ?? null,
+            subjectChanges: (resolved ?? candidate)?.subject_changes?.[t.days[orig]] ?? [] };
         }) : { covered: !1, span: 1 };
         if (merge.covered) return f;
         const subjectStyle = /\n\s*\n/.test(F) ? "" : subjectColorStyle(F, t.subject_colors);
@@ -1982,7 +2041,7 @@ const v = (D = class extends U {
           return !!start && !!end && this.isNowBetween(start, end);
         })(), cellCurrent = isToday && (w || mergedCurrent);
         const currentColor = pt && se && cellCurrent && t.highlight_current_text && l && s >= 0 && orig === s ? l : "";
-        return currentColor && (Ct += `color:${currentColor};`), d`<td class=${G} style=${Ct} rowspan=${merge.span} @mouseenter=${event => this.updatePreviewTooltip(t, event)} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, orig, dateForColumn(P), merge.span)}>${this.renderCell(F, t, !!I, currentColor)}${datedCell.notes.map(note => d`<div class="datedNote" style=${datedNoteStyle(note)}
+        return currentColor && (Ct += `color:${currentColor};`), d`<td class=${G} style=${Ct} rowspan=${merge.span} @mouseenter=${event => this.updatePreviewTooltip(t, event)} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, orig, dateForColumn(P), merge.span)}>${this.renderCell(F, t, !!I, currentColor, (rowForDay ?? m)?.subject_changes?.[t.days[orig]] ?? [])}${datedCell.notes.map(note => d`<div class="datedNote" style=${datedNoteStyle(note)}
           title=${cardEditDialog(this) ? "Hinweis bearbeiten" : f}
           role=${cardEditDialog(this) ? "button" : f} tabindex=${cardEditDialog(this) ? "0" : f}
           @click=${event => this.handlePreviewNote(t, event, rowForDay ?? m, orig, dateForColumn(P), note)}
@@ -2001,6 +2060,7 @@ const v = (D = class extends U {
               @keydown=${event => { if (cardEditDialog(this) && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); this.handlePreviewNote(t, event, { time: note.periods[0] }, 0, new Date(`${note.date}T12:00:00`), note); } }}><strong>${note.text}</strong><br>${entrySummary(note).detail}</div>`)}
           </div>` : f}
           ${dated.warnings.map(warning => d`<div class="datedWarning" role="status">${warning}</div>`)}
+          ${t.holiday_calendar_entity ? (this._holidays?.warnings ?? []).map(warning => d`<div class="datedWarning" role="status">${warning}</div>`) : f}
         </div>
       </ha-card>
     `;
@@ -2172,6 +2232,28 @@ const v = (D = class extends U {
       white-space: nowrap;
     }
 
+    .holidayBanner {
+      margin-bottom: 10px;
+      padding: 9px 12px;
+      border: 1px solid var(--stundenplan-divider-color, var(--divider-color));
+      border-inline-start: 3px solid var(--primary-color, #03a9f4);
+      border-radius: 8px;
+      background: var(--stundenplan-header-background, var(--secondary-background-color));
+      color: var(--primary-text-color);
+      overflow-wrap: anywhere;
+    }
+    .holidayBanner > div { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+    .holidayBanner span { font-size: 12px; }
+    .holidayDay {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 4px;
+      border: 1px solid currentColor;
+      border-radius: 4px;
+      font-size: 11px;
+      line-height: 1.2;
+    }
+
     .time {
       font-weight: 700;
       white-space: normal;
@@ -2229,6 +2311,11 @@ const v = (D = class extends U {
       flex: 1 1 0;
       min-width: 0;
     }
+    .subjectChange { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; min-width: 0; flex: 1 1 0; overflow-wrap: anywhere; }
+    .subjectChange > * { min-width: 0; }
+    .subjectChange > * + * { border-left: 1px solid var(--stundenplan-divider-color, var(--divider-color)); padding-left: 8px; }
+    .subjectChangeOriginal .fach, .subjectChangeOriginal .cellText { text-decoration: line-through; }
+    .subjectChangeLabel { font-size: 10px; font-weight: normal; opacity: 0.8; margin-bottom: 4px; }
     .subjectColorBlock { flex: 1 1 0; min-width: 0; padding: 4px; border-radius: 4px; }
     td.today .subjectColorBlock { box-shadow: inset 0 0 0 9999px var(--sp-hl); }
     .fach {
@@ -2450,6 +2537,7 @@ const ut = class ut extends U {
       general: !1,
       rolling: !1,
       filters: !1,
+      holidays: !1,
       typography: !1,
       appearance: !1,
       highlights: !1,
@@ -2701,6 +2789,7 @@ const ut = class ut extends U {
       manual: ["Fächer, Zeiten und Pausen selbst eintragen.", "M4 4h16v16H4zM4 9h16M9 4v16M9 14h11"],
       filters: ["Fächer/Angebote gezielt ausblenden.", "M3 4h18l-7 8v7l-4 2v-9z"],
       dates: ["Klassenarbeiten und Erinnerungen nach Datum und Stunde.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M8 15h8M12 12v6"],
+      holidays: ["Ferien aus einem Kalender im Stundenplan kennzeichnen.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M8 15l3 3 5-5"],
       replacements: ["Fächer an ausgewählten Tagen ersetzen, z. B. Schwimmen durch Sport.", "M4 7h14l-3-3M20 17H6l3 3M18 7l-3 3M6 17l3-3"],
       rolling: ["Ganze Woche oder ab heute: Ansicht und Zeitraum wählen.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M9 15h6M13 13l2 2-2 2"],
       typography: ["Textgrößen und Abstände deiner Karte.", "M3 5h12M9 5v15M6 20h6M15 12h6M18 12v8"],
@@ -2747,7 +2836,27 @@ const ut = class ut extends U {
     if (!this._open.filters) return this.renderSection("Inhalte filtern", "filters", f);
     const selected = this._config.hidden_subjects ?? [];
     const subjects = this.getFilterSubjects();
+    const reader = new Xt();
+    reader.hass = this.hass;
+    const suite = suiteFilterInfo(this.hass, this._config, reader.getActiveWeek(this._config));
+    const localFilters = this.renderCardSubjectFilters(selected, subjects, !!suite);
     return this.renderSection("Inhalte filtern", "filters", d`
+      ${suite ? d`<div class="infoBox suiteFilters" data-suite-filters>
+        <strong>Bereits durch die Suite ausgeblendet</strong>
+        ${suite.courses === null ? d`<p>Diese Suite-Version übermittelt noch keine Liste der ausgeblendeten Kurse.</p>`
+          : suite.courses.length ? d`<ul style="margin:8px 0;padding-left:20px;overflow-wrap:anywhere">
+            ${suite.courses.map(course => d`<li>${course.label}</li>`)}
+          </ul>` : d`<p>In der Suite sind keine Kurse ausgeblendet.</p>`}
+        <div>Die Kursauswahl verwaltest du in den Einstellungen der Stundenplan Suite. Sie gilt für alle Karten mit dieser Quelle.</div>
+      </div>
+      <details class="additionalCardFilters">
+        <summary>Zusätzliche Filter nur für diese Karte${selected.length ? d`<span class="hint">${selected.length} Fächer/Angebote zusätzlich ausgeblendet</span>` : f}</summary>
+        ${localFilters}
+      </details>` : localFilters}
+    `);
+  }
+  renderCardSubjectFilters(selected, subjects, isSuite) {
+    return d`
       <div class="hint">Wähle die Fächer/Angebote aus, an denen dein Kind nicht teilnimmt. Nur diese Karte wird gefiltert; die Quelldaten bleiben unverändert.</div>
       ${subjects.length ? d`<div class="subjectChoices" role="group" aria-label="Zum Ausblenden auswählen">
         ${subjects.map(subject => d`<label class="subjectChoice">
@@ -2770,8 +2879,8 @@ const ut = class ut extends U {
       </form>
       <div class="hint">Verglichen wird der vollständige Fachname in der ersten Zeile, nicht Raum, Lehrkraft oder Hinweise. Groß-/Kleinschreibung spielt keine Rolle. Neue Namen werden nicht automatisch ausgewählt.</div>
       ${selected.length ? d`<div class="infoBox slim">${selected.length} Fächer/Angebote ausgeblendet. Vollständig leere Endzeilen werden gekürzt. „Nach der letzten Stunde“ berücksichtigt nur die verbleibenden Einträge des jeweiligen Tages.</div>
-        <button type="button" class="spBtn" @click=${() => this.setValue("hidden_subjects", [])}>Alle Einträge wieder anzeigen</button>` : f}
-    `);
+        <button type="button" class="spBtn" @click=${() => this.setValue("hidden_subjects", [])}>${isSuite ? "Kartenfilter zurücksetzen" : "Alle Einträge wieder anzeigen"}</button>` : f}
+    `;
   }
   updateDatedEntry(index, patch) {
     if (index === -1 || index === -2) {
@@ -2864,7 +2973,7 @@ const ut = class ut extends U {
           <option value="">Kein Kalender</option>
           ${Object.keys(this.hass?.states ?? {}).filter(id => id.startsWith("calendar.")).sort().map(id => d`<option value=${id} ?selected=${config.calendar_entity === id}>${this.hass.states[id].attributes?.friendly_name ?? id}</option>`)}
         </select></label>`}
-        <div class="hint">Ganztägige Einzeltermine im Kalender anlegen, z. B. „Mathearbeit [3,4]“ für die 3. und 4. Stunde. Die nächsten 60 Tage werden alle 5 Minuten geladen, auch ohne vorliegenden Stundenplan. Kein zusätzlicher Sensor nötig. Termine bitte im Kalender bearbeiten.</div>
+        <div class="hint">Ganztägige Einzeltermine im Kalender anlegen, z. B. „Mathearbeit [3,4]“ für die 3. und 4. Stunde oder „Pasta [Essen]“ für die Zeile „Essen“ in der Stundenspalte. Die nächsten 60 Tage werden alle 5 Minuten geladen, auch ohne vorliegenden Stundenplan. Kein zusätzlicher Sensor nötig. Termine bitte im Kalender bearbeiten.</div>
       </div>` : f}
       ${!replacement ? d`${this.renderToggle("show_upcoming_notes", "Anstehende Termine unter der Tabelle anzeigen")}
         <div class="hint">Standardmäßig aus. Hinweise in den Unterrichtsstunden bleiben sichtbar; gespeicherte Termine werden nicht gelöscht.</div>` : f}
@@ -2890,6 +2999,30 @@ const ut = class ut extends U {
       ${replacement ? d`<div class="hint">Erkennbare Ausfall- und Vertretungshinweise werden nicht ersetzt. Bei widersprüchlichen Abweichungen bleibt das Original stehen.</div>` : f}
       ${collectEntries(config, this.hass).warnings.map(warning => d`<div class="hint" role="status">${warning}</div>`)}
     `);
+  }
+  renderHolidaySettings() {
+    const config = this._config;
+    if (!this._open.holidays) return this.renderSection("Ferien", "holidays", f);
+    return this.renderSection("Ferien", "holidays", d`<div class="datedFields">
+      ${this.isHaEntityPickerAvailable() ? d`<ha-entity-picker
+        .hass=${this.hass} .value=${config.holiday_calendar_entity ?? ""} .includeDomains=${["calendar"]}
+        .label=${"Ferienkalender (optional)"} .allowCustomEntity=${false}
+        @value-changed=${event => { event.stopPropagation(); this.setValue("holiday_calendar_entity", event.detail?.value ?? ""); }}
+      ></ha-entity-picker>` : d`<label>Ferienkalender (optional)<select aria-label="Ferienkalender (optional)"
+        .value=${config.holiday_calendar_entity ?? ""} @change=${event => this.setValue("holiday_calendar_entity", event.target.value)}>
+        <option value="">Kein Ferienkalender</option>
+        ${Object.keys(this.hass?.states ?? {}).filter(id => id.startsWith("calendar.")).sort().map(id => d`<option value=${id} ?selected=${config.holiday_calendar_entity === id}>${this.hass.states[id].attributes?.friendly_name ?? id}</option>`)}
+      </select></label>`}
+      <div class="hint">Wähle z. B. den Schulmanager-Kalender. Ganztägige Ferieneinträge erscheinen über der Tabelle und an den passenden Tagen, auch wenn sie mehrere Tage dauern. Unterricht und Termine bleiben unverändert.</div>
+      <details><summary>Welche Einträge zählen als Ferien?</summary>
+        <div class="hint">Nur diese vollständigen Namen werden erkannt (Groß-/Kleinschreibung egal): ${holidayTitles.join(", ")}. Elternabende, Ferienbetreuung und andere Schultermine zählen nicht dazu. Der Kalender wird alle 5 Minuten für den angezeigten Zeitraum geprüft.</div>
+        <label>Zusätzliche Ferienbezeichnungen<textarea rows="2" aria-label="Zusätzliche Ferienbezeichnungen"
+          placeholder="Ein vollständiger Terminname pro Zeile"
+          .value=${normalizeHolidayTitles(config.holiday_extra_titles).join("\n")}
+          @change=${event => this.setValue("holiday_extra_titles", normalizeHolidayTitles(event.target.value))}></textarea></label>
+        <div class="hint">Nur eindeutige Bezeichnungen für schulfreie Tage ergänzen. Keine Teilwörter oder allgemeinen Schultermine.</div>
+      </details>
+    </div>`);
   }
   onToggle(t, e) {
     const s = !!t?.target?.checked;
@@ -3704,6 +3837,7 @@ placeholder="sensor.stundenplan"
         ${(t.source_type ?? "manual") === "manual" ? this.renderSection("Manueller Stundenplan", "manual", this.renderManualRows()) : f}
         ${this.renderFilterSettings()}
         ${this.renderDatedSettings()}
+        ${this.renderHolidaySettings()}
         ${this.renderDatedSettings("replace")}
 
         ${this.renderSection("Schrift & Abstände", "typography", d`
@@ -4153,6 +4287,11 @@ ut.properties = {
     .cellStyles--hidden { display: none !important; }
     .subjectColors { margin-bottom: 16px; }
     .subjectColors summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
+    .suiteFilters { display: block; margin-bottom: 0; overflow-wrap: anywhere; }
+    .suiteFilters > strong { display: block; }
+    .additionalCardFilters { margin-top: 12px; border: 1px solid var(--divider-color); border-radius: 10px; padding: 0 12px 12px; }
+    .additionalCardFilters > summary { cursor: pointer; font-weight: 600; padding: 12px 0; overflow-wrap: anywhere; }
+    .additionalCardFilters > summary .hint { display: block; margin-top: 4px; font-weight: normal; }
     .subjectColorRule { min-width: 0; padding: 10px; border: 1px solid var(--divider-color); border-radius: 10px; }
     .subjectColorRule > label { display: block; margin-bottom: 12px; }
     .subjectColorName { display: block; width: 100%; min-width: 0; margin-top: 5px; padding: 10px; color: inherit; background: var(--secondary-background-color); border: 1px solid var(--divider-color); border-radius: 6px; font: inherit; }
@@ -4296,14 +4435,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.10.0";
+window.__STUNDENPLAN_CARD_VERSION = "v3.11.0-beta.1";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.10.0 (marker: STUNDENPLAN_CARD_v3.10.0)",
+  description: "Stundenplan Card v3.11.0-beta.1 (marker: STUNDENPLAN_CARD_v3.11.0-beta.1)",
   preview: !0
 });
 export {

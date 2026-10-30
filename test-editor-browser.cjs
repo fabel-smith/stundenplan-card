@@ -185,9 +185,9 @@ customElements.define('ha-card',HaCard);
   assert.equal(await page.evaluate(()=>document.createElement('stundenplan-card-editor')._open.rolling),false);
   await page.evaluate(async()=>{editor.setConfig(window.originalRollingConfig);await editor.updateComplete;});
   assert.deepEqual(await page.locator('.sectionTitle').allTextContents(),
-    ['Allgemein','Datenquellen','Ansicht & Rolling','Manueller Stundenplan','Inhalte filtern','Termine und Hinweise eintragen','Fachabweichungen an bestimmten Tagen','Schrift & Abstände','Highlights','Farben','Hintergründe & Linien']);
-  assert.equal(await page.locator('.sectionDescription').count(),11);
-  assert.equal(await page.locator('.sectionIcon path').count(),11);
+    ['Allgemein','Datenquellen','Ansicht & Rolling','Manueller Stundenplan','Inhalte filtern','Termine und Hinweise eintragen','Ferien','Fachabweichungen an bestimmten Tagen','Schrift & Abstände','Highlights','Farben','Hintergründe & Linien']);
+  assert.equal(await page.locator('.sectionDescription').count(),12);
+  assert.equal(await page.locator('.sectionIcon path').count(),12);
   const filterHeader=page.locator('[data-section="filters"] .sectionHead');
   assert.equal(await filterHeader.getAttribute('aria-expanded'),'false');
   await filterHeader.focus();await page.keyboard.press('Enter');
@@ -245,8 +245,10 @@ customElements.define('ha-card',HaCard);
   assert.equal(await page.getByText('Manueller Stundenplan',{exact:true}).count(),0);
   await require('./test-dated-browser.cjs')(browser,'http://127.0.0.1:'+server.address().port);
   await require('./test-calendar-browser.cjs')(browser,'http://127.0.0.1:'+server.address().port);
+  await require('./test-holiday-browser.cjs')(browser,'http://127.0.0.1:'+server.address().port);
   await require('./test-subject-colors-browser.cjs')(browser,'http://127.0.0.1:'+server.address().port);
   await require('./test-time-label-browser.cjs')(browser,'http://127.0.0.1:'+server.address().port);
+  await require('./test-subject-change-browser.cjs')(browser,'http://127.0.0.1:'+server.address().port);
   assert.deepEqual(errors,[]);
   const oldPage=await browser.newPage();
   const newPage=await browser.newPage();
@@ -815,6 +817,62 @@ customElements.define('ha-card',HaCard);
     }),true,'Filter controls must fit narrow editors');
   }
   console.log('Afternoon filters passed: manual, JSON sensor/URL, Suite, merged lessons, pauses, week/popup/rolling, Friday sixth lesson, A/B and safe reset.');
+  await repeatedDayPage.evaluate(async()=>{
+    const editor=document.createElement('stundenplan-card-editor');
+    window.suiteFilterEditor=editor;
+    editor.hass={states:{'sensor.suite':{state:'ok',attributes:{provider:'schulmanager',
+      meta:{source_interface:'get_schedule',excluded_courses:[
+        {id:'10',label:'FSJ / 3c / FSJ1 (Kurs 10)'},
+        {id:'11',label:'<img src=x onerror=alert(1)> (Kurs 11)'}]},
+      rows_table:[{time:'1.',Mo:'M',Di:'BSC'}]}}}};
+    editor.setConfig({type:'custom:stundenplan-card',source_type:'entity',source_entity:'sensor.suite',hidden_subjects:['M']});
+    editor._open={filters:true};document.querySelector('#editor').replaceChildren(editor);await editor.updateComplete;
+  });
+  const suiteFilterBox=repeatedDayPage.locator('[data-suite-filters]');
+  assert((await suiteFilterBox.innerText()).includes('FSJ / 3c'));
+  assert.equal(await suiteFilterBox.locator('input,img').count(),0,'Upstream filters must be escaped read-only text');
+  const additionalFilters=repeatedDayPage.locator('.additionalCardFilters');
+  assert.equal(await additionalFilters.evaluate(el=>el.open),false,'Additional filters start collapsed even with saved filters');
+  assert((await additionalFilters.locator('summary').innerText()).includes('1 Fächer/Angebote zusätzlich ausgeblendet'));
+  assert.deepEqual(await repeatedDayPage.evaluate(()=>suiteFilterEditor._config.hidden_subjects),['M']);
+  if (process.env.SUITE_FILTER_SCREENSHOT) {
+    await repeatedDayPage.locator('stundenplan-card-editor').screenshot({path:process.env.SUITE_FILTER_SCREENSHOT});
+  }
+  await additionalFilters.locator('summary').press('Enter');
+  assert.equal(await additionalFilters.evaluate(el=>el.open),true,'Keyboard opens extra filters');
+  await repeatedDayPage.getByRole('button',{name:'Kartenfilter zurücksetzen',exact:true}).click();
+  assert.deepEqual(await repeatedDayPage.evaluate(()=>suiteFilterEditor._config.hidden_subjects),[]);
+  assert.equal(await suiteFilterBox.locator('li').count(),2,'Reset must not clear upstream exclusions');
+  assert.equal(await additionalFilters.evaluate(el=>el.open),true,'Editing does not collapse extra filters');
+  for(const width of [320,440]) {
+    await repeatedDayPage.evaluate(width=>document.querySelector('#editor').style.width=width+'px',width);
+    assert.equal(await suiteFilterBox.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+    assert.equal(await suiteFilterBox.evaluate(el=>{
+      const children=[...el.children].map(child=>child.getBoundingClientRect());
+      return children.every((bounds,index)=>index===0 || bounds.top>=children[index-1].bottom-1);
+    }),true,'Suite heading, course list and explanation must stack vertically');
+  }
+  await repeatedDayPage.evaluate(async()=>{
+    const state=suiteFilterEditor.hass.states['sensor.suite'];
+    suiteFilterEditor.hass={states:{'sensor.suite':{...state,attributes:{...state.attributes,
+      meta:{source_interface:'get_schedule',excluded_courses:[]}}}}};
+    await suiteFilterEditor.updateComplete;
+  });
+  assert((await suiteFilterBox.innerText()).includes('keine Kurse ausgeblendet'));
+  assert.equal(await additionalFilters.count(),1,'Suite without exclusions still has advanced card filters');
+  await repeatedDayPage.evaluate(async()=>{
+    const state=suiteFilterEditor.hass.states['sensor.suite'];
+    suiteFilterEditor.hass={states:{'sensor.suite':{...state,attributes:{...state.attributes,
+      meta:{source_interface:'get_schedule'}}}}};
+    await suiteFilterEditor.updateComplete;
+  });
+  assert((await suiteFilterBox.innerText()).includes('noch keine Liste'));
+  await repeatedDayPage.evaluate(async()=>{
+    suiteFilterEditor.hass={states:{}};await suiteFilterEditor.updateComplete;
+  });
+  assert.equal(await suiteFilterBox.count(),0,'Removed source must not leave stale filter information');
+  assert.equal(await additionalFilters.count(),0,'Other sources keep their direct card filters');
+  console.log('Suite filter editor: independent reset, safe labels, live updates and narrow layout passed.');
   const weekResults=await repeatedDayPage.evaluate(async()=>{
     window.testNow='2026-10-08T09:00:00';
     const card=document.createElement('stundenplan-card');
