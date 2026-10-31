@@ -6,8 +6,8 @@ Bitte vorher ein HA-Backup erstellen. Die stabile Nutzung muss nicht umgestellt 
 ## Passende Versionen
 
 - Schulmanager Online: **v0.13.0b4**
-- Stundenplan Suite: **v0.4.0b1**
-- Stundenplan Card: **v3.11.0-beta.1**
+- Stundenplan Suite: **v0.4.0b3**
+- Stundenplan Card: **v3.11.0-beta.2**
 
 Die neue Kursauswahl benoetigt alle drei passenden Staende. Bestehende Quellen
 werden nicht automatisch umgestellt. Manuelle Plaene, JSON und Stundenplan24
@@ -43,6 +43,25 @@ sollen weiterhin unveraendert funktionieren.
   Daten duerfen nicht als sicher unterrichtsfrei erscheinen.
 - **Optional:** Ferienkalender, Kalenderhinweise sowie eine bisherige manuelle,
   JSON- oder Stundenplan24-Karte gegenpruefen. Ferien blenden Unterricht nicht aus.
+
+## Wochenwechsel ab Samstag oder Sonntag
+
+1. Suite **v0.4.0b3** und Card **v3.11.0-beta.2** installieren, HA neu starten
+   und das Dashboard vollstaendig neu laden. Schulmanager **v0.13.0b4** kann bleiben.
+2. In der Karte **Ansicht & Rolling > Ganze Woche** waehlen.
+3. Unter **Automatisch zur naechsten Woche** **Ab Samstag** oder **Ab Sonntag**
+   einstellen und die Wochenwahl auf **0** setzen. Standard bleibt **Erst am Montag**.
+4. Datum und Unterricht sollen zusammen wechseln. Bitte auch Rolling sowie
+   die bisherigen Kurs- und Wochentagsfilter pruefen.
+
+Eine andere manuell gewaehlte Woche hat Vorrang. Der automatische Wechsel
+veraendert nicht den gemeinsamen Suite-Wochenregler. Fehlende Unterrichtsdaten
+bleiben leer und werden als noch nicht geladen gekennzeichnet.
+Die neue Schulmanager-Schnittstelle stellt mehrere bereits geladene Wochen
+bereit; alte Quellen koennen nur ihre tatsaechlich geladene Woche liefern.
+Die manuelle Wochenwahl bleibt bei -1 bis +1, noch keine Erweiterung auf +2.
+
+[Suite-Wochentagsfilter und gemeinsame Testanleitung](https://github.com/fabel-smith/stundenplan-suite/blob/v0.4.0b3/PRERELEASE_TEST.md)
 
 ## Rueckmeldung
 

@@ -4,6 +4,7 @@ import { HolidaySource, holidayTitles, normalizeHolidayTitles, holidaysOnDate, h
 import { normalizeSubjectColors, subjectColorStyle } from "./subject-colors.js";
 import { parseTimeRange, timeLabelParts } from "./time-label.js";
 import { suiteFilterInfo } from "./suite-filters.js";
+import { TimetableView, weekendOffset, weekKey, rowKey } from "./timetable-view.js";
 // Bundled Lit runtime: see THIRD_PARTY_NOTICES for its BSD-3-Clause license.
 const Q = globalThis, $t = Q.ShadowRoot && (Q.ShadyCSS === void 0 || Q.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, vt = /* @__PURE__ */ Symbol(), Dt = /* @__PURE__ */ new WeakMap();
 let Ft = class {
@@ -817,6 +818,7 @@ const v = (D = class extends U {
     return { columns: "full" };
   }
   syncCalendar() {
+    this.syncTimetable();
     this._calendar ??= new CalendarSource(() => this.requestUpdate());
     if (this.isConnected) void this._calendar.update(this.hass, this.config?.calendar_entity ?? "");
     this._holidays ??= new HolidaySource(() => this.requestUpdate());
@@ -825,7 +827,7 @@ const v = (D = class extends U {
   }
   getColumnDates(config, rollingDates = null) {
     if (rollingDates?.length) return rollingDates;
-    const header = this.getHeaderDaysFromEntity(config);
+    const header = this.hasTimetableView(config) || this.autoWeekend(config) ? null : this.getHeaderDaysFromEntity(config);
     const dates = header && header.length >= (config.days?.length ?? 0) ? header : null;
     const monday = this.mondayOfWeek(this.getBaseDate(config));
     return (config.days ?? []).map(label => {
@@ -847,6 +849,57 @@ const v = (D = class extends U {
     result.warnings.push(...(this._calendar?.warnings ?? []));
     return result;
   }
+  timetableEntity(config) {
+    if (!["entity", "sensor"].includes(config?.source_type)) return "";
+    return (config.source_type === "entity" ? config.source_entity_integration || config.source_entity
+      : config.source_entity_legacy || config.source_entity) ?? "";
+  }
+  hasTimetableView(config) {
+    if (config?.week_mode !== "off" && (config?.source_entity_a || config?.source_entity_b)) return false;
+    return this.hass?.states?.[this.timetableEntity(config)]?.attributes?.view_service === 1;
+  }
+  autoWeekend(config) {
+    return (this.getWeekOffsetValue(config) ?? 0) === 0 ? weekendOffset(config.weekend_switch) : 0;
+  }
+  syncTimetable() {
+    if (!this.config || !this.isConnected) return;
+    if (!this.hasTimetableView(this.config)) {
+      if (this._timetable) { this._timetable.reset(); this._timetable = null; }
+      return;
+    }
+    this._timetable ??= new TimetableView(() => { this.recomputeRows(); this.requestUpdate(); });
+    let dates = this.getHolidayDates(this.config);
+    if ((this._uiViewMode ?? this.config.view_mode) === "rolling" && !(this.getWeekOffsetValue(this.config) ?? 0)) {
+      // Keep the request stable when the last lesson advances the visible day.
+      const monday = this.mondayOfWeek(new Date());
+      dates = Array.from({ length: 21 }, (_, index) => {
+        const date = new Date(monday); date.setDate(date.getDate() + index); return date;
+      });
+    }
+    void this._timetable.update(this.hass, this.timetableEntity(this.config), dates);
+  }
+  timetableRows(config) {
+    const data = this._timetable?.data;
+    const templates = new Map();
+    const visibleWeeks = new Set(this.getHolidayDates(config).filter(Boolean).map(weekKey));
+    for (const [week, rows] of Object.entries(data?.weeks ?? {})) {
+      if (!visibleWeeks.has(week)) continue;
+      for (const row of this.buildRowsFromArray(config, rows) ?? []) templates.set(rowKey(row), row);
+    }
+    return [...templates.values()].sort((a, b) => (a.start ?? a.time).localeCompare(b.start ?? b.time));
+  }
+  viewWarning(config, dates) {
+    if (this.hasTimetableView(config)) {
+      if (!this._timetable?.data) return this._timetable?.error || "Stundenplandaten für diese Ansicht werden geladen.";
+      if (dates.some(day => day && !this._timetable.data.loaded_days.includes(dateKey(day))))
+        return "Für einen Teil dieser Ansicht liegen noch keine aktuellen Stundenplandaten vor.";
+    } else if (this.timetableEntity(config)) {
+      const known = this.getHeaderDaysFromEntity(config);
+      if (known && dates.some(day => day && !known.some(value => dateKey(value) === dateKey(day))))
+        return "Die Datenquelle liefert diese Tage noch nicht. Bitte die Datenwoche auswählen oder die Suite aktualisieren.";
+    }
+    return "";
+  }
   get hass() {
     return k(this, X);
   }
@@ -865,7 +918,7 @@ const v = (D = class extends U {
           const vm = (cfg?.view_mode ?? "week").toString();
           const da = Number(cfg?.days_ahead);
           const daysAhead = Number.isFinite(da) ? Math.max(0, Math.min(6, Math.floor(da))) : 0;
-          if (vm === "rolling" && daysAhead === 0) {
+          if (vm === "rolling" && daysAhead === 0 && !this.hasTimetableView(cfg)) {
             const offEnt = ((cfg?.week_offset_entity ?? "") + "").toString().trim();
             if (offEnt && t?.states?.[offEnt]) {
               const cur = Number(t.states[offEnt].state);
@@ -891,7 +944,7 @@ const v = (D = class extends U {
           (Array.isArray(a?.rows_table_json) && a.rows_table_json.length === 0) ||
           (Array.isArray(a?.rows_json) && a.rows_json.length === 0);
 
-        if (sensorId && isEmpty) {
+        if (sensorId && isEmpty && !this.hasTimetableView(cfg)) {
           let offEnt = ((cfg?.week_offset_entity ?? "") + "").toString().trim();
           if (!offEnt) offEnt = sensorId.replace(/^sensor\./, "number.") + "_offset";
           const hasOff = offEnt && hass?.states && offEnt in hass.states;
@@ -996,10 +1049,12 @@ const v = (D = class extends U {
     this.syncCalendar();
     super.connectedCallback(), this._tick = window.setInterval(() => {
       this.syncCalendar();
+      if (this.hasTimetableView(this.config)) this.recomputeRows();
       this.requestUpdate();
     }, 3e4);
   }
   disconnectedCallback() {
+    this._timetable?.reset();
     this._calendar?.reset();
     this._holidays?.reset();
     super.disconnectedCallback(), this._tick && window.clearInterval(this._tick), this._tick = void 0;
@@ -1039,6 +1094,7 @@ const v = (D = class extends U {
       days_ahead: 0,
       rolling_switch_mode: "midnight",
       rolling_week_only: !1,
+      weekend_switch: "off",
       rolling_switch_time: "",
       tap_action: { action: "none" },
       highlight_today: !0,
@@ -1151,6 +1207,7 @@ const v = (D = class extends U {
       days_ahead: daysAhead,
       rolling_switch_mode: rollingSwitchMode,
       rolling_week_only: t.rolling_week_only === !0,
+      weekend_switch: ["saturday", "sunday"].includes(t.weekend_switch) ? t.weekend_switch : "off",
       rolling_switch_time: rollingSwitchTime,
       tap_action: this.normalizeTapAction(t.tap_action ?? e.tap_action),
       highlight_today: t.highlight_today ?? e.highlight_today,
@@ -1340,6 +1397,7 @@ const v = (D = class extends U {
     return filterHiddenSubjects((t ?? "").toString().trim(), e.hidden_subjects);
   }
   getDatedCell(config, row, day, date, entries) {
+    if (this.timetableEntity(config)) row = this.getManualRowForDate(config, row, -1, date);
     const original = this.filterCellText(row?.cells?.[day], config);
     if (!entries?.length || ct(row)) return { text: original, notes: [] };
     const notes = new Map(), blocks = [];
@@ -1388,6 +1446,18 @@ const v = (D = class extends U {
     return s;
   }
   getLastLessonEnd(config = this.config, date = new Date()) {
+    if (this.hasTimetableView(config)) {
+      const data = this._timetable?.data, day = this.findConfiguredDayIndexForDate(date, config.days);
+      if (day < 0 || !data?.loaded_days.includes(dateKey(date))) return "";
+      let latest = "";
+      for (const row of this.buildRowsFromArray(config, data.weeks[weekKey(date)] ?? []) ?? []) {
+        if (ct(row) || yt(this.filterCellText(row.cells?.[day], config))) continue;
+        const end = row.cell_times?.[day]?.end || row.end;
+        if (!/^\d{2}:\d{2}$/.test(end ?? "")) return "";
+        if (end > latest) latest = end;
+      }
+      return latest;
+    }
     const t = this._rowsCache ?? [];
     if (config?.hidden_subjects?.length) {
       const entries = this.collectDatedEntries(config).entries;
@@ -1463,11 +1533,13 @@ const v = (D = class extends U {
     if (i.action === "toggle_view") {
       const l = ((this._uiViewMode ?? t.view_mode ?? "week") + "").toString();
       this._uiViewMode = l === "rolling" ? "week" : "rolling";
+      if (this.hasTimetableView(t)) this.recomputeRows();
       this.requestUpdate();
       return;
     }
     if (i.action === "popup_week") {
       this._uiPopupOpen = !0;
+      if (this.hasTimetableView(t)) this.recomputeRows();
       this.requestUpdate();
       return;
     }
@@ -1537,7 +1609,7 @@ const v = (D = class extends U {
     We(this, "stundenplan-edit-cell", { config: this.config, rowIndex: sourceIndex, dayIndex, week });
   }
   getBaseDate(t) {
-    const e = this.getWeekOffsetValue(t) ?? 0, s = /* @__PURE__ */ new Date();
+    const e = (this.getWeekOffsetValue(t) ?? 0) || this.autoWeekend(t), s = /* @__PURE__ */ new Date();
     return s.setHours(12, 0, 0, 0), s.setDate(s.getDate() + e * 7), s;
   }
   mondayOfWeek(t) {
@@ -1612,6 +1684,7 @@ const v = (D = class extends U {
     return null;
   }
   getRowsResolved(t) {
+    if (this.hasTimetableView(t)) return this.timetableRows(t);
     const e = t.source_type ?? "manual";
     const effEntity = (
       e === "entity"
@@ -1641,6 +1714,16 @@ const v = (D = class extends U {
     return s ? this.getRowsFromEntity(t, s, ((t.source_attribute ?? "") + "").toString().trim() || "plan") ?? [] : [];
   }
   getManualRowForDate(t, e, s, i) {
+    if (i instanceof Date && this.hasTimetableView(t)) {
+      const data = this._timetable?.data;
+      const rows = data?.loaded_days?.includes(dateKey(i)) ? this.buildRowsFromArray(t, data.weeks[weekKey(i)] ?? []) ?? [] : [];
+      return rows.find(row => rowKey(row) === rowKey(e)) ?? { ...e, cells: [], cell_styles: [], cell_times: [], subject_changes: {} };
+    }
+    if (i instanceof Date && this.timetableEntity(t)) {
+      const dates = this.getHeaderDaysFromEntity(t);
+      if (dates && !dates.some(day => dateKey(day) === dateKey(i)))
+        return { ...e, cells: [], cell_styles: [], cell_times: [], subject_changes: {} };
+    }
     if ((t.source_type ?? "manual") !== "manual" || t.week_mode !== "kw_parity" || !(i instanceof Date)) return e;
     const n = this.weekFromParityAtDate(t, i), o = n === "B" && Array.isArray(t.rows_b) && t.rows_b.length ? t.rows_b : t.rows ?? [];
     const l = (e?.time ?? "").toString(), a = o.find((c) => ct(c) === ct(e) && (c?.time ?? "").toString() === l);
@@ -1656,7 +1739,7 @@ const v = (D = class extends U {
       this._noData = !1, this._noDataMsg = "";
       return;
     }
-    const i = "Keine Daten für diesen Zeitraum (Ferien/Feiertag).";
+    const i = this.hasTimetableView(t) ? "Keine Unterrichtseinträge für diese Ansicht verfügbar." : "Keine Daten für diesen Zeitraum (Ferien/Feiertag).";
     !s || s.length === 0 ? (this._noData = !0, e === "json" && this._jsonStatus === "error" ? this._noDataMsg = `JSON: ${this._jsonError || i}` : e === "json" && this._jsonStatus === "loading" ? this._noDataMsg = "JSON wird geladen…" : this._noDataMsg = i) : (this._noData = !1, this._noDataMsg = "");
   }
   // Parse to Fach (bold) + Raum + Lehrer + Info/Notes
@@ -1917,10 +2000,10 @@ const v = (D = class extends U {
         visibleHolidays = [...new Set(columnHolidays.flat())],
         focusVisibleIndex = rollingSlots.length ? 0 : Math.max(0, idxs.indexOf(s)),
         focusDayIndex = idxs[focusVisibleIndex] ?? 0,
-        focusDate = rollingDates?.[focusVisibleIndex] ?? null,
+        focusDate = columnDates?.[focusVisibleIndex] ?? null,
         focusIsToday = focusDate instanceof Date ? this.fmtYMD(focusDate) === this.fmtYMD(new Date()) : focusDayIndex === s,
         visibleRows = t.trim_empty_rows || t.hidden_subjects?.length ? trimTrailingEmptyRows(e, idxs, (row, rowIndex, dayIndex, visibleIndex) => {
-          const resolved = this.getManualRowForDate(t, row, rowIndex, rollingDates?.[visibleIndex]);
+          const resolved = this.getManualRowForDate(t, row, rowIndex, columnDates?.[visibleIndex]);
           const cell = this.getDatedCell(t, resolved ?? row, dayIndex, dateForColumn(visibleIndex), dated.entries);
           return cell.text + cell.notes.map(note => note.text).join(" ");
         }) : e,
@@ -1972,10 +2055,10 @@ const v = (D = class extends U {
               <tr>
                 ${showTimeColumn ? d`<th class="time">Stunde</th>` : d``}
                 ${daysVis.map((y, m) => { const orig = idxs[m];
-      const W = t.highlight_today && (rollingDates ? this.fmtYMD(rollingDates[m]) === this.fmtYMD(new Date()) : orig === s) ? "today" : "";
+      const W = t.highlight_today && columnDates[m] && this.fmtYMD(columnDates[m]) === this.fmtYMD(new Date()) ? "today" : "";
       let b = "";
-      if (rollingDates?.[m] instanceof Date)
-        b = this.fmtDDMMYYYY(rollingDates[m]);
+      if (columnDates?.[m] instanceof Date)
+        b = this.fmtDDMMYYYY(columnDates[m]);
       else if (g)
         b = this.fmtDDMMYYYY(g[orig]);
       else {
@@ -2021,11 +2104,11 @@ const v = (D = class extends U {
                       </div>
                     </td>` : d``}
 
-                    ${daysVis.map((z, P) => { const orig = idxs[P], rowForDay = this.getManualRowForDate(t, m, rowIndex, rollingDates?.[P]), rowCells = rowForDay?.cells ?? W, rowStyles = rowForDay?.cell_styles ?? b;
+                    ${daysVis.map((z, P) => { const orig = idxs[P], rowForDay = this.getManualRowForDate(t, m, rowIndex, columnDates?.[P]), rowCells = rowForDay?.cells ?? W, rowStyles = rowForDay?.cell_styles ?? b;
         // Rolling can contain the same weekday twice; only the actual date is today.
-        const isToday = rollingDates ? this.fmtYMD(rollingDates[P]) === this.fmtYMD(new Date()) : orig === s;
+        const isToday = columnDates[P] && this.fmtYMD(columnDates[P]) === this.fmtYMD(new Date());
         const datedCell = this.getDatedCell(t, rowForDay ?? m, orig, dateForColumn(P), dated.entries), F = datedCell.text, I = rowStyles[orig] ?? null, G = t.highlight_today && isToday ? "today" : "", merge = t.merge_double_lessons ? mergedCellInfo(visibleRows, rowIndex, (candidate, candidateIndex) => {
-          const resolved = this.getManualRowForDate(t, candidate, candidateIndex, rollingDates?.[P]);
+          const resolved = this.getManualRowForDate(t, candidate, candidateIndex, columnDates?.[P]);
           const cell = this.getDatedCell(t, resolved ?? candidate, orig, dateForColumn(P), dated.entries);
           return { text: cell.text, notes: cell.notes, style: (resolved?.cell_styles ?? candidate?.cell_styles ?? [])[orig] ?? null,
             subjectChanges: (resolved ?? candidate)?.subject_changes?.[t.days[orig]] ?? [] };
@@ -2036,7 +2119,7 @@ const v = (D = class extends U {
         const se = !yt(F), mergedCurrent = (() => {
           if (!isToday || !focusIsToday || orig !== focusDayIndex || merge.span <= 1) return !1;
           const firstTime = (rowForDay?.cell_times ?? m.cell_times)?.[orig] ?? null;
-          const lastIndex = rowIndex + merge.span - 1, lastBase = visibleRows[lastIndex], lastRow = this.getManualRowForDate(t, lastBase, lastIndex, rollingDates?.[P]), lastTime = (lastRow?.cell_times ?? lastBase?.cell_times)?.[orig] ?? null;
+          const lastIndex = rowIndex + merge.span - 1, lastBase = visibleRows[lastIndex], lastRow = this.getManualRowForDate(t, lastBase, lastIndex, columnDates?.[P]), lastTime = (lastRow?.cell_times ?? lastBase?.cell_times)?.[orig] ?? null;
           const start = firstTime?.start || rowForDay?.start || m.start, end = lastTime?.end || lastRow?.end || lastBase?.end;
           return !!start && !!end && this.isNowBetween(start, end);
         })(), cellCurrent = isToday && (w || mergedCurrent);
@@ -2060,6 +2143,7 @@ const v = (D = class extends U {
               @keydown=${event => { if (cardEditDialog(this) && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); this.handlePreviewNote(t, event, { time: note.periods[0] }, 0, new Date(`${note.date}T12:00:00`), note); } }}><strong>${note.text}</strong><br>${entrySummary(note).detail}</div>`)}
           </div>` : f}
           ${dated.warnings.map(warning => d`<div class="datedWarning" role="status">${warning}</div>`)}
+          ${this.viewWarning(t, columnDates) ? d`<div class="datedWarning" role="status">${this.viewWarning(t, columnDates)}</div>` : f}
           ${t.holiday_calendar_entity ? (this._holidays?.warnings ?? []).map(warning => d`<div class="datedWarning" role="status">${warning}</div>`) : f}
         </div>
       </ha-card>
@@ -3704,6 +3788,19 @@ placeholder="sensor.stundenplan"
       </div>
       <div class="hint">Ab dem Starttag werden die nächsten passenden Schultage angezeigt. Beim Blättern in andere Wochen beginnt die Ansicht am Montag.</div>
       ` : f}
+      ${(t.view_mode ?? "week") === "week" ? d`
+        <ha-form .hass=${this.hass}
+          .data=${{ weekend_switch: t.weekend_switch ?? "off" }}
+          .schema=${[{ name: "weekend_switch", selector: { select: { mode: "dropdown", options: [
+            { value: "off", label: "Erst am Montag" },
+            { value: "saturday", label: "Ab Samstag" },
+            { value: "sunday", label: "Ab Sonntag" }
+          ] } } }]}
+          .computeLabel=${() => "Automatisch zur nächsten Woche"}
+          @value-changed=${event => { event.stopPropagation(); this.setValue("weekend_switch", event.detail?.value?.weekend_switch ?? "off"); }}
+        ></ha-form>
+        <div class="hint">Gilt in der Grundansicht (Wochenwahl 0). Manuelles Blättern hat Vorrang. Für datumsgenaue Suite-Daten wird Suite ab v0.4.0b3 benötigt. Fehlende Unterrichtsdaten bleiben leer.</div>
+      ` : f}
     `);
   }
   render() {
@@ -4435,14 +4532,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.11.0-beta.1";
+window.__STUNDENPLAN_CARD_VERSION = "v3.11.0-beta.2";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.11.0-beta.1 (marker: STUNDENPLAN_CARD_v3.11.0-beta.1)",
+  description: "Stundenplan Card v3.11.0-beta.2 (marker: STUNDENPLAN_CARD_v3.11.0-beta.2)",
   preview: !0
 });
 export {
