@@ -58,8 +58,10 @@ module.exports = async function testDatedEntries(browser, url) {
         return rolling;
       },source);
       assert(result.today.includes('Schwimmen')&&result.today.includes("'Kit")&&result.today.includes('SH3'),source);
-      assert(result.future.includes('Sport')&&!result.future.includes('Schwimmen'),source);
-      assert.equal(result.todaySpan,2);assert.equal(result.futureSpan,2);
+      const datedSource = source === 'entity' || source === 'sensor';
+      if (datedSource) assert.equal(result.future.trim(),'','A dated source must not repeat lessons in an unloaded week');
+      else assert(result.future.includes('Sport')&&!result.future.includes('Schwimmen'),source);
+      assert.equal(result.todaySpan,2);if (!datedSource) assert.equal(result.futureSpan,2);
       assert.equal(result.noteCount,1);assert.equal(result.futureNoteCount,0);
       assert.equal(result.unchanged,true);
       assert(result.week.includes('Schwimmen'));assert(result.popup.includes('Schwimmen'));

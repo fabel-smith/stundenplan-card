@@ -1,5 +1,7 @@
 # Stundenplan Card (Home Assistant)
 
+<img src="src/assets/icon.png" alt="Stundenplan Card" width="96" height="96">
+
 [![HACS Default](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/default/pull/11272)
 ![Version](https://img.shields.io/github/v/release/fabel-smith/stundenplan-card)
 ![Maintenance](https://img.shields.io/maintenance/yes/2026)
@@ -352,6 +354,16 @@ Hintergründe & Linien. Die Bereiche sind auch per Tastatur bedienbar.
 [Editorübersicht](docs/screenshots/editor-overview.png) und
 [Beispiel mit ausgeblendeten Fächern/Angeboten](docs/screenshots/filtered-offers.png)
 zeigen die neuen Bereiche mit fiktiven Daten.
+
+**Fächer umbenennen** ändert nur die Anzeige in dieser Karte, dauerhaft und ohne Datum.
+Beispiel: Fach / Kürzel `BSS`, Anzeigen als `Sport`, dann **Zuordnung übernehmen**.
+Filter, Fachfarben und datierte Abweichungen verwenden weiterhin das Originalkürzel.
+
+```yaml
+subject_aliases:
+  - subject: BSS
+    name: Sport
+```
 
 **Inhalte filtern** schlägt Fachnamen aus der aktuell verfügbaren Quelle vor.
 Angehakte Namen werden ausgeblendet. Fehlende Namen kannst du einzeln über

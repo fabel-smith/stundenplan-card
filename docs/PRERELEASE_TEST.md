@@ -5,9 +5,9 @@ Bitte vorher ein HA-Backup erstellen. Die stabile Nutzung muss nicht umgestellt 
 
 ## Passende Versionen
 
-- Schulmanager Online: **v0.13.0b4**
-- Stundenplan Suite: **v0.4.0b3**
-- Stundenplan Card: **v3.11.0-beta.2**
+- Schulmanager Online: **v0.13.0b5**
+- Stundenplan Suite: **v0.4.0b4**
+- Stundenplan Card: **v3.11.0-beta.3**
 
 Die neue Kursauswahl benoetigt alle drei passenden Staende. Bestehende Quellen
 werden nicht automatisch umgestellt. Manuelle Plaene, JSON und Stundenplan24
@@ -46,8 +46,8 @@ sollen weiterhin unveraendert funktionieren.
 
 ## Wochenwechsel ab Samstag oder Sonntag
 
-1. Suite **v0.4.0b3** und Card **v3.11.0-beta.2** installieren, HA neu starten
-   und das Dashboard vollstaendig neu laden. Schulmanager **v0.13.0b4** kann bleiben.
+1. Suite **v0.4.0b4** und Card **v3.11.0-beta.3** installieren, HA neu starten
+   und das Dashboard vollstaendig neu laden. Schulmanager **v0.13.0b5** wird mitgetestet.
 2. In der Karte **Ansicht & Rolling > Ganze Woche** waehlen.
 3. Unter **Automatisch zur naechsten Woche** **Ab Samstag** oder **Ab Sonntag**
    einstellen und die Wochenwahl auf **0** setzen. Standard bleibt **Erst am Montag**.
@@ -61,7 +61,14 @@ Die neue Schulmanager-Schnittstelle stellt mehrere bereits geladene Wochen
 bereit; alte Quellen koennen nur ihre tatsaechlich geladene Woche liefern.
 Die manuelle Wochenwahl bleibt bei -1 bis +1, noch keine Erweiterung auf +2.
 
-[Suite-Wochentagsfilter und gemeinsame Testanleitung](https://github.com/fabel-smith/stundenplan-suite/blob/v0.4.0b3/PRERELEASE_TEST.md)
+[Suite-Wochentagsfilter und gemeinsame Testanleitung](https://github.com/fabel-smith/stundenplan-suite/blob/v0.4.0b4/PRERELEASE_TEST.md)
+
+## Gemeinsamer Abschlusstest
+
+1. Nach dem HACS-Update die normale Karte (nicht die separate Testressource) verwenden.
+2. An einem Schultag mit mehreren Kursen Fach, Lehrkraft und Raum mit den Quelldaten vergleichen.
+3. Unter **Fächer umbenennen** testweise ein Kürzel umbenennen. Nur die Anzeige dieser Karte soll wechseln.
+4. Bei einer leeren Woche zwischen noch fehlenden Daten und einer vollständig geladenen Woche ohne Unterricht unterscheiden.
 
 ## Rueckmeldung
 

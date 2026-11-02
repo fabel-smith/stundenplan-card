@@ -77,4 +77,41 @@ rollingCard.getHolidayDates = () => [new Date(2026, 10, 9, 12)];
 method('syncTimetable').call(rollingCard);
 assert.deepEqual(requests[0], requests[1], 'Last-lesson rollover must not oscillate the fetch range');
 assert.equal(requests[0].length, 21);
-console.log('Timetable view: weekend, date isolation, missing data, response races and read-only requests passed.');
+// Only fully loaded views may be described as having no lessons.
+const emptyCard = {
+  config: { source_type: 'entity', view_mode: 'week' },
+  hasTimetableView: () => true,
+  getRowsResolved: () => [],
+  getHolidayDates: () => dates,
+  _timetable: { data: { loaded_days: dates.map(dateKey) } },
+  viewWarning: method('viewWarning'),
+  emptyTimetableMessage: method('emptyTimetableMessage'),
+};
+const recompute = method('recomputeRows');
+recompute.call(emptyCard);
+assert.equal(emptyCard._noData, true);
+assert.equal(emptyCard._noDataMsg, 'Kein Unterricht in dieser Woche.');
+emptyCard._uiViewMode = 'rolling';
+recompute.call(emptyCard);
+assert.equal(emptyCard._noDataMsg, 'Kein Unterricht im angezeigten Zeitraum.');
+emptyCard._timetable.data.loaded_days = [];
+recompute.call(emptyCard);
+assert.equal(emptyCard._noDataMsg, 'Für einen Teil dieser Ansicht liegen noch keine aktuellen Stundenplandaten vor.');
+emptyCard._timetable.data = null;
+recompute.call(emptyCard);
+assert.equal(emptyCard._noDataMsg, 'Stundenplandaten für diese Ansicht werden geladen.');
+emptyCard._timetable.error = 'Abruf fehlgeschlagen';
+recompute.call(emptyCard);
+assert.equal(emptyCard._noDataMsg, 'Abruf fehlgeschlagen');
+emptyCard._timetable = { data: { loaded_days: dates.map(dateKey) } };
+emptyCard.getHolidayDates = () => [dates[0], new Date(2026, 10, 3, 12)];
+recompute.call(emptyCard);
+assert.match(emptyCard._noDataMsg, /noch keine aktuellen Stundenplandaten/);
+emptyCard.getHolidayDates = () => [];
+recompute.call(emptyCard);
+assert.equal(emptyCard._noDataMsg, 'Keine Unterrichtseinträge für diese Ansicht verfügbar.');
+emptyCard.getRowsResolved = () => [row];
+recompute.call(emptyCard);
+assert.equal(emptyCard._noData, false);
+assert.equal(emptyCard._noDataMsg, '');
+console.log('Timetable view: weekend, date isolation, empty views, missing data, response races and read-only requests passed.');

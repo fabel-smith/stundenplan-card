@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { collectEntries, applyDatedEntries } from './src/dated-entries.js';
+import { normalizeCellDetails } from './src/cell-details.js';
 
 const code = fs.readFileSync(new URL('./src/stundenplan-card.ts', import.meta.url), 'utf8');
 function method(name, next, deps = {}) {
@@ -25,7 +26,7 @@ const parseTime = value => {
 const normalizeCellTime = standalone('normalizeCellTime', 'wt', {mt: parseTime});
 const normalizeSubjectChanges = standalone('normalizeSubjectChanges', 'filterHiddenSubjects');
 const build = method('buildRowsFromArray', 'getRowsFromEntity', {
-  mt: parseTime, De: x => x, normalizeCellTime, normalizeSubjectChanges,
+  mt: parseTime, De: x => x, normalizeCellTime, normalizeSubjectChanges, normalizeCellDetails,
 });
 const read = method('getRowsFromEntity', 'async loadJsonRows');
 const config = {days:['Mo','Di','Mi','Do','Fr'],source_time_key:'time'};

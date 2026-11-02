@@ -5,6 +5,9 @@ import { normalizeSubjectColors, subjectColorStyle } from "./subject-colors.js";
 import { parseTimeRange, timeLabelParts } from "./time-label.js";
 import { suiteFilterInfo } from "./suite-filters.js";
 import { TimetableView, weekendOffset, weekKey, rowKey } from "./timetable-view.js";
+import { normalizeCellDetails, findCellDetails } from "./cell-details.js";
+import cardBrandIcon from "./assets/icon-editor.png?inline";
+import { displaySubject, normalizeSubjectAliases } from "./subject-aliases.js";
 // Bundled Lit runtime: see THIRD_PARTY_NOTICES for its BSD-3-Clause license.
 const Q = globalThis, $t = Q.ShadowRoot && (Q.ShadyCSS === void 0 || Q.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype, vt = /* @__PURE__ */ Symbol(), Dt = /* @__PURE__ */ new WeakMap();
 let Ft = class {
@@ -747,7 +750,7 @@ function mergedCellInfo(r, t, e) {
     const info = e(rows[index], index) ?? {};
     const text = mergedCellTextKey(info.text);
     if (yt(text)) return null;
-    return JSON.stringify([text, mergedCellStyleKey(info.style), info.notes ?? [], info.subjectChanges ?? []]);
+    return JSON.stringify([text, mergedCellStyleKey(info.style), info.notes ?? [], info.subjectChanges ?? [], info.cellDetails ?? []]);
   };
   const current = signature(t);
   if (!current) return { covered: !1, span: 1 };
@@ -1085,6 +1088,7 @@ const v = (D = class extends U {
       show_week_navigation: !0,
       trim_empty_rows: !1,
       hidden_subjects: [],
+      subject_aliases: [],
       subject_colors: [],
       merge_double_lessons: !1,
       equal_column_widths: !1,
@@ -1191,6 +1195,7 @@ const v = (D = class extends U {
       show_week_navigation: t.show_week_navigation ?? e.show_week_navigation,
       trim_empty_rows: t.trim_empty_rows ?? e.trim_empty_rows,
       hidden_subjects: normalizeHiddenSubjects(t.hidden_subjects),
+      subject_aliases: normalizeSubjectAliases(t.subject_aliases),
       subject_colors: normalizeSubjectColors(t.subject_colors),
       dated_entries: Array.isArray(t.dated_entries) ? t.dated_entries : [],
       show_upcoming_notes: E(t.show_upcoming_notes, !1),
@@ -1323,6 +1328,8 @@ const v = (D = class extends U {
         return (o?.[O] ?? "").toString();
       }), _ = Array.isArray(o?.cell_styles) ? Array.from({ length: s.length }, (u, g) => De(o?.cell_styles?.[g])) : [], h = Array.isArray(o?.cell_times) ? Array.from({ length: s.length }, (u, g) => normalizeCellTime(o.cell_times[g])) : [], f = (o?.start ?? "").toString().trim() || a.start, p = (o?.end ?? "").toString().trim() || a.end, x = { time: l, start: f || void 0, end: p || void 0, cells: c };
       x.subject_changes = normalizeSubjectChanges(o?.subject_changes);
+      const details = normalizeCellDetails(o?.cell_details);
+      if (Object.keys(details).length) x.cell_details = details;
       return _.some((u) => !!u) && (x.cell_styles = _), h.some((u) => !!u) && (x.cell_times = h), x;
     });
     return n.length ? n : null;
@@ -1416,6 +1423,14 @@ const v = (D = class extends U {
     const i = (t.title_font_family ?? "").toString().trim();
     i && e.push(`font-family:${i}`);
     return e.join(";");
+  }
+  getDatedCellDetails(config, row, day, date, entries) {
+    const details = row?.cell_details?.[config.days[day]] ?? [];
+    if (!entries?.length) return details;
+    return details.map(detail => {
+      const text = applyDatedEntries(detail.text, row, day, date, entries).text;
+      return { ...detail, text, subject: text.split("\n")[0] };
+    });
   }
   getTypographyStyle(t) {
     const values = normalizeTypography(t);
@@ -1717,17 +1732,26 @@ const v = (D = class extends U {
     if (i instanceof Date && this.hasTimetableView(t)) {
       const data = this._timetable?.data;
       const rows = data?.loaded_days?.includes(dateKey(i)) ? this.buildRowsFromArray(t, data.weeks[weekKey(i)] ?? []) ?? [] : [];
-      return rows.find(row => rowKey(row) === rowKey(e)) ?? { ...e, cells: [], cell_styles: [], cell_times: [], subject_changes: {} };
+      return rows.find(row => rowKey(row) === rowKey(e)) ?? { ...e, cells: [], cell_styles: [], cell_times: [], subject_changes: {}, cell_details: {} };
     }
     if (i instanceof Date && this.timetableEntity(t)) {
       const dates = this.getHeaderDaysFromEntity(t);
       if (dates && !dates.some(day => dateKey(day) === dateKey(i)))
-        return { ...e, cells: [], cell_styles: [], cell_times: [], subject_changes: {} };
+        return { ...e, cells: [], cell_styles: [], cell_times: [], subject_changes: {}, cell_details: {} };
     }
     if ((t.source_type ?? "manual") !== "manual" || t.week_mode !== "kw_parity" || !(i instanceof Date)) return e;
     const n = this.weekFromParityAtDate(t, i), o = n === "B" && Array.isArray(t.rows_b) && t.rows_b.length ? t.rows_b : t.rows ?? [];
     const l = (e?.time ?? "").toString(), a = o.find((c) => ct(c) === ct(e) && (c?.time ?? "").toString() === l);
     return a ?? o[s] ?? e;
+  }
+  emptyTimetableMessage(config) {
+    const dates = this.getHolidayDates(config).filter(Boolean);
+    const warning = this.viewWarning(config, dates);
+    if (warning) return warning;
+    if (!dates.length) return "Keine Unterrichtseinträge für diese Ansicht verfügbar.";
+    return (this._uiViewMode ?? config.view_mode) === "rolling"
+      ? "Kein Unterricht im angezeigten Zeitraum."
+      : "Kein Unterricht in dieser Woche.";
   }
   recomputeRows() {
     if (!this.config) {
@@ -1739,7 +1763,7 @@ const v = (D = class extends U {
       this._noData = !1, this._noDataMsg = "";
       return;
     }
-    const i = this.hasTimetableView(t) ? "Keine Unterrichtseinträge für diese Ansicht verfügbar." : "Keine Daten für diesen Zeitraum (Ferien/Feiertag).";
+    const i = this.hasTimetableView(t) ? this.emptyTimetableMessage(t) : "Keine Daten für diesen Zeitraum (Ferien/Feiertag).";
     !s || s.length === 0 ? (this._noData = !0, e === "json" && this._jsonStatus === "error" ? this._noDataMsg = `JSON: ${this._jsonError || i}` : e === "json" && this._jsonStatus === "loading" ? this._noDataMsg = "JSON wird geladen…" : this._noDataMsg = i) : (this._noData = !1, this._noDataMsg = "");
   }
   // Parse to Fach (bold) + Raum + Lehrer + Info/Notes
@@ -1809,7 +1833,7 @@ const v = (D = class extends U {
     const p = s.slice(1).filter((u) => o(u));
     return { fach: n, raum: _, lehrer: h, notes: p.length ? p : void 0 };
   }
-  renderCell(t, e, cellOverride = false, currentColor = "", subjectChanges = []) {
+  renderCell(t, e, cellOverride = false, currentColor = "", subjectChanges = [], cellDetails = []) {
     const raw = (t ?? "").toString();
     const filtered0 = this.filterCellText(raw, e);
     if (yt(filtered0)) return d``;
@@ -1871,9 +1895,17 @@ const v = (D = class extends U {
 
     // Multi-Block (z.B. geteilte Gruppen nebeneinander): entweder durch Leerzeile getrennt
     // oder als 3er-Gruppen (Fach / Raum / Lehrer) hintereinander.
-    const renderDetails = (val: string) => {
+    const renderDetails = (val: string, explicit = null) => {
       const v = (val ?? "").toString().trim();
       if (!v) return d``;
+      const detail = explicit ?? findCellDetails(v, cellDetails);
+      if (detail) return d`<div class="cellWrap">
+        <div class="fach">${displaySubject(detail.subject, e.subject_aliases)}</div>
+        ${detail.teachers.map(value => d`<div class="lehrer">${value}</div>`)}
+        ${detail.rooms.map(value => d`<div class="raum">${value}</div>`)}
+        ${detail.notes.length ? d`<div class="notes">${detail.notes.map(line =>
+          d`<div class=${noteClass(line)}><span class="txt">${noteText(line) || line}</span></div>`)}</div>` : d``}
+      </div>`;
 
       // Erst normal versuchen (Fach + Lehrer + Raum + Notes)
       const p = this.parseCellTriplet(v);
@@ -1883,7 +1915,7 @@ const v = (D = class extends U {
           line && line !== p.raum && line !== p.lehrer);
         return d`
           <div class="cellWrap">
-            <div class="fach">${p.fach}</div>
+            <div class="fach">${displaySubject(p.fach, e.subject_aliases)}</div>
             <div class="lehrer">${p.lehrer}</div>
             <div class="raum">${p.raum}</div>
 
@@ -1910,7 +1942,7 @@ const v = (D = class extends U {
       if (head && rest.length) {
         return d`
           <div class="cellWrap">
-            <div class="fach">${head}</div>
+            <div class="fach">${displaySubject(head, e.subject_aliases)}</div>
             <div class="notes">
               ${rest.map((line) => {
                 const cls = noteClass(line);
@@ -1922,15 +1954,16 @@ const v = (D = class extends U {
         `;
       }
 
-      return d`<span class="cellText">${v}</span>`;
+      return d`<span class="cellText">${displaySubject(v, e.subject_aliases)}</span>`;
     };
 
     const renderOne = (part) => {
       const matches = subjectChanges.filter(change =>
         mergedCellTextKey(change.current) === mergedCellTextKey(part));
       if (matches.length !== 1) return renderDetails(part);
+      const originalDetail = findCellDetails(part, cellDetails)?.original;
       return d`<div class="subjectChange" role="group" aria-label="Fachwechsel">
-        <div class="subjectChangeOriginal"><div class="subjectChangeLabel">Bisher</div>${renderDetails(matches[0].original)}</div>
+        <div class="subjectChangeOriginal"><div class="subjectChangeLabel">Bisher</div>${renderDetails(matches[0].original, originalDetail?.text === matches[0].original ? originalDetail : null)}</div>
         <div><div class="subjectChangeLabel">Jetzt</div>${renderDetails(part)}</div>
       </div>`;
     };
@@ -1941,6 +1974,7 @@ const v = (D = class extends U {
     if (partsByBlank.length > 1) {
       return d`<div class="cellMulti">${partsByBlank.map(renderColoredBlock)}</div>`;
     }
+    if (findCellDetails(filtered, cellDetails)) return renderOne(filtered);
     // Explicit source metadata takes precedence over the legacy line-count heuristic.
     if (subjectChanges.some(change => mergedCellTextKey(change.current) === mergedCellTextKey(filtered))) {
       return renderOne(filtered);
@@ -2111,7 +2145,8 @@ const v = (D = class extends U {
           const resolved = this.getManualRowForDate(t, candidate, candidateIndex, columnDates?.[P]);
           const cell = this.getDatedCell(t, resolved ?? candidate, orig, dateForColumn(P), dated.entries);
           return { text: cell.text, notes: cell.notes, style: (resolved?.cell_styles ?? candidate?.cell_styles ?? [])[orig] ?? null,
-            subjectChanges: (resolved ?? candidate)?.subject_changes?.[t.days[orig]] ?? [] };
+            subjectChanges: (resolved ?? candidate)?.subject_changes?.[t.days[orig]] ?? [],
+            cellDetails: this.getDatedCellDetails(t, resolved ?? candidate, orig, dateForColumn(P), dated.entries) };
         }) : { covered: !1, span: 1 };
         if (merge.covered) return f;
         const subjectStyle = /\n\s*\n/.test(F) ? "" : subjectColorStyle(F, t.subject_colors);
@@ -2124,7 +2159,7 @@ const v = (D = class extends U {
           return !!start && !!end && this.isNowBetween(start, end);
         })(), cellCurrent = isToday && (w || mergedCurrent);
         const currentColor = pt && se && cellCurrent && t.highlight_current_text && l && s >= 0 && orig === s ? l : "";
-        return currentColor && (Ct += `color:${currentColor};`), d`<td class=${G} style=${Ct} rowspan=${merge.span} @mouseenter=${event => this.updatePreviewTooltip(t, event)} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, orig, dateForColumn(P), merge.span)}>${this.renderCell(F, t, !!I, currentColor, (rowForDay ?? m)?.subject_changes?.[t.days[orig]] ?? [])}${datedCell.notes.map(note => d`<div class="datedNote" style=${datedNoteStyle(note)}
+        return currentColor && (Ct += `color:${currentColor};`), d`<td class=${G} style=${Ct} rowspan=${merge.span} @mouseenter=${event => this.updatePreviewTooltip(t, event)} @click=${(event) => this.handlePreviewCell(t, event, rowIndex, orig, dateForColumn(P), merge.span)}>${this.renderCell(F, t, !!I, currentColor, (rowForDay ?? m)?.subject_changes?.[t.days[orig]] ?? [], this.getDatedCellDetails(t, rowForDay ?? m, orig, dateForColumn(P), dated.entries))}${datedCell.notes.map(note => d`<div class="datedNote" style=${datedNoteStyle(note)}
           title=${cardEditDialog(this) ? "Hinweis bearbeiten" : f}
           role=${cardEditDialog(this) ? "button" : f} tabindex=${cardEditDialog(this) ? "0" : f}
           @click=${event => this.handlePreviewNote(t, event, rowForDay ?? m, orig, dateForColumn(P), note)}
@@ -2872,6 +2907,7 @@ const ut = class ut extends U {
       sources: ["Woher dein Stundenplan kommt.", "M4 4h16v5H4zM4 15h16v5H4zM8 9v6M16 9v6"],
       manual: ["Fächer, Zeiten und Pausen selbst eintragen.", "M4 4h16v16H4zM4 9h16M9 4v16M9 14h11"],
       filters: ["Fächer/Angebote gezielt ausblenden.", "M3 4h18l-7 8v7l-4 2v-9z"],
+      aliases: ["Fachkürzel dauerhaft durch eigene Namen ersetzen.", "M4 20l5-1 11-11-4-4L5 15zM13 7l4 4"],
       dates: ["Klassenarbeiten und Erinnerungen nach Datum und Stunde.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M8 15h8M12 12v6"],
       holidays: ["Ferien aus einem Kalender im Stundenplan kennzeichnen.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M8 15l3 3 5-5"],
       replacements: ["Fächer an ausgewählten Tagen ersetzen, z. B. Schwimmen durch Sport.", "M4 7h14l-3-3M20 17H6l3 3M18 7l-3 3M6 17l3-3"],
@@ -2915,6 +2951,29 @@ const ut = class ut extends U {
       }
     }
     return normalizeHiddenSubjects(labels).sort((a, b) => a.localeCompare(b, "de"));
+  }
+  renderSubjectAliases() {
+    const title = "Fächer umbenennen";
+    if (!this._open.aliases) return this.renderSection(title, "aliases", f);
+    const rules = this._config.subject_aliases ?? [];
+    return this.renderSection(title, "aliases", d`<div class="datedFields">
+      <div class="hint">Gilt für jede Woche in dieser Karte. Datenquelle, Filter und Fachfarben verwenden weiterhin das ursprüngliche Kürzel.</div>
+      ${rules.map(rule => d`<div class="aliasRule"><span>${rule.subject} → ${rule.name}</span>
+        <button type="button" class="datedRemove" aria-label=${"Umbenennung entfernen: " + rule.subject}
+          @click=${() => this.setValue("subject_aliases", rules.filter(item => item !== rule))}>×</button></div>`)}
+      <form class="datedFields" @submit=${event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const subject = form.elements.subject.value.trim(), name = form.elements.alias.value.trim();
+        if (!subject || !name) return;
+        this.setValue("subject_aliases", normalizeSubjectAliases([...rules, {subject, name}]));
+        form.reset();
+      }}>
+        <datalist id="alias-subjects">${this.getFilterSubjects().map(subject => d`<option value=${subject}></option>`)}</datalist>
+        <label>Fach / Kürzel<input required name="subject" list="alias-subjects" placeholder="z. B. BSS"></label>
+        <label>Anzeigen als<input required name="alias" placeholder="z. B. Sport"></label>
+        <button type="submit" class="spBtn">Zuordnung übernehmen</button>
+      </form></div>`);
   }
   renderFilterSettings() {
     if (!this._open.filters) return this.renderSection("Inhalte filtern", "filters", f);
@@ -3808,6 +3867,7 @@ placeholder="sensor.stundenplan"
     const t = this._config;
     return d`
       <div class="wrap">
+        <div class="editorBrand"><img src=${cardBrandIcon} alt="" width="32" height="32"><span>Stundenplan Card</span></div>
         ${this.renderSection(
       "Allgemein",
       "general",
@@ -3933,6 +3993,7 @@ placeholder="sensor.stundenplan"
         ${this.renderRollingSettings()}
         ${(t.source_type ?? "manual") === "manual" ? this.renderSection("Manueller Stundenplan", "manual", this.renderManualRows()) : f}
         ${this.renderFilterSettings()}
+        ${this.renderSubjectAliases()}
         ${this.renderDatedSettings()}
         ${this.renderHolidaySettings()}
         ${this.renderDatedSettings("replace")}
@@ -4028,6 +4089,9 @@ ut.properties = {
       display: grid;
       gap: 10px;
     }
+    .editorBrand { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 600; padding: 2px 4px 4px; }
+    .editorBrand img { display: block; flex: 0 0 auto; object-fit: contain; }
+    .aliasRule { display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .section {
       border: 1px solid var(--divider-color);
       border-radius: 12px;
@@ -4532,14 +4596,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.11.0-beta.2";
+window.__STUNDENPLAN_CARD_VERSION = "v3.11.0-beta.3";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.11.0-beta.2 (marker: STUNDENPLAN_CARD_v3.11.0-beta.2)",
+  description: "Stundenplan Card v3.11.0-beta.3 (marker: STUNDENPLAN_CARD_v3.11.0-beta.3)",
   preview: !0
 });
 export {
