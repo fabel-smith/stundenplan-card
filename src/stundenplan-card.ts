@@ -849,7 +849,7 @@ const v = (D = class extends U {
   }
   collectDatedEntries(config) {
     const result = collectEntries({ ...config, dated_entries: [...(config.dated_entries ?? []), ...(this._calendar?.entries ?? [])] }, this.hass);
-    result.warnings.push(...(this._calendar?.warnings ?? []));
+    result.warnings.push(...(this._calendar?.displayWarnings(!!cardEditDialog(this)) ?? []));
     return result;
   }
   timetableEntity(config) {
@@ -2179,7 +2179,7 @@ const v = (D = class extends U {
           </div>` : f}
           ${dated.warnings.map(warning => d`<div class="datedWarning" role="status">${warning}</div>`)}
           ${this.viewWarning(t, columnDates) ? d`<div class="datedWarning" role="status">${this.viewWarning(t, columnDates)}</div>` : f}
-          ${t.holiday_calendar_entity ? (this._holidays?.warnings ?? []).map(warning => d`<div class="datedWarning" role="status">${warning}</div>`) : f}
+          ${t.holiday_calendar_entity ? (this._holidays?.displayWarnings(true) ?? []).map(warning => d`<div class="datedWarning" role="status">${warning}</div>`) : f}
         </div>
       </ha-card>
     `;
@@ -2907,10 +2907,9 @@ const ut = class ut extends U {
       sources: ["Woher dein Stundenplan kommt.", "M4 4h16v5H4zM4 15h16v5H4zM8 9v6M16 9v6"],
       manual: ["Fächer, Zeiten und Pausen selbst eintragen.", "M4 4h16v16H4zM4 9h16M9 4v16M9 14h11"],
       filters: ["Fächer/Angebote gezielt ausblenden.", "M3 4h18l-7 8v7l-4 2v-9z"],
-      aliases: ["Fachkürzel dauerhaft durch eigene Namen ersetzen.", "M4 20l5-1 11-11-4-4L5 15zM13 7l4 4"],
       dates: ["Klassenarbeiten und Erinnerungen nach Datum und Stunde.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M8 15h8M12 12v6"],
       holidays: ["Ferien aus einem Kalender im Stundenplan kennzeichnen.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M8 15l3 3 5-5"],
-      replacements: ["Fächer an ausgewählten Tagen ersetzen, z. B. Schwimmen durch Sport.", "M4 7h14l-3-3M20 17H6l3 3M18 7l-3 3M6 17l3-3"],
+      replacements: ["Fächer dauerhaft umbenennen oder an einzelnen Tagen ersetzen.", "M4 7h14l-3-3M20 17H6l3 3M18 7l-3 3M6 17l3-3"],
       rolling: ["Ganze Woche oder ab heute: Ansicht und Zeitraum wählen.", "M4 5h16v16H4zM8 3v4M16 3v4M4 10h16M9 15h6M13 13l2 2-2 2"],
       typography: ["Textgrößen und Abstände deiner Karte.", "M3 5h12M9 5v15M6 20h6M15 12h6M18 12v8"],
       highlights: ["Heute, aktuellen Unterricht und Pausen hervorheben.", "M12 3l3 6 6 1-4 5 1 6-6-3-6 3 1-6-4-5 6-1z"],
@@ -2953,27 +2952,35 @@ const ut = class ut extends U {
     return normalizeHiddenSubjects(labels).sort((a, b) => a.localeCompare(b, "de"));
   }
   renderSubjectAliases() {
-    const title = "Fächer umbenennen";
-    if (!this._open.aliases) return this.renderSection(title, "aliases", f);
     const rules = this._config.subject_aliases ?? [];
-    return this.renderSection(title, "aliases", d`<div class="datedFields">
-      <div class="hint">Gilt für jede Woche in dieser Karte. Datenquelle, Filter und Fachfarben verwenden weiterhin das ursprüngliche Kürzel.</div>
-      ${rules.map(rule => d`<div class="aliasRule"><span>${rule.subject} → ${rule.name}</span>
+    const draft = this._aliasDraft;
+    const edit = async rule => {
+      this._aliasDraft = { original: rule?.subject, subject: rule?.subject ?? "", name: rule?.name ?? "" };
+      this.requestUpdate();
+      await this.updateComplete;
+      this.shadowRoot.querySelector('.aliasForm input')?.focus();
+    };
+    return d`<div class="datedFields">
+      <strong>Dauerhaft umbenennen</strong>
+      <div class="hint">In jeder Woche einen anderen Namen anzeigen, z. B. BSS → Sport. Filter und Fachfarben verwenden weiterhin das ursprüngliche Kürzel.</div>
+      ${rules.map(rule => d`<div class="aliasRule"><button type="button" class="spBtn" aria-label=${"Umbenennung bearbeiten: " + rule.subject} @click=${() => edit(rule)}>${rule.subject} → ${rule.name}</button>
         <button type="button" class="datedRemove" aria-label=${"Umbenennung entfernen: " + rule.subject}
-          @click=${() => this.setValue("subject_aliases", rules.filter(item => item !== rule))}>×</button></div>`)}
-      <form class="datedFields" @submit=${event => {
+          @click=${() => { if (draft?.original === rule.subject) this._aliasDraft = null; this.setValue("subject_aliases", rules.filter(item => item !== rule)); }}>×</button></div>`)}
+      ${draft ? d`<form class="datedFields aliasForm" @submit=${event => {
         event.preventDefault();
         const form = event.currentTarget;
         const subject = form.elements.subject.value.trim(), name = form.elements.alias.value.trim();
         if (!subject || !name) return;
-        this.setValue("subject_aliases", normalizeSubjectAliases([...rules, {subject, name}]));
-        form.reset();
+        this._aliasDraft = null;
+        this.setValue("subject_aliases", normalizeSubjectAliases([...rules.filter(rule => rule.subject !== draft.original), {subject, name}]));
       }}>
         <datalist id="alias-subjects">${this.getFilterSubjects().map(subject => d`<option value=${subject}></option>`)}</datalist>
-        <label>Fach / Kürzel<input required name="subject" list="alias-subjects" placeholder="z. B. BSS"></label>
-        <label>Anzeigen als<input required name="alias" placeholder="z. B. Sport"></label>
+        <label>Fach / Kürzel<input required name="subject" list="alias-subjects" placeholder="z. B. BSS" .value=${draft.subject} @input=${e => draft.subject = e.target.value}></label>
+        <label>Anzeigen als<input required name="alias" placeholder="z. B. Sport" .value=${draft.name} @input=${e => draft.name = e.target.value}></label>
         <button type="submit" class="spBtn">Zuordnung übernehmen</button>
-      </form></div>`);
+        <button type="button" class="spBtn" @click=${() => { this._aliasDraft = null; this.requestUpdate(); }}>Abbrechen</button>
+      </form>` : d`<button type="button" class="spBtn" @click=${() => edit(null)}>+ Umbenennung hinzufügen</button>`}
+    </div>`;
   }
   renderFilterSettings() {
     if (!this._open.filters) return this.renderSection("Inhalte filtern", "filters", f);
@@ -3044,7 +3051,7 @@ const ut = class ut extends U {
   }
   renderDatedSettings(action = "note") {
     const replacement = action === "replace", section = replacement ? "replacements" : "dates",
-      title = replacement ? "Fachabweichungen an bestimmten Tagen" : "Termine und Hinweise eintragen";
+      title = replacement ? "Fachnamen & Abweichungen" : "Termine und Hinweise eintragen";
     if (!this._open[section]) return this.renderSection(title, section, f);
     const config = this._config, entries = config.dated_entries ?? [];
     const visibleEntries = entries.map((raw, index) => ({ raw, index })).filter(({ raw }) => (raw?.action === "replace") === replacement);
@@ -3106,6 +3113,7 @@ const ut = class ut extends U {
         </details>`;
     };
     return this.renderSection(title, section, d`
+      ${replacement ? d`${this.renderSubjectAliases()}<hr><strong>An bestimmten Tagen ersetzen</strong>` : f}
       ${!replacement ? d`<div class="datedFields">
         ${this.isHaEntityPickerAvailable() ? d`<ha-entity-picker
           .hass=${this.hass} .value=${config.calendar_entity ?? ""} .includeDomains=${["calendar"]}
@@ -3116,7 +3124,7 @@ const ut = class ut extends U {
           <option value="">Kein Kalender</option>
           ${Object.keys(this.hass?.states ?? {}).filter(id => id.startsWith("calendar.")).sort().map(id => d`<option value=${id} ?selected=${config.calendar_entity === id}>${this.hass.states[id].attributes?.friendly_name ?? id}</option>`)}
         </select></label>`}
-        <div class="hint">Ganztägige Einzeltermine im Kalender anlegen, z. B. „Mathearbeit [3,4]“ für die 3. und 4. Stunde oder „Pasta [Essen]“ für die Zeile „Essen“ in der Stundenspalte. Die nächsten 60 Tage werden alle 5 Minuten geladen, auch ohne vorliegenden Stundenplan. Kein zusätzlicher Sensor nötig. Termine bitte im Kalender bearbeiten.</div>
+        <div class="hint">Ganztägige Einzeltermine im Kalender anlegen, z. B. „Mathearbeit [3,4]“ oder „Pasta [Essen]“. Andere Termine bleiben im Kalender. Nur die Editorvorschau zeigt, wie viele übersprungen wurden. Die Karte prüft die nächsten 60 Tage alle 5 Minuten.</div>
       </div>` : f}
       ${!replacement ? d`${this.renderToggle("show_upcoming_notes", "Anstehende Termine unter der Tabelle anzeigen")}
         <div class="hint">Standardmäßig aus. Hinweise in den Unterrichtsstunden bleiben sichtbar; gespeicherte Termine werden nicht gelöscht.</div>` : f}
@@ -3993,10 +4001,9 @@ placeholder="sensor.stundenplan"
         ${this.renderRollingSettings()}
         ${(t.source_type ?? "manual") === "manual" ? this.renderSection("Manueller Stundenplan", "manual", this.renderManualRows()) : f}
         ${this.renderFilterSettings()}
-        ${this.renderSubjectAliases()}
+        ${this.renderDatedSettings("replace")}
         ${this.renderDatedSettings()}
         ${this.renderHolidaySettings()}
-        ${this.renderDatedSettings("replace")}
 
         ${this.renderSection("Schrift & Abstände", "typography", d`
           <div class="hint">Alle Größen in Pixeln. Leere Felder verwenden die bisherigen Vorgaben der normalen oder kompakten Ansicht.</div>
@@ -4092,6 +4099,7 @@ ut.properties = {
     .editorBrand { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 600; padding: 2px 4px 4px; }
     .editorBrand img { display: block; flex: 0 0 auto; object-fit: contain; }
     .aliasRule { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .aliasRule .datedRemove { position:static; transform:none; flex:none; }
     .section {
       border: 1px solid var(--divider-color);
       border-radius: 12px;
@@ -4596,14 +4604,14 @@ $([
 ], ht.prototype, "_open", 2);
 customElements.get("stundenplan-card") || customElements.define("stundenplan-card", Xt);
 customElements.get("stundenplan-card-editor") || customElements.define("stundenplan-card-editor", ht);
-window.__STUNDENPLAN_CARD_VERSION = "v3.11.0-beta.3";
+window.__STUNDENPLAN_CARD_VERSION = "v3.11.0";
 console.info("Stundenplan Card loaded:", window.__STUNDENPLAN_CARD_VERSION);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "stundenplan-card",
   name: "Stundenplan Card",
-  description: "Stundenplan Card v3.11.0-beta.3 (marker: STUNDENPLAN_CARD_v3.11.0-beta.3)",
+  description: "Stundenplan Card v3.11.0 (marker: STUNDENPLAN_CARD_v3.11.0)",
   preview: !0
 });
 export {

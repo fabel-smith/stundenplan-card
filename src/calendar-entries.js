@@ -45,9 +45,10 @@ export class CalendarSource {
     this.messages = options.messages ?? {
       unavailable: 'Kalender nicht verfügbar; Kalendertermine werden nicht angezeigt.',
       failed: 'Kalender konnte nicht geladen werden. Erneuter Versuch in einer Minute; manuelle Termine bleiben erhalten.',
-      ignored: count => `${count} Kalendertermine ohne unterstützte Tages-/Stundenangabe übersprungen.`
+      ignored: count => `${count} ${count === 1 ? 'Kalendertermin' : 'Kalendertermine'} ohne unterstützte Tages-/Stundenangabe übersprungen.`
     };
     this.entries = [];
+    this.ignored = 0;
     this.warnings = [];
     this.generation = 0;
     this.key = '';
@@ -60,7 +61,12 @@ export class CalendarSource {
     this.unavailable = false;
     this.next = 0;
     this.entries = [];
+    this.ignored = 0;
     this.warnings = [];
+  }
+  displayWarnings(includeSkipped) {
+    return includeSkipped && this.ignored
+      ? [...this.warnings, this.messages.ignored(this.ignored)] : this.warnings;
   }
   async update(hass, entity, now = new Date(), range = calendarRange(now)) {
     const key = entity ? `${entity}|${range.first}|${range.last}` : '';
@@ -93,11 +99,13 @@ export class CalendarSource {
       if (generation !== this.generation) return;
       const result = this.parse(events, range);
       this.entries = result.entries;
-      this.warnings = result.ignored ? [this.messages.ignored(result.ignored)] : [];
+      this.ignored = result.ignored;
+      this.warnings = [];
       this.next = now.getTime() + 5 * 60000;
     } catch {
       if (generation !== this.generation) return;
       this.entries = [];
+      this.ignored = 0;
       this.warnings = [this.messages.failed];
       this.next = now.getTime() + 60000;
     } finally {

@@ -185,7 +185,7 @@ customElements.define('ha-card',HaCard);
   assert.equal(await page.evaluate(()=>document.createElement('stundenplan-card-editor')._open.rolling),false);
   await page.evaluate(async()=>{editor.setConfig(window.originalRollingConfig);await editor.updateComplete;});
   assert.deepEqual(await page.locator('.sectionTitle').allTextContents(),
-    ['Allgemein','Datenquellen','Ansicht & Rolling','Manueller Stundenplan','Inhalte filtern','Fächer umbenennen','Termine und Hinweise eintragen','Ferien','Fachabweichungen an bestimmten Tagen','Schrift & Abstände','Highlights','Farben','Hintergründe & Linien']);
+    ['Allgemein','Datenquellen','Ansicht & Rolling','Manueller Stundenplan','Inhalte filtern','Fachnamen & Abweichungen','Termine und Hinweise eintragen','Ferien','Schrift & Abstände','Highlights','Farben','Hintergründe & Linien']);
   const sectionCount = await page.locator('.sectionTitle').count();
   assert.equal(await page.locator('.sectionDescription').count(),sectionCount);
   assert.equal(await page.locator('.sectionIcon path').count(),sectionCount);

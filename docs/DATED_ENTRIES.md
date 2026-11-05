@@ -4,7 +4,7 @@ Verfuegbar ab v3.9.0.
 
 Im Karteneditor gibt es zwei unabhaengig aufklappbare Bereiche:
 **Termine und Hinweise eintragen** fuer Diktate, Klassenarbeiten und Erinnerungen sowie
-**Fachabweichungen an bestimmten Tagen** zum Ersetzen eines Fachnamens.
+**Fachnamen & Abweichungen** mit den Abschnitten **Dauerhaft umbenennen** (ohne Datum) und **An bestimmten Tagen ersetzen**.
 Bestehende Karten bleiben ohne neue Eintraege unveraendert. Die Funktion
 arbeitet mit manuellen Plaenen, JSON-Sensoren, bestehenden JSON-Dateiquellen
 und der Stundenplan Suite. Eine Aenderung an der Suite ist nicht erforderlich.
@@ -58,7 +58,7 @@ Aeltere Hinweise ohne `match: period` behalten ihre bisherige Fachzuordnung.
 Unter **Bisherige Fachzuordnung** kann sie bearbeitet oder nach Eingabe von Stunden
 ausdruecklich mit **Auf Datum und Stunde umstellen** entfernt werden.
 
-Unter **Fachabweichungen an bestimmten Tagen** bleibt das urspruengliche Fach
+Unter **Fachnamen & Abweichungen > An bestimmten Tagen ersetzen** bleibt das urspruengliche Fach
 erforderlich, z. B. `BSC` fuer einen Wechsel zu `Schwimmen`. Die Stunden sind dort
 optional: Leer bedeutet alle passenden Fachstunden am Datum. Gross-/Kleinschreibung
 ist unerheblich; Fachnamen muessen ansonsten vollstaendig stimmen.

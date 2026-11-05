@@ -223,6 +223,16 @@ module.exports = async function testDatedEntries(browser, url) {
     assert.equal(await section.getByText('Anstehende Termine unter der Tabelle anzeigen',{exact:true}).evaluate(el=>el.parentElement.querySelector('ha-switch').checked),true);
     assert((await section.textContent()).includes('Klicke auf „+ Termin hinzufügen“ oder auf ein Fach in der Vorschau'));
     assert((await replacements.textContent()).includes('Wähle die Tage'));
+    assert.equal(await replacements.getByLabel('Anzeigen als').count(),0);
+    await replacements.getByRole('button',{name:'+ Umbenennung hinzufügen'}).click();
+    await replacements.getByLabel('Fach / Kürzel').fill('BSS');
+    await replacements.getByLabel('Anzeigen als').fill('Sport');
+    await replacements.getByRole('button',{name:'Zuordnung übernehmen'}).click();
+    await replacements.getByRole('button',{name:'Umbenennung bearbeiten: BSS'}).click();
+    assert.equal(await replacements.getByLabel('Anzeigen als').inputValue(),'Sport');
+    await replacements.getByLabel('Anzeigen als').fill('Test');
+    await replacements.getByRole('button',{name:'Abbrechen'}).click();
+    assert.deepEqual(await page.evaluate(()=>editor._config.subject_aliases),[{subject:'BSS',name:'Sport'}]);
     await section.getByRole('button',{name:'+ Termin hinzufügen',exact:true}).click();
     for(let click=0;click<3;click++) {
       await replacements.getByRole('button',{name:'+ Abweichung hinzufügen',exact:true}).click();

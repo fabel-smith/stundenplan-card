@@ -15,7 +15,8 @@ module.exports = async function(browser, url) {
           {time:'Essen',cells:['','','','','','','']}],
         calendar_entity: 'calendar.test', dated_entries: [{date:day(0),match:'period',periods:[3],text:'Local note'}] };
       const events = [{summary:'Calendar note [3]',start:{date:day(0)},end:{date:day(1)}},
-        {summary:'Pasta [Essen]',start:{date:day(0)},end:{date:day(1)}}];
+        {summary:'Pasta [Essen]',start:{date:day(0)},end:{date:day(1)}},
+        {summary:'Schulfest',start:{date:day(0)},end:{date:day(1)}}];
       let calls = 0;
       const hass = {states:{'calendar.test':{state:'off',attributes:{friendly_name:'Test calendar'}}},
         callApi: async () => {calls++; return events;}};
@@ -26,6 +27,13 @@ module.exports = async function(browser, url) {
       const namedRow = [...card.shadowRoot.querySelectorAll('tr')].find(row => row.textContent.includes('Essen'))?.textContent;
       for(let i=0;i<5;i++){card.hass = {...hass};await card.updateComplete;}
       const count = calls;
+      const dialog = document.createElement('hui-dialog-edit-card');
+      const preview = document.createElement('stundenplan-card');
+      preview.setConfig(config); preview.hass = hass;
+      dialog.append(preview); document.body.append(dialog);
+      await preview.updateComplete; await new Promise(resolve => setTimeout(resolve,10)); await preview.updateComplete;
+      const previewText = preview.shadowRoot.textContent;
+      dialog.remove();
       card.setConfig({...config,calendar_entity:''});await card.updateComplete;await card.updateComplete;
       const cleared = card.shadowRoot.textContent;
       card.setConfig(config);await card.updateComplete;await new Promise(resolve => setTimeout(resolve,10));await card.updateComplete;
@@ -39,9 +47,14 @@ module.exports = async function(browser, url) {
       const select = editor.shadowRoot.querySelector('select[aria-label="Kalender für Termine (optional)"]');
       const selected = select.value;
       select.value='';select.dispatchEvent(new Event('change',{bubbles:true}));await editor.updateComplete;
-      return {loaded,namedRow,cleared,unavailable,count,selected,changed};
+      card.hass = {...hass,callApi:async()=>{throw Error('offline')}};
+      await card.updateComplete;await new Promise(resolve=>setTimeout(resolve,10));await card.updateComplete;
+      return {loaded,previewText,namedRow,cleared,unavailable,failed:card.shadowRoot.textContent,count,selected,changed};
     });
     assert(result.loaded.includes('Calendar note') && result.loaded.includes('Local note'));
+    assert(!result.loaded.includes('übersprungen'));
+    assert(result.previewText.includes('1 Kalendertermin ohne unterstützte Tages-/Stundenangabe übersprungen.'));
+    assert(result.failed.includes('Kalender konnte nicht geladen werden') && !result.failed.includes('übersprungen'));
     assert(result.namedRow?.includes('Pasta'), 'Named calendar note appears in its empty named row');
     assert(!result.cleared.includes('Pasta') && !result.unavailable.includes('Pasta'));
     assert.equal(result.count,1);
